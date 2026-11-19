@@ -219,7 +219,10 @@
 
     const dayW = 50;
     const cols = [80, 64, 170, 80, 92, 168, 64, 64];
-    $('#sheet').style.width = cols.reduce((a, b) => a + b, 0) + days.length * dayW + 120 + 'px'; // 표가 화면에 맞춰 줄어들지 않게 고정
+    const tableW = cols.reduce((a, b) => a + b, 0) + days.length * dayW + 120;
+    $('#sheet').style.width = tableW + 'px'; // 표가 화면에 맞춰 줄어들지 않게 고정
+    $('#sheetTitle').style.width = tableW + 'px'; // 제목은 표 가운데에
+    $('#pageFoot').style.width = tableW + 'px';
     let h = '<colgroup>' + cols.map((w) => `<col style="width:${w}px">`).join('') + days.map(() => `<col style="width:${dayW}px">`).join('') + '<col style="width:120px"></colgroup>';
 
     // 헤더 3줄

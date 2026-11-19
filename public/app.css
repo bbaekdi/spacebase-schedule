@@ -155,3 +155,10 @@ body.printing .sheet td.d.sel, body.printing .sheet td.d.sel-multi { box-shadow:
 @media (max-width: 700px) {
   .weeklabel { display: block; width: 100%; margin: 4px 0 0; }
 }
+
+/* 엑셀 머리글/바닥글 (제목, 회사명) */
+.sheet-title { text-align: center; padding: 14px 0 26px; }
+.sheet-title .t1 { font-size: 22px; font-weight: 800; letter-spacing: .5px; }
+.sheet-title .t2 { font-size: 13px; margin-top: 4px; }
+.page-foot { display: flex; justify-content: space-between; margin: 34px 0 0 80px; font-size: 11px; color: #000; }
+body.printing .page-foot { margin-left: 0; }
