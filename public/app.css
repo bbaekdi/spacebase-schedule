@@ -44,7 +44,7 @@ button { font-family: inherit; font-size: inherit; }
 .sheet td, .sheet th { border: 1px solid var(--grid); padding: 0; height: var(--row-h); white-space: nowrap; text-align: center; vertical-align: middle; }
 .sheet th { background: var(--head); font-weight: 700; }
 .sheet th.day { background: var(--dayhead); font-weight: 700; }
-.sheet th.day.today { color: var(--red); }
+.sheet th.day.red { color: var(--red); }
 .sheet th.month { background: var(--dayhead); }
 .sheet th.note-h { background: var(--head); font-weight: 400; }
 .sheet tr.head-1 th { height: 26px; }

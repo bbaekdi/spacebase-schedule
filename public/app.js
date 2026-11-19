@@ -51,6 +51,10 @@
     return Number(String(v).replace(/,/g, '')).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' PY';
   }
 
+  // 일요일과 공휴일은 빨간 글자 (토요일은 검은 글자)
+  function holName(d) { return (window.SB_HOLIDAYS || {})[ymd(d)] || ''; }
+  function redDay(d) { return d.getDay() === 0 || !!holName(d); }
+
   // ---------- 연결 ----------
   // ---------- 클라우드(Firebase) 방식 ----------
   // FIREBASE_CONFIG 가 있으면 회사 서버 없이 Firebase 실시간 데이터베이스에 바로 저장한다.
@@ -346,7 +350,6 @@
     const keep = ae && ae.dataset && ae.dataset.key ? { key: ae.dataset.key, val: ae.value, s: ae.selectionStart, e: ae.selectionEnd } : null;
 
     days = Array.from({ length: 21 }, (_, i) => addDays(focusMonday, i - 7));
-    const today = ymd(new Date());
     $('#weekLabel').textContent = weekLabel(focusMonday);
 
     const dayW = 50;
@@ -368,9 +371,9 @@
     h += '<th rowspan="3" colspan="2">구&nbsp;&nbsp;&nbsp;분</th><th rowspan="3">PROJECT</th><th rowspan="3">면적<br>(py)</th><th rowspan="3">공사금액<br>(천원)</th><th rowspan="3">공사기간/진행업무<br>(예정)</th><th colspan="2">담 당 자</th>';
     h += months.map((x) => `<th class="month" colspan="${x.n}">${x.m}월</th>`).join('');
     h += '<th class="note-h">NOTE</th></tr><tr><th>설계</th><th>공사</th>';
-    h += days.map((d) => `<th class="day${ymd(d) === today ? ' today' : ''}">${d.getDate()}</th>`).join('');
+    h += days.map((d) => `<th class="day${redDay(d) ? ' red' : ''}"${holName(d) ? ` title="${holName(d)}"` : ''}>${d.getDate()}</th>`).join('');
     h += '<th class="note-h" rowspan="2"></th></tr><tr><th>M/S</th><th>M/S</th>';
-    h += days.map((d) => `<th class="day${ymd(d) === today ? ' today' : ''}">${WD[d.getDay()]}</th>`).join('');
+    h += days.map((d) => `<th class="day${redDay(d) ? ' red' : ''}"${holName(d) ? ` title="${holName(d)}"` : ''}>${WD[d.getDay()]}</th>`).join('');
     h += '</tr></thead><tbody>';
     const spacer = `<tr class="spacer"><td colspan="${8 + days.length}"></td><td class="keep"></td></tr>`;
     h += spacer;
@@ -398,7 +401,7 @@
         const cells = dateKeys.map((k) => db.cells[p.id + '|' + k] || {});
         cells.forEach((cell, c) => {
           const d = days[c];
-          const we = d.getDay() === 0 || d.getDay() === 6;
+          const we = d.getDay() === 0 || d.getDay() === 6 || !!holName(d);
           const cat = cell.c && catOf(cell.c);
           let style = cat ? `background:${cat.color}` : '';
           let inner = '';
