@@ -24,7 +24,12 @@ let serverOrigin = null; // 접속 중인 서버 주소 (예: http://192.168.0.1
 let redirectUri = null; // 밴드 Redirect URI (이 주소로 가는 이동을 가로챈다)
 
 if (!app.requestSingleInstanceLock()) { app.quit(); }
-app.on('second-instance', () => { if (win) { win.show(); win.focus(); } });
+app.on('second-instance', () => {
+  // 창이 이미 닫혀(파괴되어) 있으면 새로 만든다
+  if (!win || win.isDestroyed()) { if (app.isReady()) { createWindow(); boot(); } return; }
+  if (win.isMinimized()) win.restore();
+  win.show(); win.focus();
+});
 
 function loadConfig() {
   try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch { return null; }
@@ -178,7 +183,7 @@ function createTray() {
     { type: 'separator' },
     { label: '종료 (다른 사람도 접속이 끊깁니다)', click: () => { quitting = true; app.quit(); } },
   ]));
-  tray.on('click', () => { win.show(); win.focus(); });
+  tray.on('click', () => { if (win && !win.isDestroyed()) { win.show(); win.focus(); } });
 }
 
 async function boot() {
@@ -417,5 +422,5 @@ app.whenReady().then(() => {
 app.on('before-quit', () => { quitting = true; });
 app.on('window-all-closed', () => {
   const cfg = loadConfig();
-  if (!(cfg && cfg.mode === 'server' && !quitting)) app.quit();
+  if (CLOUD || !(cfg && cfg.mode === 'server' && !quitting)) app.quit();
 });
