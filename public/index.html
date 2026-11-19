@@ -20,7 +20,7 @@
     <div class="people" id="people"></div>
     <div class="menu">
       <button id="printBtn" title="인쇄">인쇄</button>
-      <a href="/api/export.json" title="전체 데이터를 파일로 받기">백업</a>
+      <a href="/api/export.json" id="backupLink" title="전체 데이터를 파일로 받기">백업</a>
       <span class="me" id="me"></span>
       <a href="/logout" id="logoutLink">로그아웃</a>
     </div>
@@ -77,6 +77,22 @@
   <div class="ctx hidden" id="ctx"></div>
   <div class="toast hidden" id="toast"></div>
 
+  <!-- 처음 한 번: 회사 비밀번호 + 이름 -->
+  <div class="gate hidden" id="gate">
+    <form class="gate-card" id="gateForm" autocomplete="off">
+      <h1>SPACEBASE SCHEDULE</h1>
+      <p>처음 한 번만 입력하면 다음부터는 바로 열려요.</p>
+      <input id="gateCode" type="password" placeholder="회사 비밀번호">
+      <input id="gateName" type="text" placeholder="이름 (예: 홍길동)" maxlength="20">
+      <div class="gate-err" id="gateErr"></div>
+      <button>시작하기</button>
+    </form>
+  </div>
+
+  <script src="vendor/firebase-app-compat.js"></script>
+  <script src="vendor/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="default-data.js"></script>
   <script src="ops.js"></script>
   <script src="app.js"></script>
 </body>

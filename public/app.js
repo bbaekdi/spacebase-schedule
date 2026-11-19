@@ -52,7 +52,132 @@
   }
 
   // ---------- 연결 ----------
+  // ---------- 클라우드(Firebase) 방식 ----------
+  // FIREBASE_CONFIG 가 있으면 회사 서버 없이 Firebase 실시간 데이터베이스에 바로 저장한다.
+  // 회사 비밀번호의 해시(64자리)가 저장 위치가 되므로, 비밀번호를 아는 사람만 같은 스케줄표를 본다.
+  const CLOUD = !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey);
+  const clientId = uid('c');
+  let fbData = null; // spaces/<key>/data
+  let fbSpace = null; // spaces/<key>
+  const ARRAY_KEYS = ['groups', 'projects', 'categories', 'teams'];
+  function getCred() { try { const c = JSON.parse(localStorage.getItem('sb_cred') || 'null'); return c && c.code && c.name ? c : null; } catch { return null; } }
+  function setCred(c) { try { localStorage.setItem('sb_cred', JSON.stringify(c)); } catch {} }
+  async function sha256hex(s) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  function toArr(v) { if (!v) return []; if (Array.isArray(v)) return v.filter((x) => x != null); return Object.keys(v).sort((a, b) => a - b).map((k) => v[k]).filter((x) => x != null); }
+  function fromFb(v) {
+    const d = Object.assign({}, v || {});
+    ARRAY_KEYS.forEach((k) => (d[k] = toArr(d[k])));
+    d.teams = [d.teams[0] || '', d.teams[1] || ''];
+    d.cells = d.cells || {};
+    d.memo = Object.assign({ left: '', right: '', etc: '' }, d.memo || {});
+    d.title = d.title || 'SPACEBASE SCHEDULE';
+    return d;
+  }
+  function toFb(d) {
+    const x = JSON.parse(JSON.stringify(d));
+    delete x.version; delete x.updatedAt; delete x.updatedBy;
+    return x;
+  }
+  let renderQueued = false;
+  function scheduleRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(() => { renderQueued = false; if (db) renderAll(); });
+  }
+  function showGate(msg) {
+    $('#gate').classList.remove('hidden');
+    $('#gateErr').textContent = msg || '';
+    const c = getCred();
+    if (c) { $('#gateName').value = c.name; if (!$('#gateCode').value) $('#gateCode').value = c.code; }
+    setTimeout(() => ($('#gateCode').value ? $('#gateName') : $('#gateCode')).focus(), 50);
+  }
+  $('#gateForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = $('#gateCode').value.trim(), name = $('#gateName').value.trim().slice(0, 20);
+    if (code.length < 4) { $('#gateErr').textContent = '회사 비밀번호는 4자 이상이어야 해요.'; return; }
+    if (!name) { $('#gateErr').textContent = '이름을 입력해 주세요.'; return; }
+    setCred({ code, name });
+    $('#gate').classList.add('hidden');
+    if (fbData) return location.reload(); // 이미 연결된 상태에서 이름/비밀번호를 바꾼 경우
+    connectCloud();
+  });
+  async function connectCloud() {
+    const cred = getCred();
+    if (!cred) return showGate();
+    if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+    const fdb = firebase.database();
+    const key = await sha256hex('spacebase:' + cred.code);
+    fbSpace = fdb.ref('spaces/' + key);
+    fbData = fbSpace.child('data');
+    me = { id: 'n:' + cred.name, name: cred.name };
+    $('#me').textContent = me.name + ' 님';
+    $('#logoutLink').textContent = '이름 바꾸기';
+    fdb.ref('.info/connected').on('value', (s) => setStatus(s.val() ? '실시간 연결됨' : '연결 끊김 · 다시 연결 중…', s.val() ? 'ok' : 'bad'));
+    let snap;
+    try { snap = await fbData.once('value'); } catch (e) { setStatus('연결 실패', 'bad'); showGate('저장소에 연결하지 못했어요. 인터넷 연결을 확인해 주세요. (' + e.message + ')'); return; }
+    if (!snap.exists()) {
+      // 처음 쓰는 회사 비밀번호: 이 PC에 예전(회사 PC 서버) 데이터가 있으면 그것으로, 없으면 빈 양식으로 시작
+      let legacy = null;
+      try { legacy = window.sbDesktop && window.sbDesktop.readLegacyData ? await window.sbDesktop.readLegacyData() : null; } catch {}
+      const ok = legacy || confirm('이 회사 비밀번호로 된 스케줄표가 아직 없어요.\n새 스케줄표를 만들까요?\n\n(비밀번호를 잘못 입력했다면 "취소"를 누르세요)');
+      if (!ok) { localStorage.removeItem('sb_cred'); return showGate('회사 비밀번호를 다시 확인해 주세요.'); }
+      await fbData.transaction((cur) => cur || toFb(legacy || window.SB_DEFAULT_DB));
+      if (legacy) toast('이 PC에 있던 기존 스케줄을 옮겼어요.');
+    }
+    fbData.on('value', (s) => { db = fromFb(s.val()); scheduleRender(); });
+    // 접속 중인 사람과 선택한 칸 표시
+    const pres = fbSpace.child('presence/' + clientId);
+    pres.onDisconnect().remove();
+    pres.set({ id: me.id, name: me.name, key: null });
+    fdb.ref('.info/connected').on('value', (s) => { if (s.val()) { pres.onDisconnect().remove(); pres.set({ id: me.id, name: me.name, key: lastCursor || null }); } });
+    fbSpace.child('presence').on('value', (s) => {
+      const all = s.val() || {};
+      const users = new Map();
+      for (const k in peers) delete peers[k];
+      for (const [cid, p] of Object.entries(all)) {
+        if (!p || !p.name) continue;
+        users.set(p.id, { id: p.id, name: p.name, img: '' });
+        if (cid !== clientId && p.key) peers[cid] = { name: p.name, key: p.key, color: colorFor(p.id) };
+      }
+      renderPeople([...users.values()]);
+    });
+  }
+  function cloudWrite(before, after) {
+    const up = {};
+    for (const k of ['title', ...ARRAY_KEYS, 'memo']) {
+      if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) up[k] = after[k] == null ? null : JSON.parse(JSON.stringify(after[k]));
+    }
+    const keys = new Set([...Object.keys(before.cells || {}), ...Object.keys(after.cells || {})]);
+    for (const k of keys) {
+      const a = (before.cells || {})[k], b = (after.cells || {})[k];
+      if (JSON.stringify(a) !== JSON.stringify(b)) up['cells/' + k] = b || null;
+    }
+    if (Object.keys(up).length) fbData.update(up).catch((e) => toast('저장 실패: ' + e.message));
+  }
+  function downloadBackup() {
+    const blob = new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const d = new Date();
+    a.download = `SPACEBASE-스케줄-백업-${ymd(d)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
   function connect() {
+    if (CLOUD) {
+      $('#backupLink').addEventListener('click', (e) => { e.preventDefault(); if (db) downloadBackup(); });
+      $('#logoutLink').addEventListener('click', (e) => {
+        e.preventDefault();
+        const c = getCred(); if (!c) return;
+        $('#gateCode').value = c.code;
+        showGate();
+      });
+      return connectCloud();
+    }
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${proto}://${location.host}/ws`);
     ws.onopen = () => setStatus('실시간 연결됨', 'ok');
@@ -153,6 +278,12 @@
   }, true);
 
   function rawSend(op) {
+    if (CLOUD) {
+      const before = JSON.parse(JSON.stringify(db));
+      Ops.applyOp(db, op); // 내 화면에 먼저 반영
+      cloudWrite(before, db);
+      return;
+    }
     Ops.applyOp(db, op); // 내 화면에 먼저 반영
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'op', op, id: uid('o') }));
     else pending.push(op);
@@ -177,6 +308,7 @@
     const key = sel ? `${rowList[sel.r0]}|${days[sel.c0] && ymd(days[sel.c0])}` : null;
     if (key === lastCursor) return;
     lastCursor = key;
+    if (CLOUD) { if (fbSpace) fbSpace.child('presence/' + clientId + '/key').set(key || null); return; }
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'cursor', key }));
   }
 
@@ -405,7 +537,7 @@
     t.focus();
     if (initialText != null) t.setSelectionRange(t.value.length, t.value.length); else t.select();
   }
-  function closePop() { pop.classList.add('hidden'); }
+  function closePop() { pop.classList.add('hidden'); if (document.activeElement && pop.contains(document.activeElement)) document.activeElement.blur(); }
   function savePopText() {
     if (pop.classList.contains('hidden') || !sel) return;
     const pid = rowList[sel.r0]; const date = ymd(days[sel.c0]);

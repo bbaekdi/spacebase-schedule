@@ -13,6 +13,9 @@ const APP_NAME = 'SPACEBASE 주간 스케줄';
 const UPDATE_REPO = require(path.join(__dirname, '..', 'package.json')).updateRepo; // 새 버전을 올리는 GitHub 저장소
 const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
 const ICON = path.join(__dirname, 'icon.png');
+const PUBLIC_INDEX = path.join(__dirname, '..', 'public', 'index.html');
+// public/firebase-config.js 에 Firebase 설정이 들어 있으면 "클라우드 모드": 회사 서버 없이 바로 Firebase 에 저장한다.
+const CLOUD = (() => { try { return /apiKey\s*:\s*['"][^'"]+['"]/.test(fs.readFileSync(path.join(__dirname, '..', 'public', 'firebase-config.js'), 'utf8')); } catch { return false; } })();
 
 let win = null;
 let tray = null;
@@ -45,7 +48,7 @@ function createWindow() {
     width: 1600, height: 950, title: APP_NAME, icon: ICON, show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
-  win.once('ready-to-show', () => { if (!process.argv.includes('--hidden')) win.show(); });
+  win.once('ready-to-show', () => { if (CLOUD || !process.argv.includes('--hidden')) win.show(); });
   // 네이버/밴드 로그인 화면이 일반 브라우저로 인식하도록 앱 표시를 뺀 User-Agent 사용
   const appTok = app.getName().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\/\\S+\\s?';
   win.webContents.setUserAgent(win.webContents.getUserAgent().replace(/Electron\/\S+\s?/, '').replace(new RegExp(appTok), ''));
@@ -65,12 +68,12 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 
   win.webContents.on('did-fail-load', (e, code, desc, url, isMain) => {
-    if (!isMain || code === -3) return; // -3 = 취소(가로채기)
+    if (!isMain || code === -3 || CLOUD) return; // -3 = 취소(가로채기)
     showSetup(`서버에 연결하지 못했습니다 (${desc}). 회사 PC가 켜져 있는지, 주소가 맞는지 확인해 주세요.`);
   });
 
   win.on('close', (e) => {
-    const cfg = loadConfig();
+    const cfg = CLOUD ? null : loadConfig();
     if (!quitting && cfg && cfg.mode === 'server') {
       e.preventDefault();
       win.hide();
@@ -90,10 +93,14 @@ function buildMenu() {
       submenu: [
         { label: '새로고침', accelerator: 'F5', click: () => win && win.webContents.reload() },
         { label: '인쇄 (A4)', accelerator: 'CmdOrCtrl+P', click: () => openPrintPreview() },
-        { label: '이번 주로', click: () => win && serverOrigin && win.loadURL(serverOrigin + '/') },
+        { label: '이번 주로', click: () => win && (CLOUD ? win.loadFile(PUBLIC_INDEX) : serverOrigin && win.loadURL(serverOrigin + '/')) },
         { type: 'separator' },
-        { label: '접속 설정…', click: () => showSetup() },
-        { label: '로그아웃 / 이름 바꾸기', click: () => serverOrigin && win.loadURL(serverOrigin + '/logout') },
+        ...(CLOUD ? [] : [{ label: '접속 설정…', click: () => showSetup() }]),
+        { label: CLOUD ? '이름 / 회사 비밀번호 바꾸기' : '로그아웃 / 이름 바꾸기', click: () => {
+          if (!win) return;
+          if (CLOUD) win.webContents.executeJavaScript("document.getElementById('logoutLink').click(); true").catch(() => {});
+          else if (serverOrigin) win.loadURL(serverOrigin + '/logout');
+        } },
         { type: 'separator' },
         { label: '종료', click: () => { quitting = true; app.quit(); } },
       ],
@@ -175,6 +182,11 @@ function createTray() {
 }
 
 async function boot() {
+  if (CLOUD) {
+    // 예전에 회사 PC(서버)로 쓰던 PC: 이제 서버가 필요 없으니 윈도우 시작 시 자동 실행을 끈다
+    if (process.platform === 'win32') app.setLoginItemSettings({ openAtLogin: false, args: ['--hidden'], name: 'SPACEBASE-Schedule' });
+    return win.loadFile(PUBLIC_INDEX);
+  }
   const cfg = loadConfig();
   if (!cfg) {
     // 처음 실행: 같은 사무실의 회사 서버를 자동으로 찾아 바로 로그인 화면으로
@@ -318,7 +330,9 @@ async function withFit(fn) {
   try { return await fn(wc); } finally { wc.executeJavaScript('window.__unfitPrint && window.__unfitPrint(); true').catch(() => {}); }
 }
 async function openPrintPreview() {
-  if (!win || !serverOrigin || !win.webContents.getURL().startsWith(serverOrigin)) return;
+  if (!win) return;
+  const cur = win.webContents.getURL();
+  if (CLOUD ? !cur.startsWith('file:') || !cur.includes('index.html') : !serverOrigin || !cur.startsWith(serverOrigin)) return;
   const data = await withFit((wc) => wc.printToPDF({ ...PRINT_OPTS, preferCSSPageSize: true }));
   previewPdf = path.join(app.getPath('temp'), `spacebase-schedule-${Date.now()}.pdf`);
   fs.writeFileSync(previewPdf, data);
@@ -334,6 +348,15 @@ async function openPrintPreview() {
   previewWin.show();
 }
 ipcMain.handle('print:preview', () => openPrintPreview());
+// 클라우드로 옮길 때: 이 PC가 예전에 서버(회사 PC)였다면 그 데이터를 넘겨준다
+ipcMain.handle('legacy:read', () => {
+  const cfg = loadConfig() || {};
+  const dirs = [cfg.dataDir, path.join(app.getPath('documents'), 'SPACEBASE 스케줄 데이터')].filter(Boolean);
+  for (const d of dirs) {
+    try { const db = JSON.parse(fs.readFileSync(path.join(d, 'db.json'), 'utf8')); if (db && Array.isArray(db.projects)) return db; } catch {}
+  }
+  return null;
+});
 ipcMain.handle('print:do', () => withFit((wc) => new Promise((resolve) => {
   wc.print({ ...PRINT_OPTS, silent: false }, (ok, reason) => resolve({ ok, reason }));
 })));
