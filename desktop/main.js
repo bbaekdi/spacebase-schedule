@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const dgram = require('dgram');
 
 const APP_NAME = 'SPACEBASE 주간 스케줄';
+const UPDATE_REPO = require(path.join(__dirname, '..', 'package.json')).updateRepo; // 새 버전을 올리는 GitHub 저장소
 const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
 const ICON = path.join(__dirname, 'icon.png');
 
@@ -210,8 +211,16 @@ let updating = false;
 async function checkUpdate(atStartup) {
   if (updating || !serverOrigin || !app.isPackaged || process.platform !== 'win32') return false;
   try {
-    const info = await (await fetch(serverOrigin + '/api/update-info', { signal: AbortSignal.timeout(4000) })).json();
-    if (!info.available || !newer(info.version, app.getVersion())) return false;
+    // 1) 회사 서버(PC)에 설치 파일이 있으면 거기서, 2) 없으면(NAS 서버 등) GitHub 최신 버전에서 받는다
+    let info = { available: false };
+    try { info = await (await fetch(serverOrigin + '/api/update-info', { signal: AbortSignal.timeout(4000) })).json(); } catch {}
+    let downloadUrl = serverOrigin + '/update/setup.exe';
+    if (!info.available || !newer(info.version, app.getVersion())) {
+      const gh = await latestGithubRelease();
+      if (!gh || !newer(gh.version, app.getVersion())) return false;
+      info = { version: gh.version, available: true };
+      downloadUrl = gh.url;
+    }
     if (!atStartup) {
       const r = await dialog.showMessageBox(win, { type: 'info', buttons: ['지금 업데이트', '나중에'], defaultId: 0, cancelId: 1,
         title: APP_NAME, message: `새 버전(${info.version})이 있어요.`, detail: '지금 업데이트하면 프로그램이 잠깐 꺼졌다가 다시 켜져요.' });
@@ -219,7 +228,8 @@ async function checkUpdate(atStartup) {
     }
     updating = true;
     showLoading(`새 버전(${info.version})으로 업데이트하는 중… 잠시 후 다시 켜져요.`);
-    const buf = Buffer.from(await (await fetch(serverOrigin + '/update/setup.exe')).arrayBuffer());
+    const buf = Buffer.from(await (await fetch(downloadUrl, { headers: { 'User-Agent': 'spacebase-schedule' } })).arrayBuffer());
+    if (buf.length < 10 * 1024 * 1024) throw new Error('다운로드가 완전하지 않습니다.');
     const file = path.join(app.getPath('temp'), `SPACEBASE-Schedule-Setup-${info.version}.exe`);
     fs.writeFileSync(file, buf);
     require('child_process').spawn(file, ['/S'], { detached: true, stdio: 'ignore' }).unref();
@@ -236,16 +246,22 @@ setInterval(() => { const c = loadConfig(); if (c && c.mode !== 'server') checkU
 
 // ---------- 자동 업데이트 (회사 PC) ----------
 // GitHub 에 올라온 새 버전을 확인해서 조용히 설치한다. 그러면 직원 PC들도 회사 PC를 따라 업데이트된다.
-const UPDATE_REPO = require(path.join(__dirname, '..', 'package.json')).updateRepo;
+async function latestGithubRelease() {
+  if (!UPDATE_REPO) return null;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, { headers: { 'User-Agent': 'spacebase-schedule', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15000) });
+    if (!r.ok) return null;
+    const rel = await r.json();
+    const asset = (rel.assets || []).find((a) => /\.exe$/i.test(a.name));
+    return asset ? { version: String(rel.tag_name || '').replace(/^v/, ''), url: asset.browser_download_url, size: asset.size } : null;
+  } catch { return null; }
+}
 async function checkServerUpdate() {
   if (updating || !UPDATE_REPO || !app.isPackaged || process.platform !== 'win32') return;
   try {
-    const r = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, { headers: { 'User-Agent': 'spacebase-schedule', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15000) });
-    if (!r.ok) return;
-    const rel = await r.json();
-    const ver = String(rel.tag_name || '').replace(/^v/, '');
-    const asset = (rel.assets || []).find((a) => /\.exe$/i.test(a.name));
-    if (!asset || !newer(ver, app.getVersion())) return;
+    const gh = await latestGithubRelease();
+    if (!gh || !newer(gh.version, app.getVersion())) return;
+    const ver = gh.version, asset = { browser_download_url: gh.url, size: gh.size };
     updating = true;
     const buf = Buffer.from(await (await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'spacebase-schedule' } })).arrayBuffer());
     if (buf.length < 10 * 1024 * 1024 || asset.size && buf.length !== asset.size) throw new Error('다운로드가 완전하지 않습니다.');

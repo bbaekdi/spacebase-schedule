@@ -1,3 +1,10 @@
 node_modules
 data
 .env
+dist
+.git
+.github
+build
+desktop
+*.ico
+*.png
