@@ -221,11 +221,11 @@ function newer(a, b) {
 }
 let updating = false;
 async function checkUpdate(atStartup) {
-  if (updating || !serverOrigin || !app.isPackaged || process.platform !== 'win32') return false;
+  if (updating || (!serverOrigin && !CLOUD) || !app.isPackaged || process.platform !== 'win32') return false;
   try {
     // 1) 회사 서버(PC)에 설치 파일이 있으면 거기서, 2) 없으면(NAS 서버 등) GitHub 최신 버전에서 받는다
     let info = { available: false };
-    try { info = await (await fetch(serverOrigin + '/api/update-info', { signal: AbortSignal.timeout(4000) })).json(); } catch {}
+    if (serverOrigin) try { info = await (await fetch(serverOrigin + '/api/update-info', { signal: AbortSignal.timeout(4000) })).json(); } catch {}
     let downloadUrl = serverOrigin + '/update/setup.exe';
     if (!info.available || !newer(info.version, app.getVersion())) {
       const gh = await latestGithubRelease();
@@ -254,7 +254,9 @@ async function checkUpdate(atStartup) {
     return false;
   }
 }
-setInterval(() => { const c = loadConfig(); if (c && c.mode !== 'server') checkUpdate(false); }, 30 * 60 * 1000);
+setInterval(() => { const c = loadConfig(); if (!CLOUD && c && c.mode !== 'server') checkUpdate(false); }, 30 * 60 * 1000);
+// 클라우드 모드: GitHub 에 새 버전이 올라오면 "지금 업데이트 / 나중에" 를 물어본다 (시작 20초 후, 이후 3시간마다)
+if (CLOUD) { setTimeout(() => checkUpdate(false), 20 * 1000); setInterval(() => checkUpdate(false), 3 * 60 * 60 * 1000); }
 
 // ---------- 자동 업데이트 (회사 PC) ----------
 // GitHub 에 올라온 새 버전을 확인해서 조용히 설치한다. 그러면 직원 PC들도 회사 PC를 따라 업데이트된다.
@@ -289,8 +291,8 @@ async function checkServerUpdate() {
     console.warn('회사 PC 업데이트 확인 실패:', e.message);
   }
 }
-setTimeout(() => { const c = loadConfig(); if (c && c.mode === 'server') checkServerUpdate(); }, 60 * 1000);
-setInterval(() => { const c = loadConfig(); if (c && c.mode === 'server') checkServerUpdate(); }, 60 * 60 * 1000);
+setTimeout(() => { const c = loadConfig(); if (!CLOUD && c && c.mode === 'server') checkServerUpdate(); }, 60 * 1000);
+setInterval(() => { const c = loadConfig(); if (!CLOUD && c && c.mode === 'server') checkServerUpdate(); }, 60 * 60 * 1000);
 
 // ---------- 설정 화면과 통신 ----------
 ipcMain.handle('config:get', () => {
