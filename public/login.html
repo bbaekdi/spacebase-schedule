@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로그인 · 주간 스케줄</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f3f2ee;
+    font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; color: #222; }
+  .card { background: #fff; border: 1px solid #d9d6cc; width: min(380px, calc(100vw - 32px)); padding: 36px 32px 28px; box-sizing: border-box; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: .5px; }
+  p.sub { margin: 0 0 28px; color: #666; font-size: 13px; }
+  .band { display: block; width: 100%; padding: 13px; border: 0; background: #1fbd5f; color: #fff; font-size: 15px; font-weight: 700;
+    text-align: center; text-decoration: none; cursor: pointer; font-family: inherit; }
+  .band:hover { background: #18a852; }
+  .dev { margin-top: 24px; padding-top: 18px; border-top: 1px dashed #ccc; font-size: 13px; color: #555; }
+  .dev form.nl { display: flex; flex-direction: column; gap: 8px; margin-top: 0; }
+  .dev input { padding: 10px; border: 1px solid #bbb; font: inherit; }
+  .dev button { padding: 11px 14px; border: 0; background: #217346; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+  .dev button:hover { background: #1a5d38; }
+  .errmsg { color: #c22; font-size: 13px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>SPACEBASE SCHEDULE</h1>
+    <p class="sub">주간 스케줄표에 로그인하세요.</p>
+    <a id="bandBtn" class="band hidden" href="/auth/band">네이버 밴드로 로그인</a>
+    <div id="dev" class="dev hidden" style="border:0;margin-top:0;padding-top:0">
+      <form method="post" action="/auth/dev" class="nl">
+        <input name="name" placeholder="이름 (예: 홍길동)" maxlength="20" required autofocus>
+        <input name="code" id="code" type="password" placeholder="회사 비밀번호" class="hidden">
+        <div id="errmsg" class="errmsg hidden"></div>
+        <button>들어가기</button>
+      </form>
+    </div>
+  </div>
+<script>
+fetch('/api/auth-config').then(r => r.json()).then(c => {
+  const q = new URLSearchParams(location.search);
+  // 밴드 로그인이 설정돼 있으면 바로 네이버 밴드 로그인으로 이동 (로그아웃 직후는 제외)
+  if (c.band && !q.has('out')) { document.querySelector('.sub').textContent = '네이버 밴드 로그인으로 이동하는 중…'; location.replace('/auth/band'); return; }
+  if (c.band) document.getElementById('bandBtn').classList.remove('hidden');
+  if (c.dev) document.getElementById('dev').classList.remove('hidden');
+  if (c.dev && !c.needCode) { document.querySelector('.sub').textContent = '처음 한 번만 이름을 입력해 주세요. 다음부터는 바로 열려요.'; document.querySelector('.dev button').textContent = '시작하기'; }
+  if (c.needCode) { const i = document.getElementById('code'); i.classList.remove('hidden'); i.required = true; }
+  const err = q.get('err'), em = document.getElementById('errmsg');
+  if (err) { em.textContent = err === 'locked' ? '비밀번호를 여러 번 틀렸습니다. 10분 뒤에 다시 시도해 주세요.' : '회사 비밀번호가 맞지 않습니다.'; em.classList.remove('hidden'); }
+});
+</script>
+</body>
+</html>

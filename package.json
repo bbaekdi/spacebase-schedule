@@ -1,0 +1,67 @@
+{
+  "name": "spacebase-weekly-schedule",
+  "version": "1.0.6",
+  "private": true,
+  "description": "SPACEBASE 주간 스케줄 (엑셀 대체, 실시간 공유, 네이버 밴드 로그인)",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "app": "electron .",
+    "dist:win": "electron-builder --win dir --x64 && node build/seticon.mjs dist/win-unpacked/SPACEBASE-Schedule.exe build-icon.ico 1.0.6 && makensis build/installer.nsi",
+    "dist:mac": "electron-builder --mac dmg"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "resedit": "^2.0.3"
+  },
+  "author": "SPACEBASE",
+  "build": {
+    "appId": "com.spacebase.schedule",
+    "productName": "SPACEBASE 주간 스케줄",
+    "files": [
+      "server.js",
+      "seed.js",
+      "seed-data.json",
+      "public/**",
+      "desktop/**",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "."
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build-icon.png",
+      "signAndEditExecutable": false,
+      "artifactName": "SPACEBASE-Schedule-Setup-${version}.exe",
+      "executableName": "SPACEBASE-Schedule"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "SPACEBASE 주간 스케줄",
+      "language": "1042"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build-icon.png",
+      "artifactName": "SPACEBASE-Schedule-${version}.dmg"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bbaekdi/spacebase-schedule.git"
+  },
+  "updateRepo": "bbaekdi/spacebase-schedule"
+}

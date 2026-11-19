@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>인쇄 미리보기</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; font-family: "Malgun Gothic", "맑은 고딕", sans-serif; background: #525659; }
+  .bar { height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: #f7f6f2; border-bottom: 1px solid #c9c5b5; box-sizing: border-box; }
+  .bar b { font-size: 15px; margin-right: auto; }
+  .bar span { font-size: 12px; color: #666; margin-right: 8px; }
+  button { font: inherit; font-size: 13px; padding: 7px 16px; border: 1px solid #aaa; background: #fff; cursor: pointer; }
+  button.primary { background: #217346; border-color: #217346; color: #fff; font-weight: 700; }
+  button:disabled { opacity: .5; }
+  embed { display: block; width: 100%; height: calc(100% - 52px); border: 0; }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <b>인쇄 미리보기</b>
+    <span>A4 가로 · 한 장에 맞춤</span>
+    <button id="save">PDF로 저장</button>
+    <button id="close">닫기</button>
+    <button id="print" class="primary">인쇄</button>
+  </div>
+  <embed id="pdf" type="application/pdf">
+<script>
+  const pdf = new URLSearchParams(location.search).get('pdf');
+  document.getElementById('pdf').src = pdf + '#toolbar=0&navpanes=0&view=Fit';
+  document.getElementById('print').onclick = async (e) => { e.target.disabled = true; await window.desktop.printNow(); e.target.disabled = false; };
+  document.getElementById('save').onclick = () => window.desktop.savePdf();
+  document.getElementById('close').onclick = () => window.desktop.closePreview();
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.desktop.closePreview(); });
+</script>
+</body>
+</html>

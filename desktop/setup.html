@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>접속 설정</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; background: #f3f2ee; color: #222; font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif; font-size: 14px; }
+  .wrap { max-width: 720px; margin: 36px auto; padding: 0 20px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #666; margin: 0 0 22px; }
+  .err { background: #fdecec; border: 1px solid #e7a3a3; color: #a11; padding: 10px 12px; margin-bottom: 16px; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .mode { background: #fff; border: 2px solid #d9d6cc; padding: 16px; cursor: pointer; }
+  .mode.on { border-color: #217346; background: #f4faf6; }
+  .mode b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .mode span { color: #666; font-size: 13px; }
+  .panel { background: #fff; border: 1px solid #d9d6cc; padding: 18px 20px; }
+  label { display: block; font-weight: 700; margin: 14px 0 5px; font-size: 13px; }
+  label:first-child { margin-top: 0; }
+  input[type=text], input[type=password], input[type=number] { width: 100%; box-sizing: border-box; padding: 8px 9px; border: 1px solid #aaa; font: inherit; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; }
+  button { font: inherit; padding: 8px 14px; border: 1px solid #888; background: #f6f6f6; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: #217346; color: #fff; border-color: #217346; font-weight: 700; padding: 10px 22px; }
+  .help { color: #666; font-size: 12px; margin-top: 4px; line-height: 1.6; }
+  .found button { display: block; width: 100%; text-align: left; margin-top: 6px; background: #fff; }
+  .copy { font-family: Consolas, monospace; background: #f4f4f4; padding: 6px 8px; border: 1px dashed #bbb; user-select: all; word-break: break-all; }
+  .foot { margin-top: 18px; display: flex; justify-content: flex-end; }
+  .hidden { display: none; }
+  details { margin-top: 14px; } summary { cursor: pointer; color: #2a6db0; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SPACEBASE 주간 스케줄</h1>
+  <p class="sub">처음 한 번만 설정하면 됩니다.</p>
+  <div id="err" class="err hidden"></div>
+
+  <div class="modes">
+    <div class="mode" data-mode="client"><b>회사 서버에 접속</b><span>대부분의 직원은 이것을 고르세요.</span></div>
+    <div class="mode" data-mode="server"><b>이 PC를 서버로 사용</b><span>항상 켜 두는 회사 PC 한 대에서만 고르세요.</span></div>
+  </div>
+
+  <div id="client" class="panel hidden">
+    <label>서버 주소</label>
+    <div class="row">
+      <input id="serverUrl" type="text" placeholder="예: 192.168.0.10:3000">
+      <button id="findBtn">자동으로 찾기</button>
+    </div>
+    <div class="help">같은 사무실 네트워크에 있으면 "자동으로 찾기"로 서버 PC를 찾을 수 있어요. 안 찾아지면 서버 PC 화면의 주소를 그대로 적어 주세요.</div>
+    <div id="found" class="found"></div>
+  </div>
+
+  <div id="server" class="panel hidden">
+    <label>이 PC의 접속 주소 (다른 직원에게 알려 주세요)</label>
+    <div class="copy" id="myAddr"></div>
+    <div class="help">다른 PC에서는 앱의 "자동으로 찾기"를 누르거나 이 주소를 입력하면 됩니다. 크롬 주소창에 넣어도 열립니다.<br>
+      처음 실행할 때 Windows 방화벽 창이 뜨면 <b>"개인 네트워크" 허용</b>을 눌러 주세요.</div>
+
+    <div class="help" style="margin-top:14px">지금은 <b>로그인 없이</b> 처음 한 번 이름만 입력하면 바로 열리게 되어 있어요.</div>
+    <details>
+      <summary>고급 설정 (접속 제한, 밴드 로그인, 포트)</summary>
+      <label>회사 공용 비밀번호 (선택)</label>
+    <input id="accessCode" type="text" autocomplete="off" placeholder="직원들이 이름과 함께 입력할 비밀번호">
+    <div class="help">밴드 로그인을 켜기 전까지는 이름 + 이 비밀번호로 로그인해요. 비워 두면 로그인 없이 이름만 입력해요.<br>밴드 키를 넣으면 자동으로 네이버 밴드 로그인으로 바뀌고, 이 비밀번호 로그인은 꺼져요.</div>
+
+    <label>밴드 Client ID</label>
+    <input id="bandClientId" type="text" autocomplete="off">
+    <label>밴드 Client Secret</label>
+    <input id="bandClientSecret" type="password" autocomplete="off">
+    <div class="help">developers.band.us 심사가 끝나면 받을 수 있어요. 그 전에는 비워 두세요.<br>
+      서비스 등록 때 Redirect URI 칸에는 아래 주소를 넣어 주세요.</div>
+    <div class="copy" id="redirect"></div>
+
+      <label>회사 밴드 key (선택)</label>
+      <input id="bandKey" type="text" placeholder="넣으면 이 밴드 멤버만 로그인할 수 있어요">
+      <label>Redirect URI 직접 지정 (선택)</label>
+      <input id="bandRedirectUri" type="text" placeholder="밴드에 다른 주소를 등록했다면 여기에 같은 주소를 넣으세요">
+      <label>포트</label>
+      <input id="port" type="number" value="3000">
+      <label style="font-weight:400"><input id="autoStart" type="checkbox" checked> Windows 시작할 때 자동으로 서버 켜기</label>
+      <div class="help" id="dataDir"></div>
+    </details>
+  </div>
+
+  <div class="foot"><button class="primary" id="save" disabled>저장하고 시작</button></div>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+let mode = null;
+const err = new URLSearchParams(location.search).get('error');
+if (err) { $('#err').textContent = err; $('#err').classList.remove('hidden'); }
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode').forEach((x) => x.classList.toggle('on', x.dataset.mode === m));
+  $('#client').classList.toggle('hidden', m !== 'client');
+  $('#server').classList.toggle('hidden', m !== 'server');
+  $('#save').disabled = false;
+}
+document.querySelectorAll('.mode').forEach((x) => x.addEventListener('click', () => setMode(x.dataset.mode)));
+
+let ip = 'localhost';
+function updateAddr() {
+  const port = $('#port').value || 3000;
+  $('#myAddr').textContent = `${ip}:${port}`;
+  $('#redirect').textContent = $('#bandRedirectUri').value.trim() || `http://${ip}:${port}/auth/band/callback`;
+}
+['#port', '#bandRedirectUri'].forEach((s) => $(s).addEventListener('input', updateAddr));
+
+window.desktop.getConfig().then((c) => {
+  ip = (c.lanIps && c.lanIps[0]) || 'localhost';
+  ['serverUrl', 'accessCode', 'bandClientId', 'bandClientSecret', 'bandKey', 'bandRedirectUri'].forEach((k) => { if (c[k]) $('#' + k).value = c[k]; });
+  if (c.port) $('#port').value = c.port;
+  if (c.autoStart === false) $('#autoStart').checked = false;
+  $('#dataDir').textContent = '데이터 저장 위치: ' + (c.dataDir || c.defaultDataDir) + ' (매일 자동 백업)';
+  if (c.mode) setMode(c.mode);
+  updateAddr();
+});
+
+$('#findBtn').addEventListener('click', async () => {
+  $('#findBtn').disabled = true; $('#findBtn').textContent = '찾는 중…';
+  const list = await window.desktop.discover();
+  $('#findBtn').disabled = false; $('#findBtn').textContent = '자동으로 찾기';
+  $('#found').innerHTML = list.length ? '' : '<div class="help" style="color:#a11">서버를 찾지 못했어요. 서버 PC가 켜져 있는지 확인하거나 주소를 직접 입력해 주세요.</div>';
+  list.forEach((s) => {
+    const b = document.createElement('button');
+    b.textContent = `${s.name}  —  ${s.ip}:${s.port}`;
+    b.onclick = () => { $('#serverUrl').value = `${s.ip}:${s.port}`; };
+    $('#found').appendChild(b);
+  });
+  if (list.length === 1) $('#serverUrl').value = `${list[0].ip}:${list[0].port}`;
+});
+
+$('#save').addEventListener('click', () => {
+  if (mode === 'client' && !$('#serverUrl').value.trim()) { alert('서버 주소를 입력해 주세요.'); return; }
+  $('#save').disabled = true; $('#save').textContent = '시작하는 중…';
+  window.desktop.saveConfig({
+    mode,
+    serverUrl: $('#serverUrl').value,
+    port: $('#port').value,
+    bandClientId: $('#bandClientId').value,
+    bandClientSecret: $('#bandClientSecret').value,
+    bandKey: $('#bandKey').value,
+    accessCode: $('#accessCode').value,
+    bandRedirectUri: $('#bandRedirectUri').value,
+    autoStart: $('#autoStart').checked,
+  });
+});
+</script>
+</body>
+</html>

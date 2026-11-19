@@ -1,0 +1,708 @@
+// SPACEBASE 주간 스케줄 - 화면 로직
+(() => {
+  'use strict';
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const WD = ['일', '월', '화', '수', '목', '금', '토'];
+
+  let db = null;
+  let me = null;
+  let ws = null;
+  let version = 0;
+  let pending = []; // 연결이 끊긴 동안 보낸 변경
+  let focusMonday = mondayOf(new Date()); // 빨간 박스(금주) 기준 월요일
+  let days = [];
+  let sel = null; // { r0, c0, r1, c1 } 행/열 인덱스 (프로젝트 순서, 날짜 순서)
+  let dragging = false;
+  let clipboard = null;
+  let rowList = []; // 화면 순서대로 프로젝트 id
+  const peers = {}; // 다른 사람이 선택한 칸 { id: {name, key, color} }
+
+  // ---------- 날짜 ----------
+  function mondayOf(d) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const wd = (x.getDay() + 6) % 7; // 월=0
+    x.setDate(x.getDate() - wd);
+    return x;
+  }
+  function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+  function weekLabel(mon) {
+    // 목요일이 속한 달 기준 주차 (엑셀 파일명 "11월3주차" 와 동일한 방식)
+    const thu = addDays(mon, 3);
+    const n = Math.ceil(thu.getDate() / 7);
+    const sun = addDays(mon, 6);
+    return `${thu.getFullYear()}년 ${thu.getMonth() + 1}월 ${n}주차  (${mon.getMonth() + 1}/${mon.getDate()} ~ ${sun.getMonth() + 1}/${sun.getDate()})`;
+  }
+
+  // ---------- 숫자 서식 ----------
+  const isNum = (v) => /^-?\d+(\.\d+)?$/.test(String(v).replace(/,/g, '').trim()) && String(v).trim() !== '';
+  function fmtAmount(v) {
+    if (v == null || v === '') return '';
+    if (!isNum(v)) return v;
+    const n = Number(String(v).replace(/,/g, ''));
+    return n.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+  }
+  function fmtArea(v) {
+    if (v == null || v === '') return '';
+    if (!isNum(v)) return v;
+    return Number(String(v).replace(/,/g, '')).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' PY';
+  }
+
+  // ---------- 연결 ----------
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.onopen = () => setStatus('실시간 연결됨', 'ok');
+    ws.onclose = () => { setStatus('연결 끊김 · 다시 연결 중…', 'bad'); setTimeout(connect, 1500); };
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.t === 'init') {
+        db = msg.db; me = msg.me; version = db.version;
+        // 끊긴 동안의 변경을 다시 적용하고 전송
+        const q = pending; pending = [];
+        q.forEach((op) => rawSend(op));
+        $('#me').textContent = me.name + ' 님';
+        if (me.id.startsWith('dev:')) $('#logoutLink').textContent = '이름 바꾸기';
+        renderAll();
+      } else if (msg.t === 'op') {
+        if (msg.version !== version + 1) { ws.send(JSON.stringify({ t: 'sync' })); return; }
+        version = msg.version;
+        Ops.applyOp(db, msg.op);
+        renderFor(msg.op);
+        if (msg.by) setStatus(`${msg.by} 님이 수정함`, 'ok');
+      } else if (msg.t === 'ack') {
+        version = msg.version;
+      } else if (msg.t === 'presence') {
+        renderPeople(msg.users);
+      } else if (msg.t === 'cursor') {
+        if (msg.id === (me && me.id)) return;
+        if (msg.key) peers[msg.id] = { name: msg.name, key: msg.key, color: colorFor(msg.id) };
+        else delete peers[msg.id];
+        renderPeers();
+      }
+    };
+  }
+  // ---------- 되돌리기 (Ctrl+Z / Ctrl+Y) ----------
+  let undoStack = [];
+  let redoStack = [];
+  function send(op) { // 사용자가 한 변경: 되돌리기 기록을 남긴다
+    const inv = invert(db, op);
+    rawSend(op);
+    if (inv) { undoStack.push(inv); if (undoStack.length > 300) undoStack.shift(); redoStack = []; }
+  }
+  function undo() {
+    const inv = undoStack.pop();
+    if (!inv) { toast('더 되돌릴 내용이 없습니다.'); return; }
+    const back = invert(db, inv);
+    rawSend(inv);
+    if (back) redoStack.push(back);
+    renderAll(); toast('되돌렸습니다 (Ctrl+Y: 다시 실행)');
+  }
+  function redo() {
+    const op = redoStack.pop();
+    if (!op) return;
+    const inv = invert(db, op);
+    rawSend(op);
+    if (inv) undoStack.push(inv);
+    renderAll();
+  }
+  // op 를 적용하기 직전 상태(d)를 보고, 원래대로 돌리는 op 를 만든다
+  function invert(d, op) {
+    const clone = (x) => JSON.parse(JSON.stringify(x));
+    switch (op.k) {
+      case 'cell': { const p = d.cells[op.pid + '|' + op.date] || {}; return { k: 'cell', pid: op.pid, date: op.date, t: p.t || '', c: p.c || '' }; }
+      case 'cells': return { k: 'batch', ops: op.list.map((it) => { const p = d.cells[it.pid + '|' + it.date] || {}; return { k: 'cell', pid: it.pid, date: it.date, t: p.t || '', c: p.c || '' }; }) };
+      case 'batch': {
+        const tmp = clone(d); const out = [];
+        for (const sub of op.ops) { const iv = invert(tmp, sub); if (iv) out.unshift(iv); Ops.applyOp(tmp, sub); }
+        const flat = []; out.forEach((x) => (x.k === 'batch' ? flat.push(...x.ops) : flat.push(x)));
+        return { k: 'batch', ops: flat };
+      }
+      case 'proj': { const p = d.projects.find((x) => x.id === op.id); return p ? { k: 'proj', id: op.id, field: op.field, value: p[op.field] || '' } : null; }
+      case 'addProj': return { k: 'delProj', id: op.project.id };
+      case 'delProj': {
+        const i = d.projects.findIndex((x) => x.id === op.id); if (i < 0) return null;
+        const p = d.projects[i];
+        const prev = d.projects[i - 1], next = d.projects[i + 1];
+        const add = { k: 'addProj', project: clone(p) };
+        if (prev && prev.groupId === p.groupId) add.after = prev.id; else if (next && next.groupId === p.groupId) add.before = next.id;
+        const ops = [add];
+        Object.keys(d.cells).forEach((k) => { if (k.startsWith(op.id + '|')) { const c = d.cells[k]; ops.push({ k: 'cell', pid: op.id, date: k.split('|')[1], t: c.t || '', c: c.c || '' }); } });
+        return { k: 'batch', ops };
+      }
+      case 'moveProj': { const tmp = clone(d); return Ops.applyOp(tmp, op) ? { k: 'moveProj', id: op.id, dir: -op.dir } : null; }
+      case 'addGroup': return { k: 'delGroup', id: op.id };
+      case 'renameGroup': { const g = d.groups.find((x) => x.id === op.id); return g ? { k: 'renameGroup', id: op.id, name: g.name } : null; }
+      case 'delGroup': { const i = d.groups.findIndex((x) => x.id === op.id); return i < 0 ? null : { k: 'addGroup', id: op.id, name: d.groups[i].name, index: i }; }
+      case 'moveGroup': { const tmp = clone(d); return Ops.applyOp(tmp, op) ? { k: 'moveGroup', id: op.id, dir: -op.dir } : null; }
+      case 'memo': return { k: 'memo', key: op.key, value: (d.memo || {})[op.key] || '' };
+      case 'team': return { k: 'team', idx: op.idx, value: (d.teams || [])[op.idx] || '' };
+    }
+    return null;
+  }
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return; // 입력 중에는 글자 단위 되돌리기
+    const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); closePop(); undo(); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); closePop(); redo(); }
+  }, true);
+
+  function rawSend(op) {
+    Ops.applyOp(db, op); // 내 화면에 먼저 반영
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'op', op, id: uid('o') }));
+    else pending.push(op);
+  }
+  function sendRemote(op) { // 이미 로컬에 반영된 경우
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'op', op, id: uid('o') }));
+    else pending.push(op);
+  }
+  function setStatus(t, cls) { const s = $('#status'); s.textContent = t; s.className = 'status ' + (cls || ''); }
+  function colorFor(id) {
+    let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return `hsl(${h % 360} 65% 42%)`;
+  }
+  function renderPeople(users) {
+    $('#people').innerHTML = users.map((u) => `<span title="${esc(u.name)}" style="background-color:${colorFor(u.id)};${u.img ? `background-image:url('${esc(u.img)}')` : ''}">${u.img ? '' : esc(u.name.slice(-2))}</span>`).join('');
+    const ids = new Set(users.map((u) => u.id));
+    Object.keys(peers).forEach((k) => { if (!ids.has(k)) delete peers[k]; });
+    renderPeers();
+  }
+  let lastCursor = null;
+  function sendCursor() {
+    const key = sel ? `${rowList[sel.r0]}|${days[sel.c0] && ymd(days[sel.c0])}` : null;
+    if (key === lastCursor) return;
+    lastCursor = key;
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'cursor', key }));
+  }
+
+  // ---------- 그리기 ----------
+  function renderAll() {
+    renderSheet();
+    renderMemo();
+    renderLegend();
+    $('#title').textContent = db.title || 'SPACEBASE SCHEDULE';
+  }
+  function renderFor(op) {
+    if (['memo'].includes(op.k)) renderMemo();
+    else if (op.k === 'team') renderMemo();
+    else if (op.k === 'cat' || op.k === 'delCat') { renderLegend(); renderSheet(); }
+    else if (op.k === 'batch') renderAll();
+    else renderSheet();
+  }
+
+  function catOf(id) { return db.categories.find((c) => c.id === id); }
+  function textColor(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.65 ? '#fff' : '#000';
+  }
+
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  function textWidth(t) {
+    measureCtx.font = `12px ${getComputedStyle(document.body).fontFamily}`;
+    return measureCtx.measureText(t).width + 4;
+  }
+
+  function renderSheet() {
+    // 포커스 중인 입력칸 보존
+    const ae = document.activeElement;
+    const keep = ae && ae.dataset && ae.dataset.key ? { key: ae.dataset.key, val: ae.value, s: ae.selectionStart, e: ae.selectionEnd } : null;
+
+    days = Array.from({ length: 21 }, (_, i) => addDays(focusMonday, i - 7));
+    const today = ymd(new Date());
+    $('#weekLabel').textContent = weekLabel(focusMonday);
+
+    const dayW = 50;
+    const cols = [80, 64, 170, 80, 92, 168, 64, 64];
+    $('#sheet').style.width = cols.reduce((a, b) => a + b, 0) + days.length * dayW + 120 + 'px'; // 표가 화면에 맞춰 줄어들지 않게 고정
+    let h = '<colgroup>' + cols.map((w) => `<col style="width:${w}px">`).join('') + days.map(() => `<col style="width:${dayW}px">`).join('') + '<col style="width:120px"></colgroup>';
+
+    // 헤더 3줄
+    const months = [];
+    days.forEach((d) => {
+      const m = d.getMonth() + 1;
+      if (months.length && months[months.length - 1].m === m) months[months.length - 1].n++;
+      else months.push({ m, n: 1 });
+    });
+    h += '<thead><tr class="head-1">';
+    h += '<th rowspan="3" colspan="2">구&nbsp;&nbsp;&nbsp;분</th><th rowspan="3">PROJECT</th><th rowspan="3">면적<br>(py)</th><th rowspan="3">공사금액<br>(천원)</th><th rowspan="3">공사기간/진행업무<br>(예정)</th><th colspan="2">담 당 자</th>';
+    h += months.map((x) => `<th class="month" colspan="${x.n}">${x.m}월</th>`).join('');
+    h += '<th class="note-h">NOTE</th></tr><tr><th>설계</th><th>공사</th>';
+    h += days.map((d) => `<th class="day${ymd(d) === today ? ' today' : ''}">${d.getDate()}</th>`).join('');
+    h += '<th class="note-h" rowspan="2"></th></tr><tr><th>M/S</th><th>M/S</th>';
+    h += days.map((d) => `<th class="day${ymd(d) === today ? ' today' : ''}">${WD[d.getDay()]}</th>`).join('');
+    h += '</tr></thead><tbody>';
+    const spacer = `<tr class="spacer"><td colspan="${8 + days.length}"></td><td class="keep"></td></tr>`;
+    h += spacer;
+
+    rowList = [];
+    const dateKeys = days.map(ymd);
+    db.groups.forEach((g, gi) => {
+      const ps = db.projects.filter((p) => p.groupId === g.id);
+      if (!ps.length) {
+        h += `<tr data-group="${g.id}" class="empty-group"><td class="g" colspan="2"><input class="cell" data-key="g|${g.id}" value="${esc(g.name)}"></td><td colspan="${6 + days.length}" style="color:#888;font-size:12px;text-align:left;padding-left:8px">비어 있는 구분입니다. 오른쪽 클릭 또는 왼쪽 ＋ 로 행을 추가하세요.</td><td class="note"></td></tr>`;
+      }
+      ps.forEach((p, i) => {
+        const r = rowList.length;
+        rowList.push(p.id);
+        h += `<tr data-pid="${p.id}" data-r="${r}">`;
+        if (i === 0) h += `<td class="g" rowspan="${ps.length}" data-group="${g.id}"><input class="cell" data-key="g|${g.id}" value="${esc(g.name)}"></td>`;
+        h += `<td class="info">${inp(p, 'type')}</td>`;
+        h += `<td class="info">${inp(p, 'name', 'left')}</td>`;
+        h += `<td class="info">${inp(p, 'area')}</td>`;
+        h += `<td class="info">${inp(p, 'amount', 'right')}</td>`;
+        h += `<td class="info">${inp(p, 'period')}</td>`;
+        h += `<td class="info">${inp(p, 'design')}</td>`;
+        h += `<td class="info">${inp(p, 'build')}</td>`;
+        // 칸 텍스트가 옆 빈칸으로 넘쳐 보이게 (엑셀처럼)
+        const cells = dateKeys.map((k) => db.cells[p.id + '|' + k] || {});
+        cells.forEach((cell, c) => {
+          const d = days[c];
+          const we = d.getDay() === 0 || d.getDay() === 6;
+          const cat = cell.c && catOf(cell.c);
+          let style = cat ? `background:${cat.color}` : '';
+          let inner = '';
+          if (cell.t) {
+            let L = 0, R = 0;
+            for (let j = c - 1; j >= 0 && !cells[j].t; j--) L++;
+            for (let j = c + 1; j < cells.length && !cells[j].t; j++) R++;
+            const need = Math.max(1, Math.ceil(textWidth(cell.t) / dayW));
+            const half = (need - 1) / 2;
+            let left, width, cls = '';
+            if (need === 1) { left = 0; width = dayW; }
+            else if (L >= Math.ceil(half) && R >= Math.ceil(half)) { width = need * dayW; left = -Math.ceil(half) * dayW; width = (2 * Math.ceil(half) + 1) * dayW; }
+            else if (R >= need - 1) { left = 0; width = need * dayW; cls = 'l'; }
+            else { const span = Math.min(need - 1, L + R); const lft = Math.max(span - R, 0); left = -lft * dayW; width = (span + 1) * dayW; cls = 'l'; }
+            const fits = need === 1;
+            const color = cat && fits ? textColor(cat.color) : '#000';
+            inner = `<span class="txt ${cls}" style="left:${left - 1}px;width:${width + 1}px;color:${color}">${esc(cell.t)}</span>`;
+          }
+          h += `<td class="d${we ? ' we' : ''}" data-r="${r}" data-c="${c}" style="${style}" title="${esc(cell.t || '')}${cat ? (cell.t ? ' · ' : '') + esc(cat.name) : ''}">${inner}</td>`;
+        });
+        h += `<td class="note">${inp(p, 'note')}</td>`;
+        h += '</tr>';
+      });
+      h += spacer;
+    });
+    h += '</tbody>';
+    $('#sheet').innerHTML = h;
+
+    if (keep) {
+      const el = document.querySelector(`[data-key="${CSS.escape(keep.key)}"]`);
+      if (el) { el.value = keep.val; el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch {} }
+    }
+    if (sel) clampSel();
+    paintSel();
+    renderPeers();
+    placeThisWeekBox();
+  }
+
+  function inp(p, field, align = '') {
+    let v = p[field] || '';
+    let shown = v;
+    if (field === 'amount') shown = fmtAmount(v);
+    if (field === 'area') shown = fmtArea(v);
+    return `<input class="cell ${align}" data-key="p|${p.id}|${field}" data-pid="${p.id}" data-field="${field}" value="${esc(shown)}" ${field === 'amount' ? 'inputmode="numeric"' : ''}>`;
+  }
+
+  function placeThisWeekBox() {
+    const box = $('#thisWeekBox');
+    const wrap = $('#sheetWrap');
+    const first = $(`#sheet td.d[data-r="0"][data-c="7"]`);
+    const lastR = rowList.length - 1;
+    const last = $(`#sheet td.d[data-r="${lastR}"][data-c="13"]`);
+    if (!first || !last) { box.style.display = 'none'; return; }
+    // offsetLeft/Top 은 확대·축소(인쇄 맞춤)에 영향을 받지 않는다
+    // 셀의 위치를 박스가 들어 있는 sheet-wrap 기준으로 계산 (offsetParent 를 따라 올라감)
+    const pos = (el) => { let x = 0, y = 0; while (el && el !== wrap) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; } return { x, y }; };
+    const pa = pos(first), pb = pos(last);
+    const x0 = pa.x, y0 = pa.y, x1 = pb.x + last.offsetWidth, y1 = pb.y + last.offsetHeight;
+    box.style.display = 'block';
+    box.style.left = x0 - 1 + 'px';
+    box.style.top = y0 - 1 + 'px';
+    box.style.width = x1 - x0 + 2 + 'px';
+    box.style.height = y1 - y0 + 2 + 'px';
+  }
+
+  // ---------- 선택 ----------
+  function normSel() {
+    if (!sel) return null;
+    return { r0: Math.min(sel.r0, sel.r1), r1: Math.max(sel.r0, sel.r1), c0: Math.min(sel.c0, sel.c1), c1: Math.max(sel.c0, sel.c1) };
+  }
+  function clampSel() {
+    const maxR = rowList.length - 1;
+    if (maxR < 0) { sel = null; return; }
+    ['r0', 'r1'].forEach((k) => (sel[k] = Math.min(Math.max(sel[k], 0), maxR)));
+    ['c0', 'c1'].forEach((k) => (sel[k] = Math.min(Math.max(sel[k], 0), 20)));
+  }
+  function paintSel() {
+    $$('#sheet td.d.sel, #sheet td.d.sel-multi').forEach((td) => td.classList.remove('sel', 'sel-multi'));
+    const n = normSel();
+    if (!n) return;
+    const multi = n.r0 !== n.r1 || n.c0 !== n.c1;
+    for (let r = n.r0; r <= n.r1; r++) for (let c = n.c0; c <= n.c1; c++) {
+      const td = $(`#sheet td.d[data-r="${r}"][data-c="${c}"]`);
+      if (td) td.classList.add(multi ? 'sel-multi' : 'sel');
+    }
+    if (multi) { const a = $(`#sheet td.d[data-r="${sel.r0}"][data-c="${sel.c0}"]`); if (a) a.classList.add('sel'); }
+    sendCursor();
+  }
+  function selCells() {
+    const n = normSel(); const out = [];
+    if (!n) return out;
+    for (let r = n.r0; r <= n.r1; r++) for (let c = n.c0; c <= n.c1; c++) out.push({ pid: rowList[r], date: ymd(days[c]) });
+    return out;
+  }
+  function renderPeers() {
+    $$('#sheet .peer').forEach((x) => x.remove());
+    for (const id in peers) {
+      const p = peers[id];
+      const [pid, date] = p.key.split('|');
+      const r = rowList.indexOf(pid);
+      const c = days.findIndex((d) => ymd(d) === date);
+      if (r < 0 || c < 0) continue;
+      const td = $(`#sheet td.d[data-r="${r}"][data-c="${c}"]`);
+      if (td) td.insertAdjacentHTML('beforeend', `<span class="peer" style="border-color:${p.color}"><b style="background:${p.color}">${esc(p.name)}</b></span>`);
+    }
+  }
+
+  // ---------- 칸 편집 팝업 ----------
+  const pop = $('#pop');
+  function openPop(initialText) {
+    const n = normSel();
+    if (!n) return;
+    const multi = n.r0 !== n.r1 || n.c0 !== n.c1;
+    const pid = rowList[sel.r0];
+    const date = ymd(days[sel.c0]);
+    const cell = db.cells[pid + '|' + date] || {};
+    const p = db.projects.find((x) => x.id === pid);
+    const d = days[sel.c0];
+    $('#popTitle').textContent = multi ? `${selCells().length}칸 선택됨 · 카테고리를 고르면 모두 칠해집니다` : `${p ? p.name : ''} · ${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`;
+    const t = $('#popText');
+    t.value = initialText != null ? initialText : (cell.t || '');
+    t.placeholder = multi ? `첫 칸(${d.getMonth() + 1}/${d.getDate()})에 넣을 글자` : '일정 입력 후 Enter';
+    const curCat = multi ? null : (cell.c || '');
+    $('#popChips').innerHTML = `<button class="chip${curCat === '' ? ' on' : ''}" data-cat=""><i class="none"></i>색 없음</button>` +
+      db.categories.map((c) => `<button class="chip${curCat === c.id ? ' on' : ''}" data-cat="${c.id}"><i style="background:${c.color}"></i>${esc(c.name)}</button>`).join('');
+    pop.classList.remove('hidden');
+    const td = $(`#sheet td.d[data-r="${sel.r0}"][data-c="${sel.c0}"]`);
+    const r = td.getBoundingClientRect();
+    let left = r.left + window.scrollX;
+    if (left + 310 > window.scrollX + document.documentElement.clientWidth) left = window.scrollX + document.documentElement.clientWidth - 316;
+    let top = r.bottom + window.scrollY + 4;
+    const ph = pop.offsetHeight;
+    if (r.bottom + ph + 10 > window.innerHeight && r.top - ph - 4 > 0) top = r.top + window.scrollY - ph - 4;
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+    t.focus();
+    if (initialText != null) t.setSelectionRange(t.value.length, t.value.length); else t.select();
+  }
+  function closePop() { pop.classList.add('hidden'); }
+  function savePopText() {
+    if (pop.classList.contains('hidden') || !sel) return;
+    const pid = rowList[sel.r0]; const date = ymd(days[sel.c0]);
+    const cur = (db.cells[pid + '|' + date] || {}).t || '';
+    const v = $('#popText').value.trim();
+    if (v !== cur) send({ k: 'cell', pid, date, t: v });
+  }
+  $('#popText').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); savePopText(); closePop(); renderSheet(); moveSel(1, 0); }
+    else if (e.key === 'Escape') { closePop(); }
+    else if (e.key === 'Tab') { e.preventDefault(); savePopText(); closePop(); renderSheet(); moveSel(0, e.shiftKey ? -1 : 1); }
+  });
+  $('#popChips').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    const list = selCells();
+    const v = $('#popText').value.trim();
+    if (list.length === 1) send({ k: 'cell', pid: list[0].pid, date: list[0].date, t: v, c: b.dataset.cat });
+    else {
+      const ops = [{ k: 'cells', list, c: b.dataset.cat }];
+      const first = { pid: rowList[sel.r0], date: ymd(days[sel.c0]) };
+      if (v !== ((db.cells[first.pid + '|' + first.date] || {}).t || '')) ops.push({ k: 'cell', ...first, t: v });
+      send({ k: 'batch', ops: ops.flatMap((o) => (o.k === 'cells' ? o.list.map((it) => ({ k: 'cell', pid: it.pid, date: it.date, c: o.c })) : [o])) });
+    }
+    closePop(); renderSheet();
+  });
+  $('#popClear').addEventListener('click', () => { clearSel(); closePop(); });
+  $('#popClose').addEventListener('click', () => { savePopText(); closePop(); renderSheet(); });
+
+  function clearSel() {
+    const list = selCells(); if (!list.length) return;
+    send({ k: 'cells', list, t: '', c: '' });
+    renderSheet();
+  }
+  function moveSel(dr, dc, extend) {
+    if (!sel) return;
+    if (extend) { sel.r1 += dr; sel.c1 += dc; }
+    else {
+      let r = sel.r0 + dr, c = sel.c0 + dc;
+      if (c < 0 || c > 20) { // 주 넘기기
+        focusMonday = addDays(focusMonday, c < 0 ? -7 : 7);
+        c = c < 0 ? c + 7 : c - 7;
+        sel = { r0: r, c0: c, r1: r, c1: c };
+        renderSheet(); return;
+      }
+      sel = { r0: r, c0: c, r1: r, c1: c };
+    }
+    clampSel(); paintSel();
+  }
+
+  // 마우스 선택
+  const sheet = $('#sheet');
+  sheet.addEventListener('mousedown', (e) => {
+    const td = e.target.closest('td.d'); if (!td || e.button !== 0) return;
+    e.preventDefault();
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (!pop.classList.contains('hidden')) { savePopText(); closePop(); }
+    const r = +td.dataset.r, c = +td.dataset.c;
+    if (e.shiftKey && sel) { sel.r1 = r; sel.c1 = c; }
+    else sel = { r0: r, c0: c, r1: r, c1: c };
+    dragging = true; paintSel();
+  });
+  sheet.addEventListener('mouseover', (e) => {
+    if (!dragging) return;
+    const td = e.target.closest('td.d'); if (!td) return;
+    sel.r1 = +td.dataset.r; sel.c1 = +td.dataset.c; paintSel();
+  });
+  document.addEventListener('mouseup', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    if (e.target.closest && e.target.closest('td.d')) openPop();
+  });
+  sheet.addEventListener('dblclick', (e) => { if (e.target.closest('td.d')) openPop(); });
+
+  // 키보드 (엑셀처럼)
+  document.addEventListener('keydown', (e) => {
+    if (!sel || !pop.classList.contains('hidden')) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const mod = e.ctrlKey || e.metaKey;
+    const arrows = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    if (arrows[e.key]) { e.preventDefault(); moveSel(...arrows[e.key], e.shiftKey); }
+    else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); openPop(); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); clearSel(); }
+    else if (e.key === 'Escape') { sel = null; paintSel(); }
+    else if (mod && e.key.toLowerCase() === 'c') { copySel(); e.preventDefault(); }
+    else if (mod && e.key.toLowerCase() === 'x') { copySel(); clearSel(); e.preventDefault(); }
+    else if (mod && e.key.toLowerCase() === 'v') { pasteSel(); e.preventDefault(); }
+    else if (!mod && e.key.length === 1) { e.preventDefault(); openPop(e.key); }
+    else if (e.key === 'Process') { openPop(''); } // 한글 입력 시작
+  });
+
+  function copySel() {
+    const n = normSel(); if (!n) return;
+    clipboard = [];
+    for (let r = n.r0; r <= n.r1; r++) {
+      const row = [];
+      for (let c = n.c0; c <= n.c1; c++) row.push(Object.assign({}, db.cells[rowList[r] + '|' + ymd(days[c])] || {}));
+      clipboard.push(row);
+    }
+    toast(`${clipboard.length * clipboard[0].length}칸 복사됨 · 붙여넣을 칸을 선택하고 Ctrl+V`);
+  }
+  function pasteSel() {
+    if (!clipboard || !sel) return;
+    const n = normSel();
+    const ops = [];
+    clipboard.forEach((row, i) => row.forEach((cell, j) => {
+      const r = n.r0 + i, c = n.c0 + j;
+      if (r >= rowList.length || c > 20) return;
+      ops.push({ k: 'cell', pid: rowList[r], date: ymd(days[c]), t: cell.t || '', c: cell.c || '' });
+    }));
+    if (ops.length) send({ k: 'batch', ops });
+    renderSheet();
+  }
+
+  // ---------- 프로젝트 정보 칸 ----------
+  sheet.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (!el.dataset || !el.dataset.field) return;
+    const p = db.projects.find((x) => x.id === el.dataset.pid);
+    if (!p) return;
+    if (el.dataset.field === 'area') el.value = p.area || '';
+    if (el.dataset.field === 'amount') el.value = fmtAmount(p.amount || '');
+    el.select();
+    sel = null; paintSel();
+  });
+  sheet.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.dataset.field === 'amount') {
+      // 숫자만 입력하면 자동으로 천 단위 쉼표
+      const raw = el.value.replace(/,/g, '');
+      if (/^-?\d*$/.test(raw) && raw !== '-') {
+        const fromEnd = el.value.length - el.selectionStart;
+        el.value = raw === '' ? '' : Number(raw).toLocaleString('ko-KR');
+        const pos = Math.max(0, el.value.length - fromEnd);
+        el.setSelectionRange(pos, pos);
+      }
+    }
+  });
+  sheet.addEventListener('focusout', (e) => commitInput(e.target));
+  sheet.addEventListener('keydown', (e) => {
+    const el = e.target;
+    if (el.tagName !== 'INPUT') return;
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); el.blur(); }
+    if (e.key === 'Escape') { el.dataset.cancel = '1'; el.blur(); }
+  });
+  function commitInput(el) {
+    if (!el || !el.dataset || !el.dataset.key) return;
+    if (el.dataset.cancel) { delete el.dataset.cancel; renderSheet(); return; }
+    const [kind, id, field] = el.dataset.key.split('|');
+    if (kind === 'g') {
+      const g = db.groups.find((x) => x.id === id);
+      if (g && g.name !== el.value.trim()) send({ k: 'renameGroup', id, name: el.value.trim() });
+      return;
+    }
+    const p = db.projects.find((x) => x.id === id);
+    if (!p) return;
+    let v = el.value.trim();
+    if (field === 'amount' && isNum(v)) v = v.replace(/,/g, '');
+    if (field === 'area') { const m = v.replace(/,/g, '').match(/^(-?\d+(\.\d+)?)\s*(py|PY|평)?$/); if (m) v = String(Number(m[1])); }
+    if ((p[field] || '') !== v) send({ k: 'proj', id, field, value: v });
+    // 서식 다시 보이기
+    if (field === 'amount') el.value = fmtAmount(v);
+    if (field === 'area') el.value = fmtArea(v);
+  }
+
+  // ---------- 행 추가/삭제/이동 ----------
+  const rowTools = $('#rowTools');
+  let hoverPid = null;
+  $('#sheetWrap').addEventListener('mousemove', (e) => {
+    if (e.target.closest('#rowTools')) return;
+    const tr = e.target.closest('tr[data-pid]');
+    if (!tr) return;
+    hoverPid = tr.dataset.pid;
+    const wr = $('#sheetWrap').getBoundingClientRect();
+    const r = tr.getBoundingClientRect();
+    rowTools.style.display = 'flex';
+    rowTools.style.top = r.top - wr.top + (r.height - 22) / 2 + 'px';
+    rowTools.style.left = $('#sheetWrap').scrollLeft + 2 + 'px';
+  });
+  $('#sheetWrap').addEventListener('mouseleave', () => { rowTools.style.display = 'none'; });
+  rowTools.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || !hoverPid) return;
+    rowAction(b.dataset.act, hoverPid);
+  });
+
+  function newProject(groupId) {
+    return { id: uid('p'), groupId, type: 'OFFICE', name: '', area: '', amount: '', period: '', design: '', build: '', note: '' };
+  }
+  function rowAction(act, pid) {
+    const p = db.projects.find((x) => x.id === pid); if (!p) return;
+    if (act === 'addBelow' || act === 'addAbove') {
+      const np = newProject(p.groupId);
+      send(act === 'addBelow' ? { k: 'addProj', project: np, after: pid } : { k: 'addProj', project: np, before: pid });
+      renderSheet();
+      const el = document.querySelector(`[data-key="p|${np.id}|name"]`); if (el) el.focus();
+    } else if (act === 'up' || act === 'down') {
+      send({ k: 'moveProj', id: pid, dir: act === 'up' ? -1 : 1 }); renderSheet();
+    } else if (act === 'del') {
+      const name = p.name || '(이름 없음)';
+      if (!confirm(`"${name}" 행을 삭제할까요?\n이 행의 모든 일정도 함께 삭제됩니다.`)) return;
+      send({ k: 'delProj', id: pid }); renderSheet(); rowTools.style.display = 'none';
+    }
+  }
+
+  // 오른쪽 클릭 메뉴
+  const ctx = $('#ctx');
+  sheet.addEventListener('contextmenu', (e) => {
+    const tr = e.target.closest('tr[data-pid], tr[data-group]');
+    const gtd = e.target.closest('td.g');
+    if (!tr) return;
+    e.preventDefault();
+    const groupId = gtd ? (gtd.dataset.group || tr.dataset.group) : null;
+    let items = [];
+    if (tr.dataset.pid && !gtd) {
+      const pid = tr.dataset.pid;
+      items = [['위에 행 추가', () => rowAction('addAbove', pid)], ['아래에 행 추가', () => rowAction('addBelow', pid)], '-',
+        ['위로 이동', () => rowAction('up', pid)], ['아래로 이동', () => rowAction('down', pid)], '-',
+        ['행 삭제', () => rowAction('del', pid), 'danger']];
+    } else if (groupId) {
+      const has = db.projects.some((p) => p.groupId === groupId);
+      items = [['이 구분에 행 추가', () => { const np = newProject(groupId); send({ k: 'addProj', project: np }); renderSheet(); }],
+        ['구분 위로 이동', () => { send({ k: 'moveGroup', id: groupId, dir: -1 }); renderSheet(); }],
+        ['구분 아래로 이동', () => { send({ k: 'moveGroup', id: groupId, dir: 1 }); renderSheet(); }], '-',
+        ['새 구분 추가', addGroup],
+        has ? ['구분 삭제 (먼저 행을 모두 지우세요)', () => toast('구분 안의 행을 먼저 모두 삭제해 주세요.'), 'danger']
+          : ['구분 삭제', () => { send({ k: 'delGroup', id: groupId }); renderSheet(); }, 'danger']];
+    }
+    ctx.innerHTML = items.map((it, i) => (it === '-' ? '<hr>' : `<button data-i="${i}" class="${it[2] || ''}">${esc(it[0])}</button>`)).join('');
+    ctx.classList.remove('hidden');
+    ctx.style.left = Math.min(e.clientX, window.innerWidth - 190) + 'px';
+    ctx.style.top = Math.min(e.clientY, window.innerHeight - ctx.offsetHeight - 8) + 'px';
+    ctx.onclick = (ev) => { const b = ev.target.closest('button'); if (!b) return; ctx.classList.add('hidden'); items[+b.dataset.i][1](); };
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('#ctx')) ctx.classList.add('hidden');
+    if (!pop.classList.contains('hidden') && !e.target.closest('#pop') && !e.target.closest('td.d')) { savePopText(); closePop(); renderSheet(); }
+  });
+  function addGroup() {
+    const name = prompt('새 구분 이름', '새 구분');
+    if (!name) return;
+    const id = uid('g');
+    send({ k: 'batch', ops: [{ k: 'addGroup', id, name }, { k: 'addProj', project: newProject(id) }] });
+    renderSheet();
+  }
+  $('#addGroupBtn').addEventListener('click', addGroup);
+
+  // ---------- 메모 / 담당자 ----------
+  function renderMemo() {
+    $$('textarea[data-memo]').forEach((t) => { if (t !== document.activeElement) t.value = (db.memo || {})[t.dataset.memo] || ''; autoGrow(t); });
+    $$('textarea[data-team]').forEach((t) => { if (t !== document.activeElement) t.value = (db.teams || [])[+t.dataset.team] || ''; autoGrow(t); });
+  }
+  function autoGrow(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
+  const timers = {};
+  function debounced(key, fn) { clearTimeout(timers[key]); timers[key] = setTimeout(fn, 500); }
+  $$('textarea[data-memo]').forEach((t) => {
+    const save = () => { if (((db.memo || {})[t.dataset.memo] || '') !== t.value) send({ k: 'memo', key: t.dataset.memo, value: t.value }); };
+    t.addEventListener('input', () => { autoGrow(t); debounced('m' + t.dataset.memo, save); });
+    t.addEventListener('blur', save);
+  });
+  $$('textarea[data-team]').forEach((t) => {
+    const save = () => { if (((db.teams || [])[+t.dataset.team] || '') !== t.value) send({ k: 'team', idx: +t.dataset.team, value: t.value }); };
+    t.addEventListener('input', () => { autoGrow(t); debounced('t' + t.dataset.team, save); });
+    t.addEventListener('blur', save);
+  });
+
+  // 카테고리는 칸을 눌렀을 때 뜨는 선택 창에서만 고른다 (하단 범례는 없앰)
+  function renderLegend() {}
+
+  // ---------- 상단 ----------
+  $('#prevWeek').addEventListener('click', () => { focusMonday = addDays(focusMonday, -7); closePop(); renderSheet(); });
+  $('#nextWeek').addEventListener('click', () => { focusMonday = addDays(focusMonday, 7); closePop(); renderSheet(); });
+  $('#thisWeek').addEventListener('click', () => { focusMonday = mondayOf(new Date()); closePop(); renderSheet(); });
+  $('#printBtn').addEventListener('click', () => (window.sbDesktop ? window.sbDesktop.printPreview() : window.print()));
+  // A4 가로 한 장에 맞게 자동 축소
+  function fitPrint() {
+    const pageW = 1080, pageH = 740; // A4 가로(여백 제외)를 화면 픽셀로 환산한 값
+    document.body.classList.add('printing');
+    sel = null; paintSel();
+    $('.etc-memo').classList.toggle('empty', !$('#memoEtc').value.trim());
+    document.body.style.zoom = 1;
+    const page = $('.page');
+    const w = Math.max($('#sheet').scrollWidth, page.scrollWidth);
+    const h = page.scrollHeight;
+    document.body.style.zoom = Math.min(pageW / w, pageH / h, 1);
+    placeThisWeekBox();
+  }
+  function unfitPrint() { document.body.classList.remove('printing'); document.body.style.zoom = ''; placeThisWeekBox(); }
+  window.__fitPrint = fitPrint; window.__unfitPrint = unfitPrint; // 앱의 인쇄 미리보기에서 사용
+  window.addEventListener('beforeprint', fitPrint);
+  window.addEventListener('afterprint', unfitPrint);
+  window.addEventListener('resize', placeThisWeekBox);
+  // 표 크기가 바뀔 때마다 (글꼴 로딩, 스크롤바, 확대/축소 등) 빨간 박스 위치를 다시 맞춘다
+  if (window.ResizeObserver) new ResizeObserver(() => placeThisWeekBox()).observe($('#sheet'));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeThisWeekBox);
+  // 자정이 지나면 오늘/금주 표시 갱신
+  let lastDay = ymd(new Date());
+  setInterval(() => { const d = ymd(new Date()); if (d !== lastDay) { const wasThis = ymd(focusMonday) === ymd(mondayOf(new Date(Date.now() - 864e5))); lastDay = d; if (wasThis) focusMonday = mondayOf(new Date()); if (db) renderSheet(); } }, 60000);
+
+  let toastTimer;
+  function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('hidden'), 2500); }
+
+  connect();
+})();

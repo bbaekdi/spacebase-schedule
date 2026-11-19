@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>주간 스케줄</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand" id="title">SPACEBASE SCHEDULE</div>
+    <div class="weeknav">
+      <button id="prevWeek" title="이전 주">◀</button>
+      <button id="thisWeek">이번 주</button>
+      <button id="nextWeek" title="다음 주">▶</button>
+      <span class="weeklabel" id="weekLabel"></span>
+    </div>
+    <div class="spacer"></div>
+    <div class="status" id="status">연결 중…</div>
+    <div class="people" id="people"></div>
+    <div class="menu">
+      <button id="printBtn" title="인쇄">인쇄</button>
+      <a href="/api/export.json" title="전체 데이터를 파일로 받기">백업</a>
+      <span class="me" id="me"></span>
+      <a href="/logout" id="logoutLink">로그아웃</a>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="sheet-wrap" id="sheetWrap">
+      <div class="row-tools" id="rowTools">
+        <button data-act="addBelow" title="아래에 행 추가">＋</button>
+        <button data-act="up" title="위로 이동">▲</button>
+        <button data-act="down" title="아래로 이동">▼</button>
+        <button data-act="del" title="행 삭제" class="danger">✕</button>
+      </div>
+      <table class="sheet" id="sheet"></table>
+      <div class="thisweek-box" id="thisWeekBox"></div>
+      <div class="add-group"><button id="addGroupBtn">＋ 구분 추가</button></div>
+    </div>
+
+    <section class="memo">
+      <div class="memo-title">□MEMO</div>
+      <div class="memo-cols">
+        <textarea id="memoLeft" data-memo="left" spellcheck="false"></textarea>
+        <textarea id="memoRight" data-memo="right" spellcheck="false"></textarea>
+      </div>
+    </section>
+
+    <section class="etc-memo">
+      <div class="memo-title">□기타 메모</div>
+      <textarea id="memoEtc" data-memo="etc" spellcheck="false" placeholder="자유롭게 적어 주세요. 모든 사람에게 바로 공유됩니다."></textarea>
+    </section>
+
+    <section class="bottom">
+      <div class="teams">
+        <textarea data-team="0" spellcheck="false"></textarea>
+        <textarea data-team="1" spellcheck="false"></textarea>
+      </div>
+    </section>
+  </main>
+
+  <!-- 칸 편집 팝업 -->
+  <div class="pop hidden" id="pop">
+    <div class="pop-head"><span id="popTitle"></span><button class="x" id="popClose">✕</button></div>
+    <input id="popText" placeholder="일정 입력 후 Enter" maxlength="200" autocomplete="off">
+    <div class="pop-label">카테고리</div>
+    <div class="chips" id="popChips"></div>
+    <div class="pop-foot">
+      <button id="popClear" class="link danger">칸 지우기</button>
+      <span class="hint">Enter 저장 · Esc 닫기</span>
+    </div>
+  </div>
+
+  <div class="ctx hidden" id="ctx"></div>
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="ops.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
