@@ -4,7 +4,9 @@ Unicode true
 
 !define APPNAME "SPACEBASE 주간 스케줄"
 !define EXENAME "SPACEBASE-Schedule.exe"
-!define VERSION "1.0.5"
+!ifndef VERSION
+  !define VERSION "0.0.0"
+!endif
 !define REGKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SPACEBASE-Schedule"
 
 Name "${APPNAME}"

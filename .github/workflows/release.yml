@@ -1,0 +1,45 @@
+# main 에 올라온 package.json 버전으로 Windows 설치 파일을 만들어 GitHub Release 에 올린다.
+# 회사 PC 앱은 1시간마다 최신 Release 를 확인해서 자동 설치한다.
+name: release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 버전 확인
+        id: ver
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          if gh release view "v$VER" >/dev/null 2>&1; then echo "exists=1" >> "$GITHUB_OUTPUT"; else echo "exists=0" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.ver.outputs.exists == '0'
+        with:
+          node-version: 22
+          cache: npm
+      - name: 빌드
+        if: steps.ver.outputs.exists == '0'
+        shell: bash
+        run: |
+          npm ci
+          npx electron-builder --win dir --x64 --publish never
+          node build/seticon.mjs dist/win-unpacked/SPACEBASE-Schedule.exe build-icon.ico "${{ steps.ver.outputs.ver }}"
+          choco install nsis -y --no-progress
+          "/c/Program Files (x86)/NSIS/makensis.exe" -V2 "-DVERSION=${{ steps.ver.outputs.ver }}" build/installer.nsi
+      - name: Release 올리기
+        if: steps.ver.outputs.exists == '0'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=${{ steps.ver.outputs.ver }}
+          gh release create "v$VER" "dist/SPACEBASE-Schedule-Setup-$VER.exe" --title "v$VER" --notes "$(git log -1 --format=%s)"

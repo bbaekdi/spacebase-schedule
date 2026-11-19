@@ -9,7 +9,8 @@
 
 ## 배포 (자동 업데이트)
 1. `package.json` 의 `version` 을 올린다.
-2. `build/release.sh` 실행 → Windows 설치 파일을 만들고 GitHub Release `vX.Y.Z` 에 올린다.
+2. main 에 커밋/푸시 → GitHub Actions(`.github/workflows/release.yml`)가 Windows 에서 설치 파일을 만들어 Release `vX.Y.Z` 를 올린다
+   (같은 버전 Release 가 이미 있으면 건너뜀). 로컬 빌드만 필요하면 `build/release.sh`.
 3. 회사 PC 앱이 1시간마다 최신 Release 를 확인해 조용히 설치(/S)하고, 직원 PC는 회사 PC의 `/update/setup.exe` 를 받아 따라 업데이트된다.
 
 주의: 이 저장소는 공개(public)다. 실제 스케줄 데이터, 직원 이름, 공지 내용 등 회사 정보는 절대 커밋하지 않는다 (`seed-data.json` 은 빈 양식만).

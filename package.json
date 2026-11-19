@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "app": "electron .",
-    "dist:win": "electron-builder --win dir --x64 && node build/seticon.mjs dist/win-unpacked/SPACEBASE-Schedule.exe build-icon.ico 1.0.6 && makensis build/installer.nsi",
+    "dist:win": "bash build/release.sh",
     "dist:mac": "electron-builder --mac dmg"
   },
   "engines": {
