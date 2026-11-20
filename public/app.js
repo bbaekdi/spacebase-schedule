@@ -456,7 +456,7 @@
             else { const span = Math.min(need - 1, L + R); const lft = Math.max(span - R, 0); left = -lft * dayW; width = (span + 1) * dayW; cls = 'l'; }
             const fits = need === 1;
             const color = '#000'; // 칸 색과 상관없이 글자는 검은색 (엑셀과 같게)
-            inner = `<span class="txt ${cls}" style="left:${left - 1}px;width:${width + 1}px;color:${color}">${esc(cell.t)}</span>`;
+            inner = `<span class="txt ${cls}" style="left:${left - 1}px;width:${width + 1}px;color:${color}"><i>${esc(cell.t)}</i></span>`; // 글자 부분을 누르면 그 글자가 있는 칸이 선택됨
           }
           h += `<td class="d${we ? ' we' : ''}" data-r="${r}" data-c="${c}" style="${style}" title="${esc(cell.t || '')}${cat ? (cell.t ? ' · ' : '') + esc(cat.name) : ''}">${inner}</td>`;
         });

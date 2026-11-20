@@ -76,6 +76,8 @@ button { font-family: inherit; font-size: inherit; }
   white-space: nowrap; overflow: hidden; pointer-events: none; z-index: 2; line-height: 1; font-size: 12px;
 }
 .sheet td.d .txt.l { justify-content: flex-start; padding-left: 3px; }
+/* 옆 칸으로 넘친 글자를 눌러도 글자 주인 칸이 선택되게 (빈 부분은 그 칸 그대로) */
+.sheet td.d .txt > i { font-style: normal; pointer-events: auto; overflow: hidden; text-overflow: clip; }
 .sheet td.d.sel { box-shadow: inset 0 0 0 2px var(--sel); }
 .sheet td.d.sel-multi { background-image: linear-gradient(rgba(33,115,70,.16), rgba(33,115,70,.16)); }
 .sheet td.d .peer { position: absolute; inset: -1px; border: 2px solid; pointer-events: none; z-index: 3; }
