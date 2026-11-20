@@ -79,6 +79,7 @@
       case 'addGroup': {
         if (!op.id || db.groups.some((g) => g.id === op.id)) return false;
         const g = { id: str(op.id, 40), name: str(op.name, 40) || '새 구분' };
+        if (op.shade != null) g.shade = !!op.shade;
         const at = Number.isInteger(op.index) && op.index >= 0 && op.index <= db.groups.length ? op.index : db.groups.length;
         db.groups.splice(at, 0, g);
         return true;
@@ -93,6 +94,12 @@
         const g = db.groups.find((x) => x.id === op.id);
         if (!g) return false;
         g.name = str(op.name, 40);
+        return true;
+      }
+      case 'groupShade': { // 구분 전체 날짜칸 기본 회색 (진행 중 프로젝트)
+        const g = db.groups.find((x) => x.id === op.id);
+        if (!g) return false;
+        g.shade = !!op.value;
         return true;
       }
       case 'delGroup': {

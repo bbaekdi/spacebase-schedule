@@ -265,7 +265,8 @@
       case 'moveProj': { const tmp = clone(d); return Ops.applyOp(tmp, op) ? { k: 'moveProj', id: op.id, dir: -op.dir } : null; }
       case 'addGroup': return { k: 'delGroup', id: op.id };
       case 'renameGroup': { const g = d.groups.find((x) => x.id === op.id); return g ? { k: 'renameGroup', id: op.id, name: g.name } : null; }
-      case 'delGroup': { const i = d.groups.findIndex((x) => x.id === op.id); return i < 0 ? null : { k: 'addGroup', id: op.id, name: d.groups[i].name, index: i }; }
+      case 'delGroup': { const i = d.groups.findIndex((x) => x.id === op.id); return i < 0 ? null : { k: 'addGroup', id: op.id, name: d.groups[i].name, index: i, shade: d.groups[i].shade }; }
+      case 'groupShade': { const g = d.groups.find((x) => x.id === op.id); return g ? { k: 'groupShade', id: op.id, value: !!g.shade } : null; }
       case 'moveGroup': { const tmp = clone(d); return Ops.applyOp(tmp, op) ? { k: 'moveGroup', id: op.id, dir: -op.dir } : null; }
       case 'memo': return { k: 'memo', key: op.key, value: (d.memo || {})[op.key] || '' };
       case 'team': return { k: 'team', idx: op.idx, value: (d.teams || [])[op.idx] || '' };
@@ -360,7 +361,17 @@
     return measureCtx.measureText(t).width + 4;
   }
 
+  const SHADE = '#D9D9D9';
+  let shadeMigrated = false;
+  function migrateShade() {
+    // 처음 한 번: 'PROJECT' 구분은 날짜칸 기본 회색 (엑셀처럼). 이후엔 오른쪽 클릭으로 끄고 켤 수 있다
+    if (shadeMigrated || !db.groups) return;
+    shadeMigrated = true;
+    const ops = db.groups.filter((g) => g.shade == null && /^project$/i.test((g.name || '').trim())).map((g) => ({ k: 'groupShade', id: g.id, value: true }));
+    if (ops.length) rawSend(ops.length === 1 ? ops[0] : { k: 'batch', ops });
+  }
   function renderSheet() {
+    migrateShade();
     // 포커스 중인 입력칸 보존
     const ae = document.activeElement;
     const keep = ae && ae.dataset && ae.dataset.key ? { key: ae.dataset.key, val: ae.value, s: ae.selectionStart, e: ae.selectionEnd } : null;
@@ -424,7 +435,8 @@
           const d = days[c];
           const we = d.getDay() === 0 || d.getDay() === 6 || !!holName(d);
           const cat = cell.c && catOf(cell.c);
-          let style = cat ? `background:${cat.color}` : '';
+          // 회색 구분(PROJECT 등): 색을 안 칠한 칸도 기본 회색 (새 행·새 날짜도 자동)
+          let style = cat ? `background:${cat.color}` : (g.shade ? `background:${SHADE}` : '');
           let inner = '';
           if (cell.t) {
             let L = 0, R = 0;
@@ -833,7 +845,9 @@
         ['행 삭제', () => rowAction('del', pid), 'danger']];
     } else if (groupId) {
       const has = db.projects.some((p) => p.groupId === groupId);
+      const gg = db.groups.find((x) => x.id === groupId) || {};
       items = [['이 구분에 행 추가', () => { const np = newProject(groupId); send({ k: 'addProj', project: np }); renderSheet(); }],
+        [gg.shade ? '날짜칸 기본색 흰색으로' : '날짜칸 기본색 회색으로', () => { send({ k: 'groupShade', id: groupId, value: !gg.shade }); renderSheet(); }],
         ['구분 위로 이동', () => { send({ k: 'moveGroup', id: groupId, dir: -1 }); renderSheet(); }],
         ['구분 아래로 이동', () => { send({ k: 'moveGroup', id: groupId, dir: 1 }); renderSheet(); }], '-',
         ['새 구분 추가', addGroup],
