@@ -450,9 +450,10 @@
             const need = Math.max(1, Math.ceil(textWidth(cell.t) / dayW));
             const half = (need - 1) / 2;
             let left, width, cls = '';
+            // 긴 글자는 자기 칸에서 시작해 오른쪽 빈칸으로 넘친다 (앞 날짜 칸에 걸쳐 보이면 헷갈려서)
             if (need === 1) { left = 0; width = dayW; }
-            else if (L >= Math.ceil(half) && R >= Math.ceil(half)) { width = need * dayW; left = -Math.ceil(half) * dayW; width = (2 * Math.ceil(half) + 1) * dayW; }
             else if (R >= need - 1) { left = 0; width = need * dayW; cls = 'l'; }
+            else if (L >= Math.ceil(half) && R >= Math.ceil(half)) { left = -Math.ceil(half) * dayW; width = (2 * Math.ceil(half) + 1) * dayW; }
             else { const span = Math.min(need - 1, L + R); const lft = Math.max(span - R, 0); left = -lft * dayW; width = (span + 1) * dayW; cls = 'l'; }
             const fits = need === 1;
             const color = '#000'; // 칸 색과 상관없이 글자는 검은색 (엑셀과 같게)
@@ -650,7 +651,12 @@
     dragging = false;
     if (e.target.closest && e.target.closest('td.d')) openPop();
   });
-  sheet.addEventListener('dblclick', (e) => { if (e.target.closest('td.d')) openPop(); });
+  sheet.addEventListener('dblclick', (e) => {
+    if (!e.target.closest('td.d')) return;
+    openPop();
+    // 더블클릭은 글자 고치기: 전체 선택 대신 커서를 글자 끝에 둔다 (엑셀처럼)
+    const t = $('#popText'); t.focus(); t.setSelectionRange(t.value.length, t.value.length);
+  });
 
   // 키보드 (엑셀처럼)
   document.addEventListener('keydown', (e) => {
