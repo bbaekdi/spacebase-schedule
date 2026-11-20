@@ -58,7 +58,7 @@ button { font-family: inherit; font-size: inherit; }
 .sheet tr.prow td.g { border-color: var(--grid); }
 .sheet tr.prow.gfirst td { border-top-color: var(--grid); }
 .sheet tr.prow.glast td { border-bottom-color: var(--grid); }
-.sheet tr.prow td.note { border-left-color: var(--grid); border-right-color: var(--grid); }
+.sheet tr.prow td.note { border-right-color: var(--grid); }
 .sheet td.info { background: var(--head); }
 .sheet td.note { background: #fff; }
 .sheet input.cell {
@@ -198,4 +198,5 @@ body.printing .memo textarea, body.printing .teams textarea { field-sizing: cont
 .memo textarea, .teams textarea { field-sizing: content; }
 body.printing .sheet tr.prow td { border-width: .6px; }
 body.printing { --grid-light: #8c8c8c; }
-body.printing .sheet tr.prow td.g, body.printing .sheet tr.prow td.note { border-width: 1px; }
+body.printing .sheet tr.prow td.g { border-width: 1px; }
+body.printing .sheet tr.prow td.note { border-right-width: 1px; }
