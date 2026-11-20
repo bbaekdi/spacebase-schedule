@@ -736,7 +736,7 @@
       const ab = chip.dataset.ab;
       let toks = abbrTokens(el.value);
       toks = toks.includes(ab) ? toks.filter((t) => t !== ab) : [...toks, ab];
-      el.value = toks.join('/') || '-';
+      el.value = toks.length ? toks[0] + (toks.length > 1 ? ' / ' + toks.slice(1).join(',') : '') : '-'; // 엑셀처럼 "도 / 이,영"
     } else if (e.target.closest('.ap-clear')) el.value = '-';
     else return;
     commitInput(el);
