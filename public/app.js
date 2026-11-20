@@ -375,8 +375,9 @@
     h += months.map((x) => `<th class="month" colspan="${x.n}">${x.m}월</th>`).join('');
     h += '<th class="note-h">NOTE</th></tr><tr><th>설계</th><th>공사</th>';
     h += days.map((d) => `<th class="day${redDay(d) ? ' red' : ''}"${holName(d) ? ` title="${holName(d)}"` : ''}>${d.getDate()}</th>`).join('');
-    h += '<th class="note-h" rowspan="2"></th></tr><tr><th>M/S</th><th>M/S</th>';
+    h += '<th class="note-h"></th></tr><tr><th>M/S</th><th>M/S</th>';
     h += days.map((d) => `<th class="day${redDay(d) ? ' red' : ''}"${holName(d) ? ` title="${holName(d)}"` : ''}>${WD[d.getDay()]}</th>`).join('');
+    h += '<th class="note-h"></th>';
     h += '</tr></thead><tbody>';
     const spacer = `<tr class="spacer"><td colspan="${8 + days.length}"></td><td class="keep"></td></tr>`;
     h += spacer;
