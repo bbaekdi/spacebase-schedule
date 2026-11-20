@@ -1,6 +1,6 @@
 {
   "name": "spacebase-weekly-schedule",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "private": true,
   "description": "SPACEBASE 주간 스케줄 (엑셀 대체, 실시간 공유, 네이버 밴드 로그인)",
   "main": "desktop/main.js",

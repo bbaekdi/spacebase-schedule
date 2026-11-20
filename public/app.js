@@ -795,8 +795,13 @@
   let hoverPid = null;
   $('#sheetWrap').addEventListener('mousemove', (e) => {
     if (e.target.closest('#rowTools')) return;
-    const tr = e.target.closest('tr[data-pid]');
+    let tr = e.target.closest('tr[data-pid]');
     if (!tr) return;
+    // 왼쪽 구분 칸(여러 행을 합친 칸)은 첫 행 소속이라, 마우스 높이로 실제 행을 찾는다
+    if (e.target.closest('td.g')) {
+      const hit = [...tr.parentNode.querySelectorAll('tr[data-pid]')].find((t) => { const q = t.getBoundingClientRect(); return e.clientY >= q.top && e.clientY < q.bottom; });
+      if (hit) tr = hit;
+    }
     hoverPid = tr.dataset.pid;
     const wr = $('#sheetWrap').getBoundingClientRect();
     const r = tr.getBoundingClientRect();
