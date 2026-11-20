@@ -151,8 +151,13 @@
   }
   function cloudWrite(before, after) {
     const up = {};
-    for (const k of ['title', ...ARRAY_KEYS, 'memo']) {
+    for (const k of ['title', ...ARRAY_KEYS]) {
       if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) up[k] = after[k] == null ? null : JSON.parse(JSON.stringify(after[k]));
+    }
+    // 메모는 칸별로 저장 (한 칸을 고칠 때 다른 사람이 쓴 다른 칸 내용을 덮어쓰지 않게)
+    const mb = before.memo || {}, ma = after.memo || {};
+    for (const k of new Set([...Object.keys(mb), ...Object.keys(ma)])) {
+      if ((mb[k] || '') !== (ma[k] || '')) up['memo/' + k] = ma[k] || '';
     }
     const keys = new Set([...Object.keys(before.cells || {}), ...Object.keys(after.cells || {})]);
     for (const k of keys) {
