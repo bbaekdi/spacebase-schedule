@@ -701,6 +701,57 @@
     }
   });
   sheet.addEventListener('focusout', (e) => commitInput(e.target));
+
+  // ---------- 담당자(설계/공사) 칸: 구성원 약칭을 눌러서 고르기 ----------
+  const abbrPop = document.createElement('div');
+  abbrPop.className = 'abbr-pop hidden';
+  document.body.appendChild(abbrPop);
+  let abbrKey = null;
+  function abbrTokens(v) { return String(v || '').split(/[\/,·]+|\s+/).map((s) => s.trim()).filter((s) => s && s !== '-'); }
+  function abbrInput() { return abbrKey ? document.querySelector(`[data-key="${CSS.escape(abbrKey)}"]`) : null; }
+  function closeAbbrPop() { abbrKey = null; abbrPop.classList.add('hidden'); }
+  function renderAbbrPop() {
+    const el = abbrInput();
+    if (!el) return closeAbbrPop();
+    const sel = abbrTokens(el.value);
+    const rows = (db.mteams || []).map((t) => {
+      const ms = (db.members || []).filter((m) => m.teamId === t.id && m.abbr);
+      if (!ms.length) return '';
+      return `<div class="ap-row"><span class="ap-team">${esc(t.name)}</span>${ms.map((m) => `<button type="button" class="ap-chip${sel.includes(m.abbr) ? ' on' : ''}" data-ab="${esc(m.abbr)}" title="${esc((m.rank + ' ' + m.name).trim())}">${esc(m.abbr)}</button>`).join('')}</div>`;
+    }).join('');
+    abbrPop.innerHTML = (rows || '<div class="ap-empty">아래 ■ 구성원에 약칭을 먼저 넣어 주세요.</div>')
+      + '<div class="ap-foot"><button type="button" class="ap-clear">비우기</button><span>눌러서 넣기/빼기 · 직접 입력도 돼요</span></div>';
+    const r = el.getBoundingClientRect();
+    abbrPop.classList.remove('hidden');
+    const w = abbrPop.offsetWidth;
+    abbrPop.style.left = Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - w - 8)) + 'px';
+    abbrPop.style.top = window.scrollY + r.bottom + 2 + 'px';
+  }
+  abbrPop.addEventListener('mousedown', (e) => e.preventDefault()); // 입력칸 포커스 유지
+  abbrPop.addEventListener('click', (e) => {
+    const el = abbrInput();
+    if (!el) return closeAbbrPop();
+    const chip = e.target.closest('.ap-chip');
+    if (chip) {
+      const ab = chip.dataset.ab;
+      let toks = abbrTokens(el.value);
+      toks = toks.includes(ab) ? toks.filter((t) => t !== ab) : [...toks, ab];
+      el.value = toks.join('/') || '-';
+    } else if (e.target.closest('.ap-clear')) el.value = '-';
+    else return;
+    commitInput(el);
+    setTimeout(() => { const n = abbrInput(); if (n && document.activeElement !== n) n.focus(); renderAbbrPop(); }, 0);
+  });
+  sheet.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (el.dataset && (el.dataset.field === 'design' || el.dataset.field === 'build')) { abbrKey = el.dataset.key; renderAbbrPop(); }
+    else closeAbbrPop();
+  });
+  sheet.addEventListener('focusout', () => setTimeout(() => {
+    const a = document.activeElement;
+    if (!a || !a.dataset || a.dataset.key !== abbrKey) closeAbbrPop();
+  }, 0));
+  sheet.addEventListener('input', (e) => { if (abbrKey && e.target.dataset && e.target.dataset.key === abbrKey) renderAbbrPop(); });
   sheet.addEventListener('keydown', (e) => {
     const el = e.target;
     if (el.tagName !== 'INPUT') return;

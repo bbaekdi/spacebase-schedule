@@ -259,3 +259,16 @@ body.printing .sheet tr.prow.gfirst td { border-top-width: 2px; }
 body.printing .sheet tr.prow.glast td { border-bottom-width: 2px; box-shadow: inset -.5px 0 0 var(--grid-light); }
 body.printing .sheet tr.prow td.note { border-right-width: 2px; box-shadow: inset 0 -.5px 0 var(--grid-light); }
 body.printing .sheet tr.prow.glast td.note { box-shadow: none; }
+
+/* 담당자 약칭 고르기 */
+.abbr-pop { position: absolute; z-index: 150; background: #fff; border: 1px solid #999; box-shadow: 0 4px 14px rgba(0,0,0,.18); padding: 8px 10px; font-size: 12px; max-width: 520px; }
+.ap-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
+.ap-team { width: 52px; color: #666; font-size: 11px; flex: none; }
+.ap-chip { min-width: 30px; padding: 3px 7px; border: 1px solid #bbb; background: #fff; cursor: pointer; font: inherit; color: #000; }
+.ap-chip:hover { border-color: var(--sel); }
+.ap-chip.on { background: var(--sel); border-color: var(--sel); color: #fff; font-weight: 700; }
+.ap-foot { display: flex; align-items: center; gap: 10px; margin-top: 4px; color: #888; font-size: 11px; }
+.ap-clear { border: 1px solid #ccc; background: #fafafa; cursor: pointer; font-size: 11px; padding: 2px 8px; }
+.ap-empty { color: #888; margin-bottom: 4px; }
+body.printing .abbr-pop { display: none !important; }
+@media print { .abbr-pop { display: none !important; } }
