@@ -35,7 +35,7 @@ jobs:
           npx electron-builder --win dir --x64 --publish never
           node build/seticon.mjs dist/win-unpacked/SPACEBASE-Schedule.exe build-icon.ico "${{ steps.ver.outputs.ver }}"
           choco install nsis -y --no-progress
-          "/c/Program Files (x86)/NSIS/makensis.exe" -V2 "-DVERSION=${{ steps.ver.outputs.ver }}" build/installer.nsi
+          "/c/Program Files (x86)/NSIS/makensis.exe" -V2 -INPUTCHARSET UTF8 "-DVERSION=${{ steps.ver.outputs.ver }}" build/installer.nsi
       - name: Release 올리기
         if: steps.ver.outputs.exists == '0'
         shell: bash
