@@ -295,8 +295,15 @@
   document.addEventListener('keydown', (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     const tag = document.activeElement && document.activeElement.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return; // 입력 중에는 글자 단위 되돌리기
     const k = e.key.toLowerCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+      // 입력 중(글자를 고친 상태)이면 글자 단위 되돌리기. 칸을 눌러 입력창만 열린 상태면 표 되돌리기
+      const el = document.activeElement;
+      if (!(k === 'z' || k === 'y') || (tag !== 'SELECT' && el.value !== el._orig)) return;
+      e.preventDefault(); closePop(); if (el.blur) el.blur();
+      if (k === 'z' && !e.shiftKey) undo(); else redo();
+      return;
+    }
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); closePop(); undo(); }
     else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); closePop(); redo(); }
   }, true);
@@ -447,17 +454,20 @@
             let L = 0, R = 0;
             for (let j = c - 1; j >= 0 && !cells[j].t; j--) L++;
             for (let j = c + 1; j < cells.length && !cells[j].t; j++) R++;
-            const need = Math.max(1, Math.ceil(textWidth(cell.t) / dayW));
-            const half = (need - 1) / 2;
-            let left, width, cls = '';
-            // 긴 글자는 자기 칸에서 시작해 오른쪽 빈칸으로 넘친다 (앞 날짜 칸에 걸쳐 보이면 헷갈려서)
-            if (need === 1) { left = 0; width = dayW; }
-            else if (R >= need - 1) { left = 0; width = need * dayW; cls = 'l'; }
-            else if (L >= Math.ceil(half) && R >= Math.ceil(half)) { left = -Math.ceil(half) * dayW; width = (2 * Math.ceil(half) + 1) * dayW; }
-            else { const span = Math.min(need - 1, L + R); const lft = Math.max(span - R, 0); left = -lft * dayW; width = (span + 1) * dayW; cls = 'l'; }
+            const tw = textWidth(cell.t);
+            const need = Math.max(1, Math.ceil(tw / dayW));
+            // 글자는 항상 자기 칸에서 시작한다. 앞(왼쪽) 날짜 칸으로는 넘치지 않고, 오른쪽 빈칸으로만 넘친다.
+            // 오른쪽에 자리가 모자라면 글자를 조금 작게 해서 자기 칸 안에 맞춘다.
+            let left = 0, width, cls = '', fs = '';
+            if (need === 1) width = dayW;
+            else {
+              width = (Math.min(need - 1, R) + 1) * dayW; cls = 'l';
+              const base = printing ? 10.7 : 12, twb = tw * base / 12; // tw 는 12px 기준
+              if (twb > width) fs = `font-size:${Math.max(7, base * (width - 2) / twb).toFixed(1)}px;`;
+            }
             const fits = need === 1;
             const color = '#000'; // 칸 색과 상관없이 글자는 검은색 (엑셀과 같게)
-            inner = `<span class="txt ${cls}" style="left:${left - 1}px;width:${width + 1}px;color:${color}"><i>${esc(cell.t)}</i></span>`; // 글자 부분을 누르면 그 글자가 있는 칸이 선택됨
+            inner = `<span class="txt ${cls}" style="left:${left - 1}px;width:${width + 1}px;color:${color};${fs}"><i>${esc(cell.t)}</i></span>`; // 글자 부분을 누르면 그 글자가 있는 칸이 선택됨
           }
           h += `<td class="d${we ? ' we' : ''}" data-r="${r}" data-c="${c}" style="${style}" title="${esc(cell.t || '')}${cat ? (cell.t ? ' · ' : '') + esc(cat.name) : ''}">${inner}</td>`;
         });
@@ -562,6 +572,7 @@
     $('#popTitle').textContent = multi ? `${selCells().length}칸 선택됨 · 카테고리를 고르면 모두 칠해집니다` : `${p ? p.name : ''} · ${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`;
     const t = $('#popText');
     t.value = initialText != null ? initialText : (cell.t || '');
+    t._orig = initialText != null ? null : t.value;
     t.placeholder = multi ? `첫 칸(${d.getMonth() + 1}/${d.getDate()})에 넣을 글자` : '일정 입력 후 Enter';
     const curCat = multi ? null : (cell.c || '');
     $('#popChips').innerHTML = `<button class="chip${curCat === '' ? ' on' : ''}" data-cat=""><i class="none"></i>색 없음</button>` +
@@ -724,6 +735,8 @@
     }
   });
   sheet.addEventListener('focusout', (e) => commitInput(e.target));
+  // 포커스 받을 때 값을 기억해 두고, 안 고친 상태에서 Ctrl+Z 를 누르면 표 되돌리기로 넘긴다
+  document.addEventListener('focusin', (e) => { const el = e.target; if (el && el.id !== 'popText' && 'value' in el) el._orig = el.value; });
 
   // ---------- 담당자(설계/공사) 칸: 구성원 약칭을 눌러서 고르기 ----------
   const abbrPop = document.createElement('div');
