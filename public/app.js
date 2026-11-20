@@ -386,7 +386,7 @@
     migrateShade();
     // 포커스 중인 입력칸 보존
     const ae = document.activeElement;
-    const keep = ae && ae.dataset && ae.dataset.key ? { key: ae.dataset.key, val: ae.value, s: ae.selectionStart, e: ae.selectionEnd } : null;
+    const keep = ae && ae.dataset && ae.dataset.key ? { key: ae.dataset.key, val: ae.value, typed: ae.value !== ae._orig, orig: ae._orig, s: ae.selectionStart, e: ae.selectionEnd } : null;
 
     days = Array.from({ length: 21 }, (_, i) => addDays(focusMonday, i - 7));
     $('#weekLabel').textContent = weekLabel(focusMonday);
@@ -481,7 +481,12 @@
 
     if (keep) {
       const el = document.querySelector(`[data-key="${CSS.escape(keep.key)}"]`);
-      if (el) { el.value = keep.val; el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch {} }
+      if (el) {
+        // 고치던 중이면 그 글자를 유지, 그냥 커서만 있던 칸이면 다른 사람이 바꾼 최신 값을 보여 준다
+        if (keep.typed) el.value = keep.val;
+        el.focus(); el._orig = keep.typed ? keep.orig : el.value;
+        try { el.setSelectionRange(keep.s, keep.e); } catch {}
+      }
     }
     if (sel) clampSel();
     paintSel();
@@ -797,6 +802,9 @@
   function commitInput(el) {
     if (!el || !el.dataset || !el.dataset.key) return;
     if (el.dataset.cancel) { delete el.dataset.cancel; renderSheet(); return; }
+    // 손대지 않은 칸은 저장하지 않는다 (오래 열어 둔 화면의 옛 값이 다른 사람의 수정을 덮어쓰지 않게)
+    if (el._orig !== undefined && el.value === el._orig) return;
+    el._orig = el.value;
     const [kind, id, field] = el.dataset.key.split('|');
     if (kind === 'g') {
       const g = db.groups.find((x) => x.id === id);
@@ -911,7 +919,8 @@
       rawSend({ k: 'memo', key: 'notice', value: m.left.slice(at).trim() });
       rawSend({ k: 'memo', key: 'left', value: m.left.slice(0, at).replace(/\s+$/, '') });
     }
-    $$('textarea[data-memo]').forEach((t) => { if (t !== document.activeElement) t.value = (db.memo || {})[t.dataset.memo] || ''; autoGrow(t); });
+    // 다른 사람이 고친 내용은 바로 보여 준다. 내가 지금 글자를 고치는 중인 칸만 그대로 둔다
+    $$('textarea[data-memo]').forEach((t) => { if (t !== document.activeElement || !t._dirty) t.value = (db.memo || {})[t.dataset.memo] || ''; autoGrow(t); });
     $$('textarea[data-team]').forEach((t) => { if (t !== document.activeElement) t.value = (db.teams || [])[+t.dataset.team] || ''; autoGrow(t); });
   }
   // 메모 칸 높이를 내용에 맞춤 (최신 브라우저/프로그램은 CSS field-sizing 으로 자동)
@@ -920,8 +929,14 @@
   const timers = {};
   function debounced(key, fn) { clearTimeout(timers[key]); timers[key] = setTimeout(fn, 500); }
   $$('textarea[data-memo]').forEach((t) => {
-    const save = () => { if (((db.memo || {})[t.dataset.memo] || '') !== t.value) send({ k: 'memo', key: t.dataset.memo, value: t.value }); };
-    t.addEventListener('input', () => { autoGrow(t); debounced('m' + t.dataset.memo, save); });
+    // 직접 글자를 고친 경우에만 저장한다. 커서만 두었다 빠져나가면 저장하지 않아서,
+    // 오래 열어 둔 화면의 빈 칸/옛 내용이 다른 사람이 쓴 공지사항을 지우지 않는다
+    const save = () => {
+      if (!t._dirty) return;
+      t._dirty = false;
+      if (((db.memo || {})[t.dataset.memo] || '') !== t.value) send({ k: 'memo', key: t.dataset.memo, value: t.value });
+    };
+    t.addEventListener('input', () => { t._dirty = true; autoGrow(t); debounced('m' + t.dataset.memo, save); });
     t.addEventListener('blur', save);
   });
   $$('textarea[data-team]').forEach((t) => {
