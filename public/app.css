@@ -81,7 +81,7 @@ button { font-family: inherit; font-size: inherit; }
 .sheet td.d .peer { position: absolute; inset: -1px; border: 2px solid; pointer-events: none; z-index: 3; }
 .sheet td.d .peer b { position: absolute; top: -15px; left: -2px; font-size: 10px; color: #fff; padding: 0 3px; line-height: 14px; font-weight: 400; white-space: nowrap; }
 
-.thisweek-box { position: absolute; border: 2px dashed var(--red); pointer-events: none; z-index: 4; }
+.thisweek-box { position: absolute; border: 3px dashed var(--red); pointer-events: none; z-index: 4; }
 
 /* 행 도구 (마우스를 올리면 왼쪽에 나타남) */
 .row-tools { position: absolute; left: 0; display: none; flex-direction: row; gap: 1px; z-index: 6; }
@@ -200,3 +200,4 @@ body.printing .sheet tr.prow td { border-width: .6px; }
 body.printing { --grid-light: #8c8c8c; }
 body.printing .sheet tr.prow td.g { border-width: 1px; }
 body.printing .sheet tr.prow td.note { border-right-width: 1px; }
+body.printing .thisweek-box { border-width: 3.5px; }
