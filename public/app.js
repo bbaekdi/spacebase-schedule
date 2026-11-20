@@ -391,7 +391,8 @@
       ps.forEach((p, i) => {
         const r = rowList.length;
         rowList.push(p.id);
-        h += `<tr data-pid="${p.id}" data-r="${r}">`;
+        const edge = (i === 0 ? ' gfirst' : '') + (i === ps.length - 1 ? ' glast' : '');
+        h += `<tr data-pid="${p.id}" data-r="${r}" class="prow${edge}">`;
         if (i === 0) h += `<td class="g" rowspan="${ps.length}" data-group="${g.id}"><input class="cell" data-key="g|${g.id}" value="${esc(g.name)}"></td>`;
         h += `<td class="info">${inp(p, 'type')}</td>`;
         h += `<td class="info">${inp(p, 'name', 'left')}</td>`;
