@@ -161,7 +161,17 @@ body.printing .sheet td.d.sel, body.printing .sheet td.d.sel-multi { box-shadow:
 .sheet-title .t1 { font-size: 22px; font-weight: 800; letter-spacing: .5px; }
 .sheet-title .t2 { font-size: 13px; margin-top: 4px; }
 .page-foot { display: flex; justify-content: space-between; margin: 34px 0 0 80px; font-size: 11px; color: #000; }
-body.printing .page-foot { margin-left: 0; }
+body.printing .page-foot { margin-left: 0; margin-top: auto; padding-top: 24px; }
+/* 인쇄: 엑셀 원본 비율 (행 높이, 제목, 메모 줄 간격) */
+body.printing { --row-h: 20px; }
+body.printing .page { display: flex; flex-direction: column; box-sizing: border-box; }
+body.printing .sheet tr.head-1 th { height: 22px; }
+body.printing .sheet tr.spacer td { height: 6px; }
+body.printing .sheet-title { padding: 0 0 40px; }
+body.printing .sheet-title .t1 { font-size: 24px; }
+body.printing .sheet-title .t2 { font-size: 14px; }
+body.printing .memo textarea { line-height: 1.6; }
+body.printing .teams textarea { font-size: 11px; line-height: 1.35; }
 
 /* 처음 입력 화면 */
 .gate { position: fixed; inset: 0; z-index: 300; background: #f3f2ee; display: grid; place-items: center; }
@@ -171,3 +181,7 @@ body.printing .page-foot { margin-left: 0; }
 .gate-card input { padding: 10px; border: 1px solid #bbb; font: inherit; }
 .gate-card button { padding: 11px; border: 0; background: #217346; color: #fff; font: inherit; font-weight: 700; cursor: pointer; margin-top: 4px; }
 .gate-err { color: #c22; font-size: 13px; min-height: 0; }
+body.printing .sheet { font-size: 12px; }
+body.printing .sheet input.cell { padding: 0 2px; }
+body.printing .sheet input.cell.right { padding-right: 3px; }
+body.printing .sheet td.note, body.printing .sheet td.note input.cell { font-size: 10.5px; }

@@ -352,13 +352,16 @@
     days = Array.from({ length: 21 }, (_, i) => addDays(focusMonday, i - 7));
     $('#weekLabel').textContent = weekLabel(focusMonday);
 
-    const dayW = 50;
-    const cols = [80, 64, 170, 80, 92, 168, 64, 64];
-    const tableW = cols.reduce((a, b) => a + b, 0) + days.length * dayW + 120;
+    // 인쇄할 때는 엑셀 원본(A4 가로 1장)과 같은 칸 비율로 좁혀서 글씨가 작아지지 않게 한다
+    const printing = document.body.classList.contains('printing');
+    const dayW = printing ? 34 : 50;
+    const cols = printing ? [68, 50, 156, 71, 70, 124, 54, 57] : [80, 64, 170, 80, 92, 168, 64, 64];
+    const noteW = printing ? 80 : 120;
+    const tableW = cols.reduce((a, b) => a + b, 0) + days.length * dayW + noteW;
     $('#sheet').style.width = tableW + 'px'; // 표가 화면에 맞춰 줄어들지 않게 고정
     $('#sheetTitle').style.width = tableW + 'px'; // 제목은 표 가운데에
     $('#pageFoot').style.width = tableW + 'px';
-    let h = '<colgroup>' + cols.map((w) => `<col style="width:${w}px">`).join('') + days.map(() => `<col style="width:${dayW}px">`).join('') + '<col style="width:120px"></colgroup>';
+    let h = '<colgroup>' + cols.map((w) => `<col style="width:${w}px">`).join('') + days.map(() => `<col style="width:${dayW}px">`).join('') + `<col style="width:${noteW}px"></colgroup>`;
 
     // 헤더 3줄
     const months = [];
@@ -822,12 +825,24 @@
     $('.etc-memo').classList.toggle('empty', !$('#memoEtc').value.trim());
     document.body.style.zoom = 1;
     const page = $('.page');
+    page.style.minHeight = '';
+    if (db) renderSheet(); // 인쇄용 칸 너비로 다시 그림
+    page.style.width = $('#sheet').offsetWidth + 'px'; // 메모 등도 표 너비에 맞춤
+    document.querySelectorAll('textarea[data-memo], textarea[data-team]').forEach(autoGrow);
     const w = Math.max($('#sheet').scrollWidth, page.scrollWidth);
     const h = page.scrollHeight;
-    document.body.style.zoom = Math.min(pageW / w, pageH / h, 1);
+    const z = Math.min(pageW / w, pageH / h, 1);
+    document.body.style.zoom = z;
+    page.style.minHeight = Math.floor(pageH / z) - 4 + 'px'; // 바닥글을 엑셀처럼 종이 맨 아래에
     placeThisWeekBox();
   }
-  function unfitPrint() { document.body.classList.remove('printing'); document.body.style.zoom = ''; placeThisWeekBox(); }
+  function unfitPrint() {
+    document.body.classList.remove('printing'); document.body.style.zoom = '';
+    const page = $('.page'); page.style.width = ''; page.style.minHeight = '';
+    if (db) renderSheet();
+    document.querySelectorAll('textarea[data-memo], textarea[data-team]').forEach(autoGrow);
+    placeThisWeekBox();
+  }
   window.__fitPrint = fitPrint; window.__unfitPrint = unfitPrint; // 앱의 인쇄 미리보기에서 사용
   window.addEventListener('beforeprint', fitPrint);
   window.addEventListener('afterprint', unfitPrint);
