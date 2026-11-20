@@ -50,7 +50,7 @@ button { font-family: inherit; font-size: inherit; }
 .sheet th.note-h { background: var(--head); font-weight: 400; }
 .sheet tr.head-1 th { height: 26px; }
 .sheet tr.spacer td { height: 9px; border-left: 0; border-right: 0; background: #fff; }
-.sheet tr.spacer td.keep { border-left: 1px solid var(--grid); }
+.sheet tr.spacer td.keep { border-left: 0; }
 
 .sheet td.g { background: var(--head); font-weight: 700; }
 /* 프로젝트 칸의 선은 엑셀처럼 날짜 머리글보다 가늘고 연하게, 구분 바깥 테두리만 진하게 */
