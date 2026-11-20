@@ -90,7 +90,8 @@ button.link.danger { color: #c33; }
 .memo, .etc-memo { margin-top: 14px; margin-left: 80px; max-width: 1820px; }
 .bottom { margin-left: 80px; }
 .memo-title { font-weight: 700; margin-bottom: 4px; }
-.memo-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); border-top: 1px solid #000; border-bottom: 1px solid #000; }
+.memo-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); border-top: 1px solid #000; }
+.memo textarea.memo-notice { display: block; border-bottom: 1px solid #000; }
 .memo textarea, .etc-memo textarea, .teams textarea {
   width: 100%; border: 0; resize: none; font: inherit; line-height: 1.7; padding: 6px 8px; outline: none; overflow: hidden; background: #fff; color: #000;
 }
@@ -185,3 +186,6 @@ body.printing .sheet { font-size: 12px; }
 body.printing .sheet input.cell { padding: 0 2px; }
 body.printing .sheet input.cell.right { padding-right: 3px; }
 body.printing .sheet td.note, body.printing .sheet td.note input.cell { font-size: 10.5px; }
+/* 인쇄할 때 메모 칸 높이는 내용에 딱 맞게 (빈 줄 없이) */
+body.printing .memo textarea, body.printing .teams textarea { field-sizing: content; height: auto !important; min-height: 0; }
+.memo textarea, .teams textarea { field-sizing: content; }

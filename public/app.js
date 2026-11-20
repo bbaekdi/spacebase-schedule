@@ -76,7 +76,7 @@
     ARRAY_KEYS.forEach((k) => (d[k] = toArr(d[k])));
     d.teams = [d.teams[0] || '', d.teams[1] || ''];
     d.cells = d.cells || {};
-    d.memo = Object.assign({ left: '', right: '', etc: '' }, d.memo || {});
+    d.memo = Object.assign({ left: '', right: '', notice: '', etc: '' }, d.memo || {});
     d.title = d.title || 'SPACEBASE SCHEDULE';
     return d;
   }
@@ -420,7 +420,7 @@
             else if (R >= need - 1) { left = 0; width = need * dayW; cls = 'l'; }
             else { const span = Math.min(need - 1, L + R); const lft = Math.max(span - R, 0); left = -lft * dayW; width = (span + 1) * dayW; cls = 'l'; }
             const fits = need === 1;
-            const color = cat && fits ? textColor(cat.color) : '#000';
+            const color = '#000'; // 칸 색과 상관없이 글자는 검은색 (엑셀과 같게)
             inner = `<span class="txt ${cls}" style="left:${left - 1}px;width:${width + 1}px;color:${color}">${esc(cell.t)}</span>`;
           }
           h += `<td class="d${we ? ' we' : ''}" data-r="${r}" data-c="${c}" style="${style}" title="${esc(cell.t || '')}${cat ? (cell.t ? ' · ' : '') + esc(cat.name) : ''}">${inner}</td>`;
@@ -782,20 +782,29 @@
     if (!pop.classList.contains('hidden') && !e.target.closest('#pop') && !e.target.closest('td.d')) { savePopText(); closePop(); renderSheet(); }
   });
   function addGroup() {
-    const name = prompt('새 구분 이름', '새 구분');
-    if (!name) return;
+    // 프로그램(Electron)에서는 prompt 창이 안 떠서, 바로 만들고 이름 칸에 커서를 둔다
     const id = uid('g');
-    send({ k: 'batch', ops: [{ k: 'addGroup', id, name }, { k: 'addProj', project: newProject(id) }] });
+    send({ k: 'batch', ops: [{ k: 'addGroup', id, name: '새 구분' }, { k: 'addProj', project: newProject(id) }] });
     renderSheet();
+    const el = document.querySelector(`[data-key="g|${id}"]`); if (el) { el.focus(); el.select(); }
   }
   $('#addGroupBtn').addEventListener('click', addGroup);
 
   // ---------- 메모 / 담당자 ----------
   function renderMemo() {
+    // 예전 데이터: 왼쪽 메모에 같이 있던 "■ 공지사항" 부분을 아래 전체 너비 칸으로 옮긴다 (엑셀과 같은 배치)
+    const m = db.memo || {};
+    const at = (m.left || '').indexOf('■ 공지사항');
+    if (!m.notice && at > 0) {
+      rawSend({ k: 'memo', key: 'notice', value: m.left.slice(at).trim() });
+      rawSend({ k: 'memo', key: 'left', value: m.left.slice(0, at).replace(/\s+$/, '') });
+    }
     $$('textarea[data-memo]').forEach((t) => { if (t !== document.activeElement) t.value = (db.memo || {})[t.dataset.memo] || ''; autoGrow(t); });
     $$('textarea[data-team]').forEach((t) => { if (t !== document.activeElement) t.value = (db.teams || [])[+t.dataset.team] || ''; autoGrow(t); });
   }
-  function autoGrow(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
+  // 메모 칸 높이를 내용에 맞춤 (최신 브라우저/프로그램은 CSS field-sizing 으로 자동)
+  const FIELD_SIZING = !!(window.CSS && CSS.supports && CSS.supports('field-sizing', 'content'));
+  function autoGrow(t) { if (FIELD_SIZING) return; t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
   const timers = {};
   function debounced(key, fn) { clearTimeout(timers[key]); timers[key] = setTimeout(fn, 500); }
   $$('textarea[data-memo]').forEach((t) => {

@@ -126,7 +126,7 @@
       }
       case 'memo': {
         db.memo = db.memo || {};
-        if (!['left', 'right', 'etc'].includes(op.key)) return false;
+        if (!['left', 'right', 'notice', 'etc'].includes(op.key)) return false;
         db.memo[op.key] = str(op.value, 20000);
         return true;
       }
