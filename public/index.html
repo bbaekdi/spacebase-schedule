@@ -55,9 +55,14 @@
     </section>
 
     <section class="bottom">
-      <div class="teams">
-        <textarea data-team="0" spellcheck="false"></textarea>
-        <textarea data-team="1" spellcheck="false"></textarea>
+      <div class="members">
+        <div class="members-head"><span class="memo-title">■ 구성원</span><button id="ranksBtn" class="link tool">직급 목록 편집</button><button id="mteamAddBtn" class="link tool">＋ 팀 추가</button></div>
+        <div class="ranks-edit hidden" id="ranksEdit">
+          <span>직급 목록 (쉼표로 구분, 적은 순서대로 보여요)</span>
+          <input id="ranksInput" autocomplete="off">
+          <button id="ranksSave">저장</button><button id="ranksCancel" class="link">취소</button>
+        </div>
+        <div class="mteams" id="mteams"></div>
       </div>
     </section>
     <footer class="page-foot" id="pageFoot"><span>SPACEBASE SCHEDULE</span><span>스페이스베이스</span></footer>

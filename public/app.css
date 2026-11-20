@@ -201,3 +201,41 @@ body.printing { --grid-light: #8c8c8c; }
 body.printing .sheet tr.prow td.g { border-width: 1px; }
 body.printing .sheet tr.prow td.note { border-right-width: 1px; }
 body.printing .thisweek-box { border-width: 3.5px; }
+
+/* ---------- 구성원 ---------- */
+.members { width: 100%; }
+.members-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.members-head .memo-title { margin: 0; }
+.ranks-edit { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; font-size: 12px; color: #555; flex-wrap: wrap; }
+.ranks-edit input { width: 360px; max-width: 100%; padding: 4px 6px; border: 1px solid #aaa; font: inherit; color: #000; }
+.ranks-edit button { font-size: 12px; padding: 3px 10px; cursor: pointer; }
+.mteams { display: flex; flex-wrap: wrap; gap: 8px 48px; align-items: flex-start; }
+.mteam { min-width: 220px; }
+.mt-head { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+.mt-name { border: 0; font: inherit; font-weight: 700; padding: 2px 0; width: 140px; outline: none; background: transparent; color: #000; }
+.mteam input:focus, .mteam select:focus { box-shadow: inset 0 -1px 0 var(--sel); }
+.mrow { display: flex; align-items: center; height: 22px; font-size: 13px; }
+.m-ab { white-space: nowrap; }
+.m-abbr { width: 2.6em; border: 0; font: inherit; text-align: center; padding: 0; outline: none; background: transparent; color: #000; }
+.m-rank { border: 0; font: inherit; padding: 0 2px; margin: 0 4px; background: transparent; color: #000; cursor: pointer; outline: none; }
+.m-name { width: 90px; border: 0; font: inherit; padding: 0; outline: none; background: transparent; color: #000; }
+.mteam .tool { visibility: hidden; border: 0; background: none; cursor: pointer; font-size: 10px; color: #777; padding: 0 3px; }
+.mteam .tool.danger, .mt-del { color: #c33; }
+.mrow:hover .tool, .mt-head:hover .tool { visibility: visible; }
+.m-add { font-size: 12px; margin-top: 2px; }
+body.printing .members-head .tool, body.printing .m-add, body.printing .mteam .tool, body.printing .ranks-edit { display: none !important; }
+body.printing .m-rank { appearance: none; -webkit-appearance: none; padding: 0; margin: 0 3px; }
+body.printing .mrow { height: 16px; font-size: 11px; }
+body.printing .mt-name { font-size: 11px; }
+body.printing .members-head .memo-title { font-size: 13px; }
+@media print { .members-head .tool, .m-add, .mteam .tool, .ranks-edit { display: none !important; } .m-rank { appearance: none; -webkit-appearance: none; } }
+/* 구성원: 글자 길이에 맞춰 칸 너비 자동 */
+.m-abbr, .m-name, .m-rank, .mt-name { field-sizing: content; }
+.m-abbr { width: auto; min-width: 1.2em; padding: 0 1px; }
+.m-name { width: auto; min-width: 3em; }
+.m-rank { min-width: 2.5em; }
+.mt-name { width: auto; min-width: 3em; }
+.mteam { min-width: 0; }
+body.printing .mteam ::placeholder { color: transparent; }
+@media print { .mteam ::placeholder { color: transparent; } }
+body.printing .mrow.empty { display: none; } @media print { .mrow.empty { display: none; } }

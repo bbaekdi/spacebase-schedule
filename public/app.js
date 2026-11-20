@@ -63,7 +63,7 @@
   const clientId = uid('c');
   let fbData = null; // spaces/<key>/data
   let fbSpace = null; // spaces/<key>
-  const ARRAY_KEYS = ['groups', 'projects', 'categories', 'teams'];
+  const ARRAY_KEYS = ['groups', 'projects', 'categories', 'teams', 'mteams', 'members', 'ranks'];
   function getCred() { try { const c = JSON.parse(localStorage.getItem('sb_cred') || 'null'); return c && c.code && c.name ? c : null; } catch { return null; } }
   function setCred(c) { try { localStorage.setItem('sb_cred', JSON.stringify(c)); } catch {} }
   async function sha256hex(s) {
@@ -269,6 +269,20 @@
       case 'moveGroup': { const tmp = clone(d); return Ops.applyOp(tmp, op) ? { k: 'moveGroup', id: op.id, dir: -op.dir } : null; }
       case 'memo': return { k: 'memo', key: op.key, value: (d.memo || {})[op.key] || '' };
       case 'team': return { k: 'team', idx: op.idx, value: (d.teams || [])[op.idx] || '' };
+      case 'ranks': return { k: 'ranks', list: clone(d.ranks || []) };
+      case 'mteamAdd': return { k: 'mteamDel', id: op.team.id };
+      case 'mteamSet': { const t = (d.mteams || []).find((x) => x.id === op.id); return t ? { k: 'mteamSet', id: op.id, value: t.name } : null; }
+      case 'mteamDel': {
+        const i = (d.mteams || []).findIndex((x) => x.id === op.id);
+        if (i < 0) return null;
+        const ops = [{ k: 'mteamAdd', team: clone(d.mteams[i]), index: i }];
+        (d.members || []).forEach((m, mi) => { if (m.teamId === op.id) ops.push({ k: 'memberAdd', member: clone(m), index: mi }); });
+        return { k: 'batch', ops };
+      }
+      case 'memberAdd': return { k: 'memberDel', id: op.member.id };
+      case 'memberSet': { const m = (d.members || []).find((x) => x.id === op.id); return m ? { k: 'memberSet', id: op.id, field: op.field, value: m[op.field] || '' } : null; }
+      case 'memberDel': { const i = (d.members || []).findIndex((x) => x.id === op.id); return i < 0 ? null : { k: 'memberAdd', member: clone(d.members[i]), index: i }; }
+      case 'memberMove': return { k: 'memberMove', id: op.id, dir: op.dir < 0 ? 1 : -1 };
     }
     return null;
   }
@@ -320,12 +334,14 @@
   function renderAll() {
     renderSheet();
     renderMemo();
+    renderMembers();
     renderLegend();
     $('#title').textContent = db.title || 'SPACEBASE SCHEDULE';
   }
   function renderFor(op) {
     if (['memo'].includes(op.k)) renderMemo();
     else if (op.k === 'team') renderMemo();
+    else if (/^(member|mteam|ranks|initMembers)/.test(op.k)) renderMembers();
     else if (op.k === 'cat' || op.k === 'delCat') { renderLegend(); renderSheet(); }
     else if (op.k === 'batch') renderAll();
     else renderSheet();
@@ -623,7 +639,7 @@
   document.addEventListener('keydown', (e) => {
     if (!sel || !pop.classList.contains('hidden')) return;
     const tag = document.activeElement && document.activeElement.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     const mod = e.ctrlKey || e.metaKey;
     const arrows = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     if (arrows[e.key]) { e.preventDefault(); moveSel(...arrows[e.key], e.shiftKey); }
@@ -819,6 +835,125 @@
     t.addEventListener('input', () => { autoGrow(t); debounced('t' + t.dataset.team, save); });
     t.addEventListener('blur', save);
   });
+
+  // ---------- 구성원 (팀별 목록, 직급은 목록에서 선택) ----------
+  const DEFAULT_RANKS = ['이사', '부장', '실장', '책임', '선임', '사원'];
+  let membersMigrated = false;
+  function migrateMembers() {
+    // 예전: 팀 목록을 글자로 적어 두던 칸 → 팀/약칭/직급/이름 구조로 한 번 옮긴다
+    if (membersMigrated || (db.mteams || []).length || (db.members || []).length) return;
+    membersMigrated = true;
+    const mteams = [], members = [], ranks = DEFAULT_RANKS.slice();
+    let cur = null;
+    (db.teams || []).forEach((txt) => String(txt || '').split('\n').forEach((line) => {
+      line = line.trim();
+      if (!line) return;
+      const m = line.match(/^\[([^\]]*)\]\s*(\S+)?\s*(.*)$/);
+      if (m) {
+        if (!cur) { cur = { id: uid('t'), name: '팀' }; mteams.push(cur); }
+        const rank = m[2] || '';
+        if (rank && !ranks.includes(rank)) ranks.push(rank);
+        members.push({ id: uid('m'), teamId: cur.id, abbr: m[1], rank, name: (m[3] || '').trim() });
+      } else { cur = { id: uid('t'), name: line }; mteams.push(cur); }
+    }));
+    if (!mteams.length) ['설계팀', '시공팀', '공무팀', '관리부'].forEach((name) => mteams.push({ id: uid('t'), name }));
+    rawSend({ k: 'initMembers', mteams, members, ranks });
+  }
+  function ranksOf() { return (db.ranks && db.ranks.length ? db.ranks : DEFAULT_RANKS); }
+  function renderMembers() {
+    migrateMembers();
+    const box = $('#mteams');
+    const ae = document.activeElement;
+    const keepK = ae && box.contains(ae) && ae.dataset.k ? { k: ae.dataset.k, s: ae.selectionStart, e: ae.selectionEnd } : null;
+    const ranks = ranksOf();
+    let h = '';
+    (db.mteams || []).forEach((t) => {
+      h += `<div class="mteam" data-team="${t.id}"><div class="mt-head"><input class="mt-name" data-k="t|${t.id}" value="${esc(t.name)}" placeholder="팀 이름"><button class="mt-del tool" title="팀 삭제">✕</button></div>`;
+      (db.members || []).filter((m) => m.teamId === t.id).forEach((m) => {
+        const opts = ranks.includes(m.rank) || !m.rank ? ranks : [m.rank, ...ranks];
+        h += `<div class="mrow${m.abbr || m.name ? '' : ' empty'}" data-id="${m.id}"><span class="m-ab">[<input class="m-abbr" data-k="m|${m.id}|abbr" value="${esc(m.abbr)}" placeholder="약칭">]</span>`
+          + `<select class="m-rank" data-k="m|${m.id}|rank"><option value=""${m.rank ? '' : ' selected'}>직급</option>${opts.map((r) => `<option${r === m.rank ? ' selected' : ''}>${esc(r)}</option>`).join('')}<option value="__edit">직급 목록 편집…</option></select>`
+          + `<input class="m-name" data-k="m|${m.id}|name" value="${esc(m.name)}" placeholder="이름">`
+          + `<span class="m-tools"><button class="tool" data-mact="up" title="위로">▲</button><button class="tool" data-mact="down" title="아래로">▼</button><button class="tool danger" data-mact="del" title="삭제">✕</button></span></div>`;
+      });
+      h += `<button class="m-add link">＋ 구성원 추가</button></div>`;
+    });
+    box.innerHTML = h;
+    if (keepK) {
+      const el = box.querySelector(`[data-k="${CSS.escape(keepK.k)}"]`);
+      if (el) { el.focus(); try { el.setSelectionRange(keepK.s, keepK.e); } catch {} }
+    }
+  }
+  function memberInputSave(el) {
+    const [kind, id, field] = el.dataset.k.split('|');
+    if (kind === 't') {
+      const t = (db.mteams || []).find((x) => x.id === id);
+      if (t && t.name !== el.value) send({ k: 'mteamSet', id, value: el.value });
+    } else {
+      const m = (db.members || []).find((x) => x.id === id);
+      if (m && (m[field] || '') !== el.value) send({ k: 'memberSet', id, field, value: el.value });
+    }
+  }
+  $('#mteams').addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.tagName === 'INPUT' && el.dataset.k) debounced('mb' + el.dataset.k, () => memberInputSave(el));
+  });
+  $('#mteams').addEventListener('focusout', (e) => { if (e.target.tagName === 'INPUT' && e.target.dataset.k) memberInputSave(e.target); });
+  $('#mteams').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.target.blur(); });
+  $('#mteams').addEventListener('change', (e) => {
+    const el = e.target;
+    if (el.tagName !== 'SELECT') return;
+    const id = el.dataset.k.split('|')[1];
+    if (el.value === '__edit') { renderMembers(); openRanksEditor(); return; }
+    send({ k: 'memberSet', id, field: 'rank', value: el.value });
+    renderMembers();
+  });
+  $('#mteams').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const team = b.closest('.mteam'), row = b.closest('.mrow');
+    if (b.classList.contains('m-add')) {
+      const tid = team.dataset.team;
+      const last = (db.members || []).reduce((a, m, i) => (m.teamId === tid ? i : a), -1);
+      const id = uid('m');
+      const prev = last >= 0 ? db.members[last] : null;
+      send({ k: 'memberAdd', member: { id, teamId: tid, abbr: '', rank: prev ? prev.rank : '', name: '' }, index: last >= 0 ? last + 1 : null });
+      renderMembers();
+      const el = $(`[data-k="m|${id}|abbr"]`); if (el) el.focus();
+    } else if (b.classList.contains('mt-del')) {
+      const t = (db.mteams || []).find((x) => x.id === team.dataset.team);
+      const n = (db.members || []).filter((m) => m.teamId === team.dataset.team).length;
+      if (n && !confirm(`"${t ? t.name : ''}" 팀과 구성원 ${n}명을 삭제할까요?`)) return;
+      send({ k: 'mteamDel', id: team.dataset.team });
+      renderMembers();
+    } else if (row && b.dataset.mact) {
+      const id = row.dataset.id;
+      if (b.dataset.mact === 'del') send({ k: 'memberDel', id });
+      else send({ k: 'memberMove', id, dir: b.dataset.mact === 'up' ? -1 : 1 });
+      renderMembers();
+    }
+  });
+  $('#mteamAddBtn').addEventListener('click', () => {
+    const id = uid('t');
+    send({ k: 'mteamAdd', team: { id, name: '새 팀' } });
+    renderMembers();
+    const el = $(`[data-k="t|${id}"]`); if (el) { el.focus(); el.select(); }
+  });
+  function openRanksEditor() {
+    $('#ranksEdit').classList.remove('hidden');
+    $('#ranksInput').value = ranksOf().join(', ');
+    $('#ranksInput').focus();
+  }
+  $('#ranksBtn').addEventListener('click', openRanksEditor);
+  $('#ranksCancel').addEventListener('click', () => $('#ranksEdit').classList.add('hidden'));
+  function saveRanks() {
+    const list = [...new Set($('#ranksInput').value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean))];
+    if (list.length) send({ k: 'ranks', list });
+    $('#ranksEdit').classList.add('hidden');
+    renderMembers();
+  }
+  $('#ranksSave').addEventListener('click', saveRanks);
+  $('#ranksInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveRanks(); } else if (e.key === 'Escape') $('#ranksEdit').classList.add('hidden'); });
 
   // 카테고리는 칸을 눌렀을 때 뜨는 선택 창에서만 고른다 (하단 범례는 없앰)
   function renderLegend() {}

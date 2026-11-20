@@ -141,8 +141,76 @@
         db.title = str(op.value, 80);
         return true;
       }
+      // ---- 구성원 (팀 / 직급 / 이름) ----
+      case 'initMembers': { // 예전 글자 목록을 구조로 바꿀 때 한 번
+        if ((db.mteams || []).length || (db.members || []).length) return false;
+        db.mteams = (op.mteams || []).slice(0, 30).map((t) => ({ id: str(t.id, 40), name: str(t.name, 40) }));
+        db.members = (op.members || []).slice(0, 300).map(cleanMember);
+        db.ranks = (op.ranks || []).slice(0, 30).map((r) => str(r, 20));
+        db.teams = ['', ''];
+        return true;
+      }
+      case 'ranks': {
+        db.ranks = (op.list || []).slice(0, 30).map((r) => str(r, 20)).filter(Boolean);
+        return true;
+      }
+      case 'mteamAdd': {
+        db.mteams = db.mteams || [];
+        if (!op.team || !op.team.id || db.mteams.some((t) => t.id === op.team.id)) return false;
+        const i = op.index == null ? db.mteams.length : Math.max(0, Math.min(db.mteams.length, Number(op.index)));
+        db.mteams.splice(i, 0, { id: str(op.team.id, 40), name: str(op.team.name, 40) });
+        return true;
+      }
+      case 'mteamSet': {
+        const t = (db.mteams || []).find((x) => x.id === op.id);
+        if (!t) return false;
+        t.name = str(op.value, 40);
+        return true;
+      }
+      case 'mteamDel': {
+        const i = (db.mteams || []).findIndex((x) => x.id === op.id);
+        if (i < 0) return false;
+        db.mteams.splice(i, 1);
+        db.members = (db.members || []).filter((m) => m.teamId !== op.id);
+        return true;
+      }
+      case 'memberAdd': {
+        db.members = db.members || [];
+        if (!op.member || !op.member.id || db.members.some((m) => m.id === op.member.id)) return false;
+        const i = op.index == null ? db.members.length : Math.max(0, Math.min(db.members.length, Number(op.index)));
+        db.members.splice(i, 0, cleanMember(op.member));
+        return true;
+      }
+      case 'memberSet': {
+        const m = (db.members || []).find((x) => x.id === op.id);
+        if (!m || !['abbr', 'rank', 'name', 'teamId'].includes(op.field)) return false;
+        m[op.field] = str(op.value, 40);
+        return true;
+      }
+      case 'memberDel': {
+        const i = (db.members || []).findIndex((x) => x.id === op.id);
+        if (i < 0) return false;
+        db.members.splice(i, 1);
+        return true;
+      }
+      case 'memberMove': { // 같은 팀 안에서 위/아래로
+        const list = db.members || [];
+        const i = list.findIndex((x) => x.id === op.id);
+        if (i < 0) return false;
+        const step = op.dir < 0 ? -1 : 1;
+        let j = i + step;
+        while (j >= 0 && j < list.length && list[j].teamId !== list[i].teamId) j += step;
+        if (j < 0 || j >= list.length) return false;
+        const [m] = list.splice(i, 1);
+        list.splice(j, 0, m);
+        return true;
+      }
     }
     return false;
+  }
+
+  function cleanMember(m) {
+    return { id: str(m.id, 40), teamId: str(m.teamId, 40), abbr: str(m.abbr, 10), rank: str(m.rank, 20), name: str(m.name, 40) };
   }
 
   function findProject(db, id) {
