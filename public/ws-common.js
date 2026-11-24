@@ -61,6 +61,7 @@
   const serverBackend = {
     mode: 'server',
     async start() { const u = await api('api/me'); return u; },
+    profile: async () => ({}),
     events: (from, to) => api(`api/calendar/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
     add: (body) => api('api/calendar/items', { method: 'POST', body: JSON.stringify(body) }),
     update: (id, body) => api('api/calendar/items/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(body) }),
@@ -103,6 +104,16 @@
         cred = await askCred('회사 비밀번호가 맞지 않아요. 주간 스케줄에서 쓰는 비밀번호를 넣어 주세요.');
       }
       return { id: 'n:' + cred.name, name: cred.name };
+    },
+    // 주간 스케줄의 "구성원" 표에서 내 이름을 찾아 직급·팀을 가져온다
+    async profile() {
+      const [ms, ts] = await Promise.all([space.child('data/members').once('value'), space.child('data/mteams').once('value')]);
+      const list = (v) => (Array.isArray(v) ? v : Object.values(v || {})).filter(Boolean);
+      const norm = (s) => String(s || '').replace(/\s+/g, '');
+      const me = list(ms.val()).find((m) => norm(m.name) === norm(cred.name));
+      if (!me) return {};
+      const team = list(ts.val()).find((t) => t.id === me.teamId);
+      return { rank: me.rank || '', team: team ? team.name : '' };
     },
     async events(from, to) {
       const [band, items] = await Promise.all([space.child('band').once('value'), space.child('calendar/items').once('value')]);
