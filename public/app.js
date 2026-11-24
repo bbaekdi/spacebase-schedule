@@ -368,6 +368,7 @@
   }
 
   const measureCtx = document.createElement('canvas').getContext('2d');
+  const SCREEN_TXT = 12.67; // 화면 날짜칸 글씨 크기(px) = 9.5pt
   function textWidth(t) {
     measureCtx.font = `12px ${getComputedStyle(document.body).fontFamily}`;
     return measureCtx.measureText(t).width + 4;
@@ -447,9 +448,9 @@
 
     // 인쇄할 때는 엑셀 원본(A4 가로 1장)과 같은 칸 비율로 좁혀서 글씨가 작아지지 않게 한다
     const printing = document.body.classList.contains('printing');
-    const dayW = printing ? 34 : 50;
-    const cols = printing ? [68, 50, 156, 71, 70, 124, 54, 57] : [80, 64, 170, 80, 92, 168, 64, 64];
-    const noteW = printing ? 80 : 120;
+    const dayW = printing ? 34 : 53; // 화면: 글씨 0.5pt 키운 만큼(약 5%) 칸도 키움
+    const cols = printing ? [68, 50, 156, 71, 70, 124, 54, 57] : [84, 67, 179, 84, 97, 177, 67, 67];
+    const noteW = printing ? 80 : 126;
     const tableW = cols.reduce((a, b) => a + b, 0) + days.length * dayW + noteW;
     $('#sheet').style.width = tableW + 'px'; // 표가 화면에 맞춰 줄어들지 않게 고정
     $('#sheetTitle').style.width = tableW + 'px'; // 제목은 표 가운데에
@@ -511,14 +512,14 @@
             for (let j = c - 1; j >= 0 && !cells[j].t; j--) L++;
             for (let j = c + 1; j < cells.length && !cells[j].t; j++) R++;
             const tw = textWidth(cell.t);
-            const need = Math.max(1, Math.ceil(tw / dayW));
+            const need = Math.max(1, Math.ceil((printing ? tw : tw * SCREEN_TXT / 12) / dayW));
             // 글자는 항상 자기 칸에서 시작한다. 앞(왼쪽) 날짜 칸으로는 넘치지 않고, 오른쪽 빈칸으로만 넘친다.
             // 오른쪽에 자리가 모자라면 글자를 조금 작게 해서 자기 칸 안에 맞춘다.
             let left = 0, width, cls = '', fs = '';
             if (need === 1) width = dayW;
             else {
               width = (Math.min(need - 1, R) + 1) * dayW; cls = 'l';
-              const base = printing ? 10.7 : 12, twb = tw * base / 12; // tw 는 12px 기준
+              const base = printing ? 10.7 : SCREEN_TXT, twb = tw * base / 12; // tw 는 12px 기준
               if (twb > width) fs = `font-size:${Math.max(7, base * (width - 2) / twb).toFixed(1)}px;`;
             }
             const fits = need === 1;
