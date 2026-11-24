@@ -14,11 +14,9 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
-  deploy:
+  # GitHub 공식 예시처럼 "파일 모으기"와 "올리기"를 두 단계로 나눈다 (한 단계로 하면 가끔 업로드한 파일을 못 찾음)
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: 사이트 파일 모으기
@@ -30,5 +28,12 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
