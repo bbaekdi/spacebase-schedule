@@ -56,7 +56,7 @@
         <section class="card">
           <h2>바로가기</h2>
           <div class="links">
-            <a href="https://www.band.us" target="_blank" rel="noopener">네이버 밴드</a>
+            <a href="https://www.band.us" id="bandHome" target="_blank" rel="noopener">네이버 밴드</a>
             <a href="https://www.spacebase.co.kr/ko" target="_blank" rel="noopener">스페이스베이스 홈페이지</a>
             <a href="https://www.spacebase.co.kr/ko/blog" target="_blank" rel="noopener">블로그</a>
             <a href="https://www.instagram.com/sbe_spacebase/" target="_blank" rel="noopener">인스타그램</a>
@@ -90,6 +90,9 @@
   }
   const byId = new Map(data.events.map((e) => [e.id, e]));
   const st = data.status, warn = document.getElementById('calWarn');
+  // "네이버 밴드" 바로가기 → 회사 밴드 게시글 화면 (밴드 주소는 저장소가 아니라 Secret BAND_URL 에서 가져옴)
+  const bandId = (String(st.bandUrl || '').match(/band\.us\/band\/(\d+)/) || [])[1];
+  if (bandId) document.getElementById('bandHome').href = `https://www.band.us/band/${bandId}/post`;
   if (st.bandConnected && st.bandUrl) { const a = document.getElementById('bandAdd'); a.href = st.bandUrl; a.classList.remove('hidden'); document.getElementById('calOpen').style.marginLeft = '10px'; }
   if (!st.bandConnected) { warn.innerHTML = esc(bandMissingText(st)) + (st.configError ? `<br>(${esc(st.configError)})` : ''); warn.classList.remove('hidden'); }
   else if (st.error) { warn.textContent = st.error; warn.classList.remove('hidden'); }
