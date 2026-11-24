@@ -251,7 +251,7 @@ body.printing .sheet tr.prow td.note, body.printing .sheet tr.prow td.note input
 /* 인쇄 선: 브라우저는 테두리(border)를 최소 1화면점으로 올려 그려서 축소 인쇄하면 검은 선이 진해진다.
    그래서 인쇄할 때는 모든 선을 안쪽 그림자로 그린다. 검은 선 --pl(1px) 은 안쪽 회색 선 --pg(0.5px)의 두 배로,
    한 장에 맞춰 줄어든 만큼 함께 가늘어진다. (선 굵기를 바꿀 때는 --pl 만 고치면 됨. --pg 보다 작게 하지 말 것) */
-body.printing { --pl: 1px; --pg: .8px; --grid-light: #7f7f7f; } /* 안쪽 회색 선: 프린터에서 날아가지 않게 조금 굵고 진하게 (검은 선보다는 가늘게) */
+body.printing { --pl: 1px; --pg: 1px; --grid-light: #666; } /* 안쪽 회색 선: 프린터에서 날아가지 않게 검은 선과 같은 굵기, 색만 회색 (검은 선보다 굵게 하지 말 것) */
 body.printing .sheet th, body.printing .sheet td {
   border: 0 !important;
   --st: 0px; --ct: transparent; --sr: 0px; --cr: transparent; --sb: 0px; --cb: transparent; --sl: 0px; --cl: transparent;
