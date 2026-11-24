@@ -63,6 +63,14 @@
   .side h2 small { font-weight: 400; color: var(--sub); font-size: 12px; }
   .listview .daygroup { font-size: 13px; font-weight: 800; margin: 18px 0 4px; }
   .listview .daygroup:first-child { margin-top: 0; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #efede6; }
+  .tg { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; }
+  .tg input { position: absolute; opacity: 0; pointer-events: none; }
+  .tg i { width: 36px; height: 20px; border-radius: 10px; background: #d6d3ca; position: relative; transition: background .15s; flex: 0 0 auto; }
+  .tg i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+  .tg input:checked + i { background: var(--accent); }
+  .tg input:checked + i::after { left: 18px; }
+  .tg input:focus-visible + i { outline: 2px solid var(--accent-text); outline-offset: 2px; }
   .status { font-size: 12px; color: var(--sub); margin-top: 10px; line-height: 1.6; }
 
   @media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
@@ -101,6 +109,10 @@
       <aside class="card side">
         <h2 id="selTitle"></h2>
         <ul class="events" id="selList"></ul>
+        <div class="toggles">
+          <label class="tg"><input type="checkbox" id="showBand" checked><i></i>밴드 일정 보기</label>
+          <label class="tg hidden" id="showGoogleRow"><input type="checkbox" id="showGoogle" checked><i></i>구글 캘린더 보기</label>
+        </div>
         <div class="status" id="status"></div>
       </aside>
     </div>
@@ -231,7 +243,15 @@
     render();
   }
 
+  // 밴드 / 구글 일정 보기 켜고 끄기 (이 브라우저에 기억)
+  const shows = (() => { try { return JSON.parse(localStorage.getItem('ws_cal_show') || '{}'); } catch { return {}; } })();
+  $('#showBand').checked = shows.band !== false; $('#showGoogle').checked = shows.google !== false;
+  $('#showBand').onchange = $('#showGoogle').onchange = () => {
+    try { localStorage.setItem('ws_cal_show', JSON.stringify({ band: $('#showBand').checked, google: $('#showGoogle').checked })); } catch {}
+    render();
+  };
   function filtered(list) {
+    list = list.filter((e) => (e.source !== 'band' || $('#showBand').checked) && (e.source !== 'google' || $('#showGoogle').checked));
     const q = $('#search').value.trim().toLowerCase();
     if (!q) return list;
     return list.filter((e) => (e.title + ' ' + (e.location || '') + ' ' + (e.description || '')).toLowerCase().includes(q));
@@ -253,6 +273,7 @@
       else if (status.error || status.gcalError) { w.textContent = [status.error, status.gcalError].filter(Boolean).join(' / '); w.classList.remove('hidden'); }
       else w.classList.add('hidden');
       $('#gcalLegend').classList.toggle('hidden', !status.gcal);
+      $('#showGoogleRow').classList.toggle('hidden', !status.gcal);
       $('#gcalBtn').textContent = status.gcal ? '내 구글 캘린더 ✓' : '내 구글 캘린더';
       $('#status').textContent = status.bandConnected
         ? `밴드 일정 ${status.bandCount}개 · 마지막 갱신 ${status.lastSync ? dayLabel(ymd(status.lastSync)) + ' ' + hm(status.lastSync) : '-'} · ${status.live ? '열 때마다 바로 갱신' : status.cloud ? '자동 갱신' : '10분마다 자동 갱신'}`
