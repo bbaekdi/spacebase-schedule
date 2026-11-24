@@ -26,8 +26,8 @@ jobs:
           mv _site/index.html _site/schedule.html
           cp _site/portal.html _site/index.html
           rm -f _site/login.html
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
