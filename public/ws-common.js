@@ -396,7 +396,8 @@
 
   // 구글 할 일 (To Do List) 칸. 홈과 캘린더가 같이 쓴다. 나에게만 보인다.
   function todoWidget(root) {
-    root.innerHTML = `<h2>TO DO LIST <small class="tdToday"></small></h2><div class="day"></div>
+    root.innerHTML = `<h2>TO DO LIST <small class="tdToday"></small></h2>
+      <div class="dayrow"><div class="day"></div><div class="dnav"><button type="button" data-d="-1" title="이전 날">‹</button><button type="button" data-go="0">오늘</button><button type="button" data-go="1">내일</button><button type="button" data-d="1" title="다음 날">›</button></div></div>
       <form class="hidden"><input name="t" placeholder="+ 할 일 추가 (Enter)" maxlength="300" autocomplete="off"><select title="할 일 목록"></select></form>
       <ul></ul><div class="tmsg"></div>`;
     const q = (sel) => root.querySelector(sel), form = q('form'), sel = q('select'), ul = q('ul'), msg = q('.tmsg');
@@ -406,7 +407,9 @@
     const connectBtn = (G, label) => { const b = q('.tdConnect'); if (b) b.onclick = () => { try { sessionStorage.setItem('sb_gjust', '1'); } catch {} G.connect(); }; };
     async function show(d) {
       day = d || day || today; const my = ++seq;
-      q('.day').textContent = dayLabel(day); q('.tdToday').textContent = day === today ? '· 오늘' : '';
+      q('.day').textContent = dayLabel(day); q('.tdToday').textContent = day === today ? '· 오늘' : day === addDays(today, 1) ? '· 내일' : '';
+      { const [, m, dd] = day.split('-').map(Number); form.t.placeholder = `+ ${day === today ? '오늘' : day === addDays(today, 1) ? '내일' : m + '월 ' + dd + '일'} 할 일 추가 (Enter)`; }
+      root.querySelectorAll('.dnav [data-go]').forEach((b) => b.classList.toggle('on', day === addDays(today, +b.dataset.go)));
       const be = await data, G = be.google;
       if (!G || !G.enabled()) return showMsg('구글 할 일은 웹사이트에서 구글 계정을 연결했을 때 보여요.');
       if (!G.account()) { showMsg('구글 계정을 연결하면 구글 할 일(Tasks)이 여기에 보여요. 나에게만 보여요.<br><button class="btn primary tdConnect" type="button">구글 계정으로 연결</button>'); return connectBtn(G); }
@@ -435,6 +438,11 @@
       try { await (await data).google.tasks.add(sel.value, title, day); inp.value = ''; await show(day); }
       catch (e) { msg.textContent = '추가하지 못했어요: ' + e.message; }
       finally { inp.disabled = false; inp.focus(); }
+    };
+    // 날짜 옮기기: 오늘 / 내일 / 하루씩 앞뒤로. 보이는 날짜에 할 일이 추가된다.
+    q('.dnav').onclick = (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      show(b.dataset.go != null ? addDays(today, +b.dataset.go) : addDays(day, +b.dataset.d));
     };
     sel.onchange = async () => { (await data).google.tasks.setList(sel.value); show(day); };
     ul.onclick = async (ev) => {
