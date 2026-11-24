@@ -44,9 +44,11 @@ desktop/             Electron (main.js, preload.js, preview.html=인쇄 미리�
 worker/              band-relay.js, google.js, naverworks-mail.js (+ band.toml, wrangler.toml)
 extension/           band-fill.js, bandform.js, site-bridge.js
 tools/sync-band.js   예비 밴드 동기화 (band-calendar.yml)
+tools/check.sh       배포 전 검토 (JS 문법, 비밀 값 의심 문자열, 버전↔릴리즈 노트)
+RELEASE-NOTES.md     바뀐 내용 기록 (최신이 위)
 build/               installer.nsi, release.sh, seticon.mjs
 .github/workflows/   pages.yml, release.yml, band-worker.yml, band-calendar.yml, mail-worker.yml
-Doc/                 할 일·계획 일정표 (Todo / Doing / Done)
+Doc/                 기획서·계획 일정표 (Todo / Doing / Done, 기획서-양식.md)
 ```
 
 ### 클라우드 모드 (실사용, Firebase)
