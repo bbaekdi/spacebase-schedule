@@ -26,6 +26,22 @@
   bottom.innerHTML = TABS.map((t) => tab(t) + `<span class="ic">${t.ic}</span>${t.label}</a>`).join('');
   document.body.append(bottom);
 
+  // 밴드 자동 입력 확장 프로그램 설치 권유 (쿠키 안내처럼 아래에 뜸). PC 크롬·엣지·웨일에서, 아직 안 깔았을 때만.
+  // "나중에"를 누르면 7일 동안 다시 안 뜬다. 설치 안내 화면에서는 띄우지 않는다.
+  setTimeout(() => {
+    try {
+      const pc = !/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && /Chrome\//.test(navigator.userAgent);
+      const later = +localStorage.getItem('sbe_ext_later') || 0;
+      if (!pc || document.documentElement.dataset.sbeExt || /band-extension/.test(location.pathname) || Date.now() - later < 7 * 864e5) return;
+      const bar = document.createElement('div');
+      bar.className = 'extbar';
+      bar.innerHTML = `<span><b>밴드 자동 입력</b>을 설치하면 이 사이트에서 쓴 일정이 밴드 "일정 만들기" 창에 자동으로 채워져요. (PC에서 1분, 한 번만)</span>
+        <a class="btn primary" href="band-extension.html">설치하기</a><button class="btn" type="button">나중에</button>`;
+      bar.querySelector('button').onclick = () => { try { localStorage.setItem('sbe_ext_later', String(Date.now())); } catch {} bar.remove(); };
+      document.body.append(bar);
+    } catch {}
+  }, 1500);
+
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // 모든 날짜는 한국 시간 기준
   const TZ = 'Asia/Seoul';
