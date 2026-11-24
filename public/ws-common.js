@@ -116,7 +116,7 @@
       list.sort((x, y) => x.start.localeCompare(y.start));
       return {
         events: list,
-        status: { bandConnected: !!b.lastSync, error: b.error || '', lastSync: b.lastSync || null, bandCount: b.count || 0, cloud: true },
+        status: { bandConnected: !!b.lastSync, error: b.error || '', lastSync: b.lastSync || null, bandCount: b.count || 0, bandUrl: b.bandUrl || '', cloud: true },
       };
     },
     async add(body) { const r = space.child('calendar/items').push(); await r.set(cleanItem(body, cred.name)); return { id: r.key }; },
@@ -170,6 +170,15 @@
         location.reload();
       });
     }
+    // 사이트에서 추가한 일정을 밴드에도 등록하면, 밴드 쪽 일정이 들어온 뒤로는 같은 날 같은 제목의 사이트 일정을 숨긴다 (중복 표시 방지)
+    const rawEvents = be.events;
+    be.events = async (from, to) => {
+      const r = await rawEvents(from, to);
+      const key = (e) => ymd(e.start) + '|' + String(e.title || '').replace(/\s+/g, '').toLowerCase();
+      const band = new Set(r.events.filter((e) => e.source === 'band').map(key));
+      r.events = r.events.filter((e) => e.source !== 'web' || !band.has(key(e)));
+      return r;
+    };
     const user = await be.start();
     if (user) document.getElementById('wsName').textContent = user.name + ' 님';
     return { ...be, user };

@@ -102,6 +102,7 @@
         </div>
         <label>장소<input name="location" maxlength="200" autocomplete="off"></label>
         <label>메모<textarea name="description" maxlength="2000"></textarea></label>
+        <label class="check" id="toBandRow"><input type="checkbox" name="toBand" checked> 밴드 캘린더에도 등록하기</label>
         <div class="dlg-err" id="editErr"></div>
       </div>
       <div class="dlg-foot">
@@ -111,6 +112,24 @@
         <button class="btn primary">저장</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="bandDlg">
+    <div class="dlg-head"><h3>밴드에도 등록해 주세요</h3><button type="button" class="x" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div class="detail">
+        <div id="bandCopied" class="meta"></div>
+        <div>1. 아래 <b>밴드 열기</b>를 누르세요.<br>2. 밴드 일정 화면에서 <b>일정 만들기</b>를 누르세요.<br>3. 제목 칸에 붙여넣기(Ctrl+V, 휴대폰은 길게 눌러 붙여넣기) 하고 날짜를 맞춘 뒤 저장하세요.</div>
+        <div class="meta">밴드에 저장되면 15분 안에 이 사이트에도 밴드 일정으로 바뀌어 보여요. (같은 날 같은 제목이면 하나만 보여요)</div>
+        <textarea id="bandText" readonly style="min-height:90px"></textarea>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" id="bandCopy">다시 복사</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>나중에</button>
+      <a class="btn primary" id="bandOpen" target="_blank" rel="noopener">밴드 열기</a>
+    </div>
   </dialog>
 
 <script src="vendor/firebase-app-compat.js"></script>
@@ -243,6 +262,8 @@
     $('#delBtn').classList.toggle('hidden', !e);
     $('#editErr').textContent = '';
     f.reset();
+    $('#toBandRow').classList.toggle('hidden', !!e);
+    f.toBand.checked = !e;
     if (e) {
       f.title.value = e.title; f.allDay.checked = e.allDay; f.location.value = e.location || ''; f.description.value = e.description || '';
       f.sd.value = ymd(e.start); f.ed.value = e.allDay ? ymd(new Date(new Date(e.end).getTime() - 1)) : ymd(e.end);
@@ -267,6 +288,7 @@
       const d = await ready;
       if (editing) await d.update(editing.id, body); else await d.add(body);
       dlg.close(); selected = f.sd.value; cursor = monthStart(selected); load();
+      if (!editing && f.toBand.checked) askBand(body);
     } catch (e) { $('#editErr').textContent = e.message; }
   });
   $('#delBtn').onclick = async () => {
@@ -274,6 +296,29 @@
     try { await (await ready).remove(editing.id); dlg.close(); load(); }
     catch (e) { $('#editErr').textContent = e.message; }
   };
+
+  // 밴드는 바깥 프로그램이 일정을 직접 써넣는 기능을 열어 두지 않았다.
+  // 그래서 일정 내용을 복사해 두고 밴드 일정 화면을 열어, 사람이 붙여넣게 돕는다.
+  const bandDlg = $('#bandDlg');
+  bandDlg.addEventListener('click', (ev) => { if (ev.target === bandDlg || ev.target.hasAttribute('data-close')) bandDlg.close(); });
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); return true; } catch {}
+    try { const ta = $('#bandText'); ta.focus(); ta.select(); return document.execCommand('copy'); } catch { return false; }
+  }
+  function bandTextOf(b) {
+    const sd = ymd(b.start), ed = ymd(new Date(new Date(b.end).getTime() - (b.allDay ? 1 : 0)));
+    const when = b.allDay ? (sd === ed ? dayLabel(sd) + ' 종일' : `${dayLabel(sd)} ~ ${dayLabel(ed)}`) : `${dayLabel(sd)} ${hm(b.start)} ~ ${sd === ymd(b.end) ? '' : dayLabel(ymd(b.end)) + ' '}${hm(b.end)}`;
+    return [b.title.trim(), when, b.location ? '장소: ' + b.location : '', b.description || ''].filter(Boolean).join('\n');
+  }
+  async function askBand(b) {
+    const text = bandTextOf(b);
+    $('#bandText').value = text;
+    $('#bandOpen').href = (status && status.bandUrl) || 'https://www.band.us';
+    bandDlg.showModal();
+    const ok = await copyText(b.title.trim());
+    $('#bandCopied').textContent = ok ? `제목 "${b.title.trim()}" 을(를) 복사해 두었어요.` : '아래 내용을 직접 복사해 주세요.';
+  }
+  $('#bandCopy').onclick = async () => { const ok = await copyText($('#bandText').value); $('#bandCopied').textContent = ok ? '전체 내용을 복사했어요.' : '아래 내용을 직접 복사해 주세요.'; };
 
   load();
   setInterval(load, 5 * 60 * 1000);
