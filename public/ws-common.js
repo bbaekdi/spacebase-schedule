@@ -166,6 +166,30 @@
     if (!r.ok) throw new Error('구글 캘린더 응답 ' + r.status);
     return r.json();
   }
+  // 구글 할 일(Tasks): 이 브라우저가 구글에서 직접 읽고 쓴다
+  const TASKS = 'https://tasks.googleapis.com/tasks/v1';
+  async function gFetch(url, opt = {}) {
+    const r = await fetch(url, { ...opt, headers: { Authorization: 'Bearer ' + await gToken(), ...(opt.body ? { 'Content-Type': 'application/json' } : {}) } });
+    if (r.status === 403 || r.status === 401) { const e = new Error('구글 할 일 권한이 없어요. 구글을 한 번 다시 연결해 주세요.'); e.code = 'scope'; throw e; }
+    if (!r.ok) throw new Error('구글 할 일 응답 ' + r.status);
+    return r.status === 204 ? null : r.json().catch(() => null);
+  }
+  const dueOf = (day) => day + 'T00:00:00.000Z';
+  const nextDay = (day) => { const d = new Date(day + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+  const tasksApi = {
+    async lists() { const j = await gFetch(TASKS + '/users/@me/lists?maxResults=100'); return (j && j.items || []).map((l) => ({ id: l.id, name: l.title })); },
+    async onDay(listId, day) {
+      const q = `dueMin=${encodeURIComponent(dueOf(day))}&dueMax=${encodeURIComponent(dueOf(nextDay(day)))}&showCompleted=true&showHidden=true&maxResults=100`;
+      const j = await gFetch(`${TASKS}/lists/${encodeURIComponent(listId)}/tasks?${q}`);
+      return (j && j.items || []).filter((t) => t.title).map((t) => ({ id: t.id, title: t.title, notes: t.notes || '', done: t.status === 'completed', link: t.webViewLink || '' }))
+        .sort((a, b) => a.done - b.done);
+    },
+    add: (listId, title, day) => gFetch(`${TASKS}/lists/${encodeURIComponent(listId)}/tasks`, { method: 'POST', body: JSON.stringify({ title, due: dueOf(day) }) }),
+    setDone: (listId, id, done) => gFetch(`${TASKS}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(done ? { status: 'completed' } : { status: 'needsAction', completed: null }) }),
+    remove: (listId, id) => gFetch(`${TASKS}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    getList: () => lsGet('sb_tlist:' + myName(), ''),
+    setList: (id) => lsSet('sb_tlist:' + myName(), id),
+  };
   async function gCalendars(force) {
     if (gCals && !force) return gCals;
     const j = await gApi('/users/me/calendarList?minAccessRole=reader&maxResults=250');
@@ -210,6 +234,7 @@
     selected: async () => gSel(await gCalendars()),
     setSelected: (ids) => { lsSet('sb_gsel:' + myName(), ids); gCache = null; },
     refresh: () => { gCache = null; gCals = null; },
+    tasks: tasksApi,
   };
   async function liveBand(saved) {
     const api = String(window.SB_BAND_API || '').replace(/\/$/, '');

@@ -17,7 +17,28 @@
   .legend { display: flex; gap: 14px; font-size: 12px; color: var(--sub); align-items: center; margin: -4px 0 12px; flex-wrap: wrap; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
 
-  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+  body[data-page="calendar"] .wrap { max-width: 1560px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "main side" "main todo"; grid-template-rows: auto 1fr; gap: 14px; align-items: start; }
+  .layout > .month, .layout > .listview { grid-area: main; }
+  .layout > .side { grid-area: side; }
+  .layout > .todo { grid-area: todo; }
+  @media (min-width: 1440px) { .layout { grid-template-columns: minmax(0, 1fr) 300px 300px; grid-template-areas: "main side todo"; grid-template-rows: auto; } }
+  .todo h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font-size: 13px; letter-spacing: .5px; }
+  .todo .day { font-size: 18px; font-weight: 700; margin: 0 0 12px; }
+  .todo form { display: flex; gap: 6px; }
+  .todo form input { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid #c9c6bb; border-radius: 8px; background: #fff; font-size: 13px; }
+  .todo select { max-width: 110px; padding: 6px; border: 1px solid #c9c6bb; border-radius: 8px; background: #fff; font-size: 12px; }
+  .todo ul { list-style: none; margin: 12px 0 0; padding: 0; }
+  .todo li { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-top: 1px solid #efede6; font-size: 14px; }
+  .todo li:first-child { border-top: 0; }
+  .todo li input { width: 17px; height: 17px; margin-top: 2px; accent-color: var(--accent); flex: 0 0 auto; cursor: pointer; }
+  .todo li .tt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .todo li .tt small { display: block; color: var(--sub); font-size: 12px; white-space: pre-wrap; }
+  .todo li.done .tt { color: var(--sub); text-decoration: line-through; }
+  .todo li .del { border: 0; background: none; color: var(--sub); cursor: pointer; visibility: hidden; padding: 0 2px; }
+  .todo li:hover .del { visibility: visible; }
+  .todo .tmsg { color: var(--sub); font-size: 13px; line-height: 1.6; padding: 10px 0 2px; }
+  .todo .tmsg .btn { margin-top: 10px; }
   .month { padding: 0; overflow: hidden; }
   .wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
   .wk.head div { padding: 8px; font-size: 12px; font-weight: 700; color: var(--sub); text-align: center; border-bottom: 1px solid var(--line); }
@@ -73,7 +94,7 @@
   .tg input:focus-visible + i { outline: 2px solid var(--accent-text); outline-offset: 2px; }
   .status { font-size: 12px; color: var(--sub); margin-top: 10px; line-height: 1.6; }
 
-  @media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "side" "todo"; grid-template-rows: auto; } }
   @media (max-width: 720px) {
     .calbar h1 { font-size: 18px; min-width: 0; flex: 1 0 100%; margin-bottom: 4px; }
     .calbar input[type=search] { flex: 1; width: auto; min-width: 0; }
@@ -106,6 +127,13 @@
         <div class="wk" id="grid"></div>
       </section>
       <section class="card listview hidden" id="listView"></section>
+      <aside class="card todo" id="todoCard">
+        <h2>TO DO LIST <small id="todoToday"></small></h2>
+        <div class="day" id="todoDay"></div>
+        <form id="todoForm" class="hidden"><input name="t" placeholder="+ 할 일 추가 (Enter)" maxlength="300" autocomplete="off"><select id="todoList" title="할 일 목록"></select></form>
+        <ul id="todoItems"></ul>
+        <div class="tmsg" id="todoMsg"></div>
+      </aside>
       <aside class="card side">
         <h2 id="selTitle"></h2>
         <ul class="events" id="selList"></ul>
@@ -318,7 +346,54 @@
     $('#listView').innerHTML = html || '<div class="empty">이 달에는 일정이 없어요.</div>';
   }
 
+  // 구글 할 일 (To Do List) — 선택한 날짜의 할 일. 나에게만 보인다.
+  let todoSeq = 0, todoLists = null;
+  async function renderTodo() {
+    const day = selected, seq = ++todoSeq;
+    $('#todoDay').textContent = dayLabel(day); $('#todoToday').textContent = day === today ? '· 오늘' : '';
+    const be = await ready, G = be.google, msg = $('#todoMsg'), form = $('#todoForm'), ul = $('#todoItems');
+    const showMsg = (html) => { form.classList.add('hidden'); ul.innerHTML = ''; msg.innerHTML = html; };
+    if (!G || !G.enabled()) return showMsg('구글 할 일은 웹사이트에서 구글 계정을 연결했을 때 보여요.');
+    if (!G.account()) { showMsg('구글 계정을 연결하면 구글 할 일(Tasks)이 여기에 보여요. 나에게만 보여요.<br><button class="btn primary" type="button" id="todoConnect">구글 계정으로 연결</button>'); $('#todoConnect').onclick = () => { try { sessionStorage.setItem('sb_gjust', '1'); } catch {} G.connect(); }; return; }
+    const T = G.tasks;
+    try {
+      if (!todoLists) todoLists = await T.lists();
+      if (!todoLists.length) return showMsg('구글 할 일 목록이 없어요.');
+      let lid = T.getList(); if (!todoLists.some((l) => l.id === lid)) lid = todoLists[0].id;
+      $('#todoList').innerHTML = todoLists.map((l) => `<option value="${esc(l.id)}" ${l.id === lid ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+      $('#todoList').classList.toggle('hidden', todoLists.length < 2);
+      const items = await T.onDay(lid, day);
+      if (seq !== todoSeq) return;
+      form.classList.remove('hidden'); msg.innerHTML = items.length ? '' : '이 날의 할 일이 없어요.<br>위에서 추가해 보세요.';
+      ul.innerHTML = items.map((t) => `<li class="${t.done ? 'done' : ''}" data-tid="${esc(t.id)}"><input type="checkbox" ${t.done ? 'checked' : ''} aria-label="완료"><span class="tt">${esc(t.title)}${t.notes ? `<small>${esc(t.notes)}</small>` : ''}</span><button class="del" type="button" title="삭제">✕</button></li>`).join('');
+    } catch (e) {
+      if (seq !== todoSeq) return;
+      todoLists = null;
+      if (e.code === 'scope') { showMsg('할 일을 보려면 구글을 한 번 <b>다시 연결</b>해 주세요. (할 일 권한이 새로 추가됐어요)<br><button class="btn primary" type="button" id="todoConnect">구글 다시 연결</button>'); $('#todoConnect').onclick = () => { try { sessionStorage.setItem('sb_gjust', '1'); } catch {} G.connect(); }; }
+      else showMsg('구글 할 일을 불러오지 못했어요. (' + esc(e.message) + ')');
+    }
+  }
+  $('#todoForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const inp = $('#todoForm').t, title = inp.value.trim(); if (!title) return;
+    inp.disabled = true;
+    try { const T = (await ready).google.tasks; await T.add($('#todoList').value, title, selected); inp.value = ''; await renderTodo(); }
+    catch (e) { $('#todoMsg').textContent = '추가하지 못했어요: ' + e.message; }
+    finally { inp.disabled = false; inp.focus(); }
+  };
+  $('#todoList').onchange = async () => { (await ready).google.tasks.setList($('#todoList').value); renderTodo(); };
+  $('#todoItems').onclick = async (ev) => {
+    const li = ev.target.closest('li[data-tid]'); if (!li) return;
+    const T = (await ready).google.tasks, lid = $('#todoList').value;
+    try {
+      if (ev.target.matches('input[type=checkbox]')) { li.classList.toggle('done', ev.target.checked); await T.setDone(lid, li.dataset.tid, ev.target.checked); }
+      else if (ev.target.closest('.del')) { if (!confirm('이 할 일을 삭제할까요? 구글 할 일에서도 지워져요.')) return; await T.remove(lid, li.dataset.tid); renderTodo(); }
+    } catch (e) { $('#todoMsg').textContent = '바꾸지 못했어요: ' + e.message; }
+  };
+
+  let todoDayShown = '';
   function renderSide() {
+    if (todoDayShown !== selected) { todoDayShown = selected; renderTodo(); }
     $('#selTitle').innerHTML = `${dayLabel(selected)} ${selected === today ? '<small>오늘</small>' : ''}`;
     const list = filtered(byDay.get(selected) || []);
     $('#selList').innerHTML = list.length ? list.map((e) => item(e, selected)).join('') : '<li class="empty">일정이 없어요.</li>';
@@ -459,8 +534,8 @@
   };
   $('#gConnect').onclick = async () => { try { sessionStorage.setItem('sb_gjust', '1'); } catch {} (await ready).google.connect(); };
   $('#gUseIcal').onclick = (ev) => { ev.preventDefault(); gDlg.dataset.ical = '1'; gRender(); };
-  $('#gSyncNow').onclick = async () => { const G = (await ready).google; G.refresh(); await load(); gRender(true); };
-  $('#gOff').onclick = async () => { if (!confirm('구글 캘린더 연결을 해제할까요?')) return; await (await ready).google.disconnect(); load(); gRender(); };
+  $('#gSyncNow').onclick = async () => { const G = (await ready).google; G.refresh(); todoLists = null; await load(); renderTodo(); gRender(true); };
+  $('#gOff').onclick = async () => { if (!confirm('구글 캘린더 연결을 해제할까요?')) return; await (await ready).google.disconnect(); todoLists = null; load(); renderTodo(); gRender(); };
   $('#gCals').onchange = async () => { (await ready).google.setSelected([...$('#gCals').querySelectorAll('input:checked')].map((x) => x.value)); load(); };
   gForm.onsubmit = async (ev) => {
     ev.preventDefault();

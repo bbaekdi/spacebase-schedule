@@ -21,7 +21,7 @@ async function open(env, s) {
   return JSON.parse(dec.decode(pt));
 }
 const page = (msg) => new Response(`<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:40px"><h3>구글 캘린더 연결</h3><p>${String(msg).replace(/</g, '&lt;')}</p>`, { status: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-const SCOPE = 'openid email profile https://www.googleapis.com/auth/calendar.readonly';
+const SCOPE = 'openid email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks';
 
 async function token(env, params) {
   const r = await fetch('https://oauth2.googleapis.com/token', {
