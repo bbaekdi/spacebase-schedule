@@ -105,3 +105,21 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 .extbar b { color: var(--accent); }
 .extbar .btn { flex: 0 0 auto; padding: 7px 12px; }
 .extbar .btn:not(.primary) { background: transparent; color: #fff; border-color: #555; }
+
+/* 구글 할 일 (To Do List) */
+.todo h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font-size: 13px; letter-spacing: .5px; }
+.todo .day { font-size: 18px; font-weight: 700; margin: 0 0 12px; }
+.todo form { display: flex; gap: 6px; }
+.todo form input { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid #c9c6bb; border-radius: 8px; background: #fff; font-size: 13px; }
+.todo select { max-width: 110px; padding: 6px; border: 1px solid #c9c6bb; border-radius: 8px; background: #fff; font-size: 12px; }
+.todo ul { list-style: none; margin: 12px 0 0; padding: 0; }
+.todo li { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-top: 1px solid #efede6; font-size: 14px; }
+.todo li:first-child { border-top: 0; }
+.todo li input { width: 17px; height: 17px; margin-top: 2px; accent-color: var(--accent); flex: 0 0 auto; cursor: pointer; }
+.todo li .tt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.todo li .tt small { display: block; color: var(--sub); font-size: 12px; white-space: pre-wrap; }
+.todo li.done .tt { color: var(--sub); text-decoration: line-through; }
+.todo li .del { border: 0; background: none; color: var(--sub); cursor: pointer; visibility: hidden; padding: 0 2px; }
+.todo li:hover .del { visibility: visible; }
+.todo .tmsg { color: var(--sub); font-size: 13px; line-height: 1.6; padding: 10px 0 2px; }
+.todo .tmsg .btn { margin-top: 10px; }

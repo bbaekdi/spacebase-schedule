@@ -394,5 +394,59 @@
     ? '밴드 캘린더가 아직 연결되지 않았어요. GitHub 저장소 설정에 밴드 구독 주소(BAND_ICAL_URL)와 회사 비밀번호(SB_CODE)를 넣으면 밴드 일정이 자동으로 들어와요.'
     : '밴드 캘린더가 아직 연결되지 않았어요. 관리자가 서버 설정에 밴드 구독 주소(BAND_ICAL_URL)를 넣으면 밴드 일정이 자동으로 보여요.';
 
-  window.WS = { srcCls, esc, ymd, hm, dayLabel, addDays, daysOf, whenText, data, showEvent, WD, bandMissingText, closeEvent: () => dlg.close() };
+  // 구글 할 일 (To Do List) 칸. 홈과 캘린더가 같이 쓴다. 나에게만 보인다.
+  function todoWidget(root) {
+    root.innerHTML = `<h2>TO DO LIST <small class="tdToday"></small></h2><div class="day"></div>
+      <form class="hidden"><input name="t" placeholder="+ 할 일 추가 (Enter)" maxlength="300" autocomplete="off"><select title="할 일 목록"></select></form>
+      <ul></ul><div class="tmsg"></div>`;
+    const q = (sel) => root.querySelector(sel), form = q('form'), sel = q('select'), ul = q('ul'), msg = q('.tmsg');
+    let day = '', seq = 0, lists = null;
+    const today = ymd(new Date());
+    const showMsg = (html) => { form.classList.add('hidden'); ul.innerHTML = ''; msg.innerHTML = html; };
+    const connectBtn = (G, label) => { const b = q('.tdConnect'); if (b) b.onclick = () => { try { sessionStorage.setItem('sb_gjust', '1'); } catch {} G.connect(); }; };
+    async function show(d) {
+      day = d || day || today; const my = ++seq;
+      q('.day').textContent = dayLabel(day); q('.tdToday').textContent = day === today ? '· 오늘' : '';
+      const be = await data, G = be.google;
+      if (!G || !G.enabled()) return showMsg('구글 할 일은 웹사이트에서 구글 계정을 연결했을 때 보여요.');
+      if (!G.account()) { showMsg('구글 계정을 연결하면 구글 할 일(Tasks)이 여기에 보여요. 나에게만 보여요.<br><button class="btn primary tdConnect" type="button">구글 계정으로 연결</button>'); return connectBtn(G); }
+      const T = G.tasks;
+      try {
+        if (!lists) lists = await T.lists();
+        if (!lists.length) return showMsg('구글 할 일 목록이 없어요.');
+        let lid = T.getList(); if (!lists.some((l) => l.id === lid)) lid = lists[0].id;
+        sel.innerHTML = lists.map((l) => `<option value="${esc(l.id)}" ${l.id === lid ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+        sel.classList.toggle('hidden', lists.length < 2);
+        const items = await T.onDay(lid, day);
+        if (my !== seq) return;
+        form.classList.remove('hidden'); msg.innerHTML = items.length ? '' : '이 날의 할 일이 없어요.<br>위에서 추가해 보세요.';
+        ul.innerHTML = items.map((t) => `<li class="${t.done ? 'done' : ''}" data-tid="${esc(t.id)}"><input type="checkbox" ${t.done ? 'checked' : ''} aria-label="완료"><span class="tt">${esc(t.title)}${t.notes ? `<small>${esc(t.notes)}</small>` : ''}</span><button class="del" type="button" title="삭제">✕</button></li>`).join('');
+      } catch (e) {
+        if (my !== seq) return;
+        lists = null;
+        if (e.code === 'scope') { showMsg('할 일을 보려면 구글을 한 번 <b>다시 연결</b>해 주세요. (할 일 권한이 새로 추가됐어요)<br><button class="btn primary tdConnect" type="button">구글 다시 연결</button>'); connectBtn(G); }
+        else showMsg('구글 할 일을 불러오지 못했어요. (' + esc(e.message) + ')');
+      }
+    }
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const inp = form.t, title = inp.value.trim(); if (!title) return;
+      inp.disabled = true;
+      try { await (await data).google.tasks.add(sel.value, title, day); inp.value = ''; await show(day); }
+      catch (e) { msg.textContent = '추가하지 못했어요: ' + e.message; }
+      finally { inp.disabled = false; inp.focus(); }
+    };
+    sel.onchange = async () => { (await data).google.tasks.setList(sel.value); show(day); };
+    ul.onclick = async (ev) => {
+      const li = ev.target.closest('li[data-tid]'); if (!li) return;
+      const T = (await data).google.tasks;
+      try {
+        if (ev.target.matches('input[type=checkbox]')) { li.classList.toggle('done', ev.target.checked); await T.setDone(sel.value, li.dataset.tid, ev.target.checked); }
+        else if (ev.target.closest('.del')) { if (!confirm('이 할 일을 삭제할까요? 구글 할 일에서도 지워져요.')) return; await T.remove(sel.value, li.dataset.tid); show(day); }
+      } catch (e) { msg.textContent = '바꾸지 못했어요: ' + e.message; }
+    };
+    return { show, reset: () => { lists = null; } };
+  }
+
+  window.WS = { todoWidget, srcCls, esc, ymd, hm, dayLabel, addDays, daysOf, whenText, data, showEvent, WD, bandMissingText, closeEvent: () => dlg.close() };
 })();

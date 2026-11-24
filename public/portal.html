@@ -38,6 +38,7 @@
   .app .ico { flex: 0 0 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; font-size: 26px; background: var(--accent); color: var(--accent-ink); }
   .app b { display: block; font-size: 16px; margin-bottom: 3px; }
   .app span { color: var(--sub); font-size: 13px; line-height: 1.45; }
+  .col { display: grid; gap: 14px; align-content: start; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
   .daygroup { font-size: 12px; font-weight: 700; color: var(--sub); margin: 10px 0 2px; }
   .daygroup:first-child { margin-top: 0; }
@@ -90,10 +91,13 @@
       </div>
 
       <div class="grid">
-        <section class="card">
-          <h2>오늘 일정 <a class="more hidden" id="bandAdd" target="_blank" rel="noopener">＋ 일정 추가</a><a class="more" href="calendar.html" id="calOpen">전체 ›</a></h2>
-          <ul class="events" id="todayList"><li class="empty">불러오는 중…</li></ul>
-        </section>
+        <div class="col">
+          <section class="card">
+            <h2>오늘 일정 <a class="more hidden" id="bandAdd" target="_blank" rel="noopener">＋ 일정 추가</a><a class="more" href="calendar.html" id="calOpen">전체 ›</a></h2>
+            <ul class="events" id="todayList"><li class="empty">불러오는 중…</li></ul>
+          </section>
+          <section class="card todo" id="todoCard"></section>
+        </div>
         <section class="card">
           <h2>다가오는 일정 (7일)</h2>
           <div id="weekList"><div class="empty">불러오는 중…</div></div>
@@ -153,6 +157,7 @@
 
 (async function () {
   const { esc, ymd, dayLabel, addDays, daysOf, whenText, data: ready, showEvent, bandMissingText } = WS;
+  WS.todoWidget(document.getElementById('todoCard')).show();
   const today = ymd(new Date());
   document.getElementById('today').textContent = '🗓 ' + dayLabel(today).replace(')', '요일)');
   ready.then(async (d) => {
