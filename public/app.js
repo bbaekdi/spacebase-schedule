@@ -512,14 +512,14 @@
             for (let j = c - 1; j >= 0 && !cells[j].t; j--) L++;
             for (let j = c + 1; j < cells.length && !cells[j].t; j++) R++;
             const tw = textWidth(cell.t);
-            const need = Math.max(1, Math.ceil(tw * (printing ? 11.6 : SCREEN_TXT) / 12 / dayW));
+            const need = Math.max(1, Math.ceil(tw * (printing ? 10.7 : SCREEN_TXT) / 12 / dayW));
             // 글자는 항상 자기 칸에서 시작한다. 앞(왼쪽) 날짜 칸으로는 넘치지 않고, 오른쪽 빈칸으로만 넘친다.
             // 오른쪽에 자리가 모자라면 글자를 조금 작게 해서 자기 칸 안에 맞춘다.
             let left = 0, width, cls = '', fs = '';
             if (need === 1) width = dayW;
             else {
               width = (Math.min(need - 1, R) + 1) * dayW; cls = 'l';
-              const base = printing ? 11.6 : SCREEN_TXT, twb = tw * base / 12; // tw 는 12px 기준
+              const base = printing ? 10.7 : SCREEN_TXT, twb = tw * base / 12; // tw 는 12px 기준
               if (twb > width) fs = `font-size:${Math.max(7, base * (width - 2) / twb).toFixed(1)}px;`;
             }
             const fits = need === 1;
