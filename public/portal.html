@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <title>홈 · SPACEBASE</title>
-<link rel="stylesheet" href="/ws.css">
+<link rel="stylesheet" href="ws.css">
 <style>
   .hello { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
   .hello h1 { margin: 0; font-size: 22px; }
@@ -27,16 +27,16 @@
   @media (max-width: 720px) { .apps, .grid { grid-template-columns: minmax(0, 1fr); } .app { padding: 16px; } }
 </style>
 </head>
-<body>
+<body data-page="home">
   <main class="wrap">
     <div class="hello"><h1 id="hello">안녕하세요</h1><span class="date" id="today"></span></div>
 
     <div class="apps">
-      <a class="card app" href="/schedule">
+      <a class="card app" href="schedule.html">
         <div class="ico" style="background:#217346">▦</div>
         <div><b>주간 스케줄</b><span>프로젝트 진행 스케줄표. 여러 명이 동시에 고쳐도 바로 반영돼요.</span></div>
       </a>
-      <a class="card app" href="/calendar">
+      <a class="card app" href="calendar.html">
         <div class="ico" style="background:#1fbd5f">▣</div>
         <div><b>회사 캘린더</b><span>밴드 캘린더 일정과 직접 추가한 일정을 월·주·목록으로 봐요.</span></div>
       </a>
@@ -44,7 +44,7 @@
 
     <div class="grid">
       <section class="card">
-        <h2>오늘 일정 <a class="more" href="/calendar">캘린더 열기 ›</a></h2>
+        <h2>오늘 일정 <a class="more" href="calendar.html">캘린더 열기 ›</a></h2>
         <ul class="events" id="todayList"><li class="empty">불러오는 중…</li></ul>
       </section>
       <section class="card">
@@ -66,20 +66,23 @@
     </div>
   </main>
 
-<script src="/ws-common.js"></script>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="ws-common.js"></script>
 <script>
 (async function () {
-  const { esc, ymd, dayLabel, addDays, daysOf, whenText, api, me, showEvent } = WS;
+  const { esc, ymd, dayLabel, addDays, daysOf, whenText, data: ready, showEvent, bandMissingText } = WS;
   const today = ymd(new Date());
   document.getElementById('today').textContent = dayLabel(today);
-  me.then((u) => { if (u) document.getElementById('hello').textContent = `${u.name} 님, 안녕하세요`; });
+  ready.then((d) => { if (d.user) document.getElementById('hello').textContent = `${d.user.name} 님, 안녕하세요`; }).catch(() => {});
 
   const item = (e, day) => `<li data-id="${esc(e.id)}"><span class="when">${whenText(e, day)}</span>
     <span class="what"><b><span class="dot ${e.source === 'web' ? 'web' : ''}"></span> ${esc(e.title)}</b>${e.location ? `<small>${esc(e.location)}</small>` : ''}</span></li>`;
 
   let data;
   try {
-    data = await api(`/api/calendar/events?from=${today}T00:00:00%2B09:00&to=${addDays(today, 8)}T00:00:00%2B09:00`);
+    data = await (await ready).events(`${today}T00:00:00+09:00`, `${addDays(today, 8)}T00:00:00+09:00`);
   } catch (e) {
     document.getElementById('todayList').innerHTML = `<li class="empty">일정을 불러오지 못했어요. (${esc(e.message)})</li>`;
     document.getElementById('weekList').innerHTML = '';
@@ -87,7 +90,7 @@
   }
   const byId = new Map(data.events.map((e) => [e.id, e]));
   const st = data.status, warn = document.getElementById('calWarn');
-  if (!st.bandConnected) { warn.innerHTML = '밴드 캘린더가 아직 연결되지 않았어요. 관리자가 서버 설정에 밴드 구독 주소(BAND_ICAL_URL)를 넣으면 밴드 일정이 자동으로 보여요.' + (st.configError ? `<br>(${esc(st.configError)})` : ''); warn.classList.remove('hidden'); }
+  if (!st.bandConnected) { warn.innerHTML = esc(bandMissingText(st)) + (st.configError ? `<br>(${esc(st.configError)})` : ''); warn.classList.remove('hidden'); }
   else if (st.error) { warn.textContent = st.error; warn.classList.remove('hidden'); }
 
   const on = (d) => data.events.filter((e) => daysOf(e).includes(d));

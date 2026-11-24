@@ -85,3 +85,11 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 .dlg-err { color: #c22; font-size: 13px; min-height: 1em; }
 .detail { display: grid; gap: 6px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .detail .meta { color: var(--sub); font-size: 13px; }
+
+/* 로그인 창 (서버 없이 쓰는 클라우드 방식) */
+.gate { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: var(--bg); padding: 16px; }
+.gate-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; width: min(380px, 100%); padding: 32px 28px 26px; display: grid; gap: 10px; }
+.gate-card h1 { margin: 0; font-size: 20px; letter-spacing: .5px; }
+.gate-card p { margin: 0 0 12px; color: var(--sub); font-size: 13px; }
+.gate-card input { padding: 11px 12px; border: 1px solid #c9c6bb; border-radius: 7px; font-size: 15px; }
+.gate-card .btn { padding: 12px; font-size: 15px; }

@@ -211,7 +211,7 @@ app.get('/api/export.json', (req, res) => {
 // ---------- 워크스페이스 (홈 · 주간 스케줄 · 캘린더를 한 사이트에서) ----------
 const pub = (f) => (req, res) => res.sendFile(path.join(__dirname, 'public', f));
 app.get('/', pub('portal.html'));
-app.get('/schedule', pub('index.html'));
+app.get(['/schedule', '/schedule.html'], pub('index.html'));
 app.get('/calendar', pub('calendar.html'));
 
 const calendar = createCalendar({ dataDir: DATA_DIR });

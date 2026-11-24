@@ -35,13 +35,23 @@
 
 밴드 일정을 보이게 하려면 서버 설정에 `BAND_ICAL_URL`(밴드 캘린더 구독 주소)을 넣으세요. 이 주소는 비밀번호처럼 다뤄야 하므로 저장소에 올리지 않습니다.
 
-### 외부(인터넷)에서 접속하게 하려면
-둘 중 하나를 고르면 됩니다.
-1. **클라우드 서버에 올리기 (추천)**: Render, Railway, Fly.io 같은 곳에 이 저장소를 연결합니다. `Dockerfile` 이 있어서 그대로 올라갑니다.
-   데이터가 파일로 저장되므로 **영구 디스크(볼륨)** 를 `/data` 에 붙여야 합니다. 보통 월 1만 원 안팎입니다.
-2. **회사 PC를 그대로 서버로 쓰기**: 회사 PC에서 서버 모드로 켜 두고 Cloudflare Tunnel(무료) 로 `https://주소` 를 만들어 연결합니다. 회사 PC가 계속 켜져 있어야 합니다.
+### 외부(인터넷)에서 접속하게 하려면 — 회사 PC 없이 (추천)
+서버 없이 **GitHub Pages(무료 주소) + Firebase(이미 쓰는 저장소)** 로 돌아갑니다. 회사 PC를 꺼 둬도 됩니다.
+주소: `https://bbaekdi.github.io/spacebase-schedule/`
 
-어느 쪽이든 인터넷에 공개할 때는 **회사 비밀번호(`ACCESS_CODE`)나 밴드 로그인을 꼭 켜세요.** 비워 두면 주소를 아는 누구나 이름만 넣고 들어올 수 있습니다.
+처음 한 번만 설정합니다.
+1. 저장소 **Settings → Pages → Source** 를 **GitHub Actions** 로 바꿉니다. (main 에 반영될 때마다 `.github/workflows/pages.yml` 이 사이트를 올립니다)
+2. 저장소 **Settings → Secrets and variables → Actions → New repository secret** 에 두 개를 넣습니다.
+   - `BAND_ICAL_URL`: 밴드 캘린더 구독 주소 (webcal://api.band.us/ical?...)
+   - `SB_CODE`: 주간 스케줄에서 쓰는 회사 비밀번호
+   그러면 `.github/workflows/band-calendar.yml` 이 15분마다 밴드 일정을 Firebase 에 넣어 줍니다. (Actions 탭에서 "band-calendar" → Run workflow 로 바로 실행할 수도 있습니다)
+
+로그인은 주간 스케줄과 같이 "회사 비밀번호 + 이름" 입니다. 비밀번호를 아는 사람만 일정을 볼 수 있습니다.
+참고: GitHub 는 저장소에 60일 동안 변경이 없으면 자동 작업(15분마다)을 멈추고 메일을 보냅니다. 메일의 버튼을 누르면 다시 켜집니다.
+
+### 서버로 직접 돌리는 방법
+Render, Railway, Fly.io 같은 곳이나 회사 PC(Cloudflare Tunnel)에서 `server.js` 를 돌릴 수도 있습니다. `Dockerfile` 이 있고, 데이터용 영구 디스크를 `/data` 에 붙여야 합니다.
+이때는 서버 설정(.env)에 `BAND_ICAL_URL` 을 넣고, 인터넷에 공개하면 **회사 비밀번호(`ACCESS_CODE`)나 밴드 로그인을 꼭 켜세요.**
 
 ## 서버만 직접 실행 (개발/리눅스 서버)
 ```bash

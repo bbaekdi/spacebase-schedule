@@ -1,0 +1,28 @@
+# 밴드 캘린더 일정을 15분마다 Firebase 에 옮긴다 (서버 없이 쓰는 웹사이트용).
+# 저장소 Settings → Secrets and variables → Actions 에 BAND_ICAL_URL, SB_CODE 를 넣어야 동작한다.
+name: band-calendar
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: band-calendar
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-package-lock ical.js@2.2.1
+      - name: 밴드 → Firebase
+        env:
+          BAND_ICAL_URL: ${{ secrets.BAND_ICAL_URL }}
+          SB_CODE: ${{ secrets.SB_CODE }}
+          BAND_URL: ${{ secrets.BAND_URL }}
+        run: node tools/sync-band.js

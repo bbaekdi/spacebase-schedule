@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <title>캘린더 · SPACEBASE</title>
-<link rel="stylesheet" href="/ws.css">
+<link rel="stylesheet" href="ws.css">
 <style>
   .calbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .calbar h1 { margin: 0 8px 0 0; font-size: 20px; min-width: 120px; }
@@ -57,7 +57,7 @@
   }
 </style>
 </head>
-<body>
+<body data-page="calendar">
   <main class="wrap">
     <div class="calbar">
       <h1 id="title"></h1>
@@ -113,10 +113,13 @@
     </form>
   </dialog>
 
-<script src="/ws-common.js"></script>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="ws-common.js"></script>
 <script>
 (function () {
-  const { esc, ymd, hm, dayLabel, addDays, daysOf, whenText, api, showEvent, closeEvent } = WS;
+  const { esc, ymd, hm, dayLabel, addDays, daysOf, whenText, data: ready, showEvent, closeEvent, bandMissingText } = WS;
   const $ = (s) => document.querySelector(s);
   const today = ymd(new Date());
   let view = (() => { try { return localStorage.getItem('ws_cal_view') || 'month'; } catch { return 'month'; } })();
@@ -137,7 +140,7 @@
   async function load() {
     const [a, b] = range();
     try {
-      const r = await api(`/api/calendar/events?from=${a}T00:00:00%2B09:00&to=${b}T00:00:00%2B09:00`);
+      const r = await (await ready).events(`${a}T00:00:00+09:00`, `${b}T00:00:00+09:00`);
       events = r.events; status = r.status;
     } catch (e) { events = []; status = null; $('#warn').textContent = '일정을 불러오지 못했어요: ' + e.message; $('#warn').classList.remove('hidden'); }
     byDay = new Map();
@@ -160,11 +163,11 @@
     $('#listView').classList.toggle('hidden', view !== 'list');
     if (status) {
       const w = $('#warn');
-      if (!status.bandConnected) { w.innerHTML = '밴드 캘린더가 아직 연결되지 않았어요. 지금은 직접 추가한 일정만 보여요. 관리자가 서버 설정에 밴드 구독 주소(BAND_ICAL_URL)를 넣으면 밴드 일정이 자동으로 함께 보여요.' + (status.configError ? `<br>(${esc(status.configError)})` : ''); w.classList.remove('hidden'); }
+      if (!status.bandConnected) { w.innerHTML = '지금은 직접 추가한 일정만 보여요. ' + esc(bandMissingText(status)) + (status.configError ? `<br>(${esc(status.configError)})` : ''); w.classList.remove('hidden'); }
       else if (status.error) { w.textContent = status.error; w.classList.remove('hidden'); }
       else w.classList.add('hidden');
       $('#status').textContent = status.bandConnected
-        ? `밴드 일정 ${status.bandCount}개 · 마지막 갱신 ${status.lastSync ? dayLabel(ymd(status.lastSync)) + ' ' + hm(status.lastSync) : '-'} · 10분마다 자동 갱신`
+        ? `밴드 일정 ${status.bandCount}개 · 마지막 갱신 ${status.lastSync ? dayLabel(ymd(status.lastSync)) + ' ' + hm(status.lastSync) : '-'} · ${status.cloud ? '15분' : '10분'}마다 자동 갱신`
         : '';
     }
     if (view === 'month') renderMonth(); else renderList();
@@ -261,14 +264,14 @@
       end: allDay ? `${addDays(f.ed.value || f.sd.value, 1)}T00:00:00+09:00` : `${f.ed.value || f.sd.value}T${f.et.value || f.st.value || '00:00'}:00+09:00`,
     };
     try {
-      if (editing) await api('/api/calendar/items/' + encodeURIComponent(editing.id), { method: 'PUT', body: JSON.stringify(body) });
-      else await api('/api/calendar/items', { method: 'POST', body: JSON.stringify(body) });
+      const d = await ready;
+      if (editing) await d.update(editing.id, body); else await d.add(body);
       dlg.close(); selected = f.sd.value; cursor = monthStart(selected); load();
     } catch (e) { $('#editErr').textContent = e.message; }
   });
   $('#delBtn').onclick = async () => {
     if (!editing || !confirm('이 일정을 삭제할까요? 모든 사람에게서 사라져요.')) return;
-    try { await api('/api/calendar/items/' + encodeURIComponent(editing.id), { method: 'DELETE' }); dlg.close(); load(); }
+    try { await (await ready).remove(editing.id); dlg.close(); load(); }
     catch (e) { $('#editErr').textContent = e.message; }
   };
 
