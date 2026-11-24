@@ -423,6 +423,11 @@
     return a + '-' + (showY ? m[4].slice(2) + '.' : '') + m[5] + '.' + m[6];
   }
   const isoDot = (d) => ymd(d).replace(/-/g, '.');
+  // A/S·부분 구분은 공사기간 칸에 진행업무를 글자로 바로 쓴다 (달력 없음)
+  function periodAsText(p) {
+    const g = p && db.groups.find((x) => x.id === p.groupId);
+    return !!g && /A\s*\/?\s*S|부분/i.test(g.name || '');
+  }
   let shadeMigrated = false;
   function migrateShade() {
     // 처음 한 번: 'PROJECT' 구분은 날짜칸 기본 회색 (엑셀처럼). 이후엔 오른쪽 클릭으로 끄고 켤 수 있다
@@ -552,7 +557,7 @@
     if (field === 'area') shown = fmtArea(v);
     if (field === 'period') shown = fmtPeriod(v);
     // 공사기간: 날짜로 적힌 칸은 달력으로만 고친다 (글자로 적힌 진행업무는 그대로 입력)
-    const ro = field === 'period' && (!v || periodRange(v, new Date())) ? ' readonly' : '';
+    const ro = field === 'period' && !periodAsText(p) && (!v || periodRange(v, new Date())) ? ' readonly' : '';
     return `<input class="cell ${align}${field === 'period' ? ' period' : ''}" data-key="p|${p.id}|${field}" data-pid="${p.id}" data-field="${field}" value="${esc(shown)}" ${field === 'amount' ? 'inputmode="numeric"' : ''}${ro}>`;
   }
 
@@ -896,7 +901,7 @@
   });
   sheet.addEventListener('focusin', (e) => {
     const el = e.target;
-    if (el.dataset && el.dataset.field === 'period' && !el._noPop) openPerPop(el);
+    if (el.dataset && el.dataset.field === 'period' && !el._noPop && !periodAsText(db.projects.find((x) => x.id === el.dataset.pid))) openPerPop(el);
     else if (el._noPop) { delete el._noPop; closePerPop(); }
     else if (!perPop.contains(el)) closePerPop();
   });
