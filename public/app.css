@@ -243,29 +243,42 @@ body.printing .members-head .memo-title { font-size: 13px; }
 body.printing .mteam ::placeholder { color: transparent; }
 @media print { .mteam ::placeholder { color: transparent; } }
 body.printing .mrow.empty { display: none; } @media print { .mrow.empty { display: none; } }
-/* 인쇄 선 굵기: 바깥 테두리·머리글 아래·구분 테두리는 굵게, 안쪽 칸선은 가늘고 연하게 (엑셀과 같게) */
-body.printing .sheet thead tr:first-child th { border-top-width: 2px; }
-body.printing .sheet thead tr:last-child th { border-bottom-width: 2px; }
-body.printing .sheet thead tr:first-child th:first-child { border-left-width: 2px; }
-body.printing .sheet th.note-h { border-right-width: 2px; }
-body.printing .sheet tr.prow td.g { border-width: 2px; }
-body.printing .sheet tr.prow.gfirst td { border-top-width: 2px; }
-body.printing .sheet tr.prow.glast td { border-bottom-width: 2px; }
-body.printing .sheet tr.prow td.note { border-right-width: 2px; }
-body.printing .memo-cols { border-top-width: 2px; }
-body.printing .memo textarea.memo-notice { border-bottom-width: 2px; }
 /* 인쇄 글씨: 프로젝트 칸(구분 이름 제외)만 1pt 작게 */
 body.printing .sheet tr.prow td:not(.g), body.printing .sheet tr.prow td:not(.g) input.cell { font-size: 10.7px; }
 body.printing .sheet td.d .txt { font-size: 10.7px; }
 body.printing .sheet tr.prow td.note, body.printing .sheet tr.prow td.note input.cell { font-size: 9.2px; }
-/* 인쇄: 안쪽 칸선은 테두리 대신 0.5px 그림자로 그려서 머리글 선보다 확실히 가늘게 */
-body.printing .sheet tr.prow td { border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
-  box-shadow: inset -.5px 0 0 var(--grid-light), inset 0 -.5px 0 var(--grid-light); }
-body.printing .sheet tr.prow td.g { border-width: 2px; box-shadow: none; }
-body.printing .sheet tr.prow.gfirst td { border-top-width: 2px; }
-body.printing .sheet tr.prow.glast td { border-bottom-width: 2px; box-shadow: inset -.5px 0 0 var(--grid-light); }
-body.printing .sheet tr.prow td.note { border-right-width: 2px; box-shadow: inset 0 -.5px 0 var(--grid-light); }
-body.printing .sheet tr.prow.glast td.note { box-shadow: none; }
+
+/* 인쇄 선: 브라우저는 테두리(border)를 최소 1화면점으로 올려 그려서 축소 인쇄하면 검은 선이 진해진다.
+   그래서 인쇄할 때는 모든 선을 안쪽 그림자로 그린다. 검은 선 --pl(1px) 은 안쪽 회색 선 --pg(0.5px)의 두 배로,
+   한 장에 맞춰 줄어든 만큼 함께 가늘어진다. (선 굵기를 바꿀 때는 --pl 만 고치면 됨. --pg 보다 작게 하지 말 것) */
+body.printing { --pl: 1px; --pg: .5px; }
+body.printing .sheet th, body.printing .sheet td {
+  border: 0 !important;
+  --st: 0px; --ct: transparent; --sr: 0px; --cr: transparent; --sb: 0px; --cb: transparent; --sl: 0px; --cl: transparent;
+  box-shadow: inset 0 var(--st) 0 var(--ct), inset calc(-1 * var(--sr)) 0 0 var(--cr), inset 0 calc(-1 * var(--sb)) 0 var(--cb), inset var(--sl) 0 0 var(--cl) !important;
+}
+/* 머리글: 모든 칸 오른쪽·아래 검은 선, 맨 위·맨 왼쪽 */
+body.printing .sheet th { --sr: var(--pl); --cr: #000; --sb: var(--pl); --cb: #000; }
+body.printing .sheet thead tr:first-child th { --st: var(--pl); --ct: #000; }
+body.printing .sheet thead tr:first-child th:first-child { --sl: var(--pl); --cl: #000; }
+/* 프로젝트 칸: 안쪽은 회색, 구분 바깥 테두리와 NOTE 오른쪽은 검은 선 */
+body.printing .sheet tr.prow td { --sr: var(--pg); --cr: var(--grid-light); --sb: var(--pg); --cb: var(--grid-light); }
+body.printing .sheet tr.prow.gfirst td { --st: var(--pl); --ct: #000; }
+body.printing .sheet tr.prow.glast td { --sb: var(--pl); --cb: #000; }
+body.printing .sheet tr.prow td.note { --sr: var(--pl); --cr: #000; }
+body.printing .sheet tr.prow td.g, body.printing .sheet tr.empty-group td.g { --st: var(--pl); --ct: #000; --sr: var(--pl); --cr: #000; --sb: var(--pl); --cb: #000; --sl: var(--pl); --cl: #000; }
+body.printing .sheet tr.empty-group td { --st: var(--pl); --ct: #000; --sb: var(--pl); --cb: #000; }
+body.printing .sheet tr.empty-group td:last-child { --sr: var(--pl); --cr: #000; }
+/* 표 맨 아래 가로선 (마지막 빈 줄의 아래) */
+body.printing .sheet tbody tr.spacer:last-child td { --sb: var(--pl); --cb: #000; }
+/* 메모 칸 선 */
+body.printing .memo, body.printing .memo-cols { position: relative; }
+body.printing .memo-cols { border-top: 0; }
+body.printing .memo-cols textarea + textarea, body.printing .memo textarea.memo-notice { border: 0; }
+body.printing .memo-cols::before { content: ''; position: absolute; left: 0; right: 0; top: calc(var(--pl) / 2); height: 0; box-shadow: 0 0 0 calc(var(--pl) / 2) #000; z-index: 1; }
+body.printing .memo-cols::after { content: ''; position: absolute; top: calc(var(--pl) / 2); bottom: 0; left: calc(100% * 1.25 / 2.25); width: 0; box-shadow: 0 0 0 calc(var(--pl) / 2) #000; z-index: 1; }
+body.printing .memo::after { content: ''; position: absolute; left: 0; right: 0; bottom: calc(var(--pl) / 2); height: 0; box-shadow: 0 0 0 calc(var(--pl) / 2) #000; z-index: 1; }
+body.printing .etc-memo textarea { border: 0; box-shadow: inset 0 0 0 var(--pl) #000; }
 
 /* 담당자 약칭 고르기 */
 .abbr-pop { position: absolute; z-index: 150; background: #fff; border: 1px solid #999; box-shadow: 0 4px 14px rgba(0,0,0,.18); padding: 8px 10px; font-size: 12px; max-width: 520px; }
