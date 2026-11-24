@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "SPACEBASE 밴드 일정 자동 입력",
+  "version": "1.0.0",
+  "description": "SPACEBASE 웹사이트에서 쓴 일정을 밴드 '일정 만들기' 창에 자동으로 채워 줍니다.",
+  "icons": { "48": "icon48.png", "128": "icon128.png" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.band.us/band/*"],
+      "js": ["bandform.js", "band-fill.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://bbaekdi.github.io/spacebase-schedule/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["site-bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

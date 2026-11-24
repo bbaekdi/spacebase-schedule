@@ -179,7 +179,7 @@
   // "네이버 밴드" 바로가기 → 회사 밴드 게시글 화면 (밴드 주소는 저장소가 아니라 Secret BAND_URL 에서 가져옴)
   const bandId = (String(st.bandUrl || '').match(/band\.us\/band\/(\d+)/) || [])[1];
   if (bandId) document.getElementById('bandHome').href = `https://www.band.us/band/${bandId}/post`;
-  if (st.bandConnected && st.bandUrl) { const a = document.getElementById('bandAdd'); a.href = st.bandUrl; a.classList.remove('hidden'); document.getElementById('calOpen').style.marginLeft = '12px'; }
+  if (st.bandConnected && st.bandUrl) { const a = document.getElementById('bandAdd'); a.href = st.bandUrl; if (document.documentElement.dataset.sbeExt) { a.href = 'calendar.html#add'; a.removeAttribute('target'); } a.classList.remove('hidden'); document.getElementById('calOpen').style.marginLeft = '12px'; }
   if (!st.bandConnected) { warn.innerHTML = esc(bandMissingText(st)) + (st.configError ? `<br>(${esc(st.configError)})` : ''); warn.classList.remove('hidden'); }
   else if (st.error) { warn.textContent = st.error; warn.classList.remove('hidden'); }
 

@@ -25,6 +25,8 @@ jobs:
           mv _site/index.html _site/schedule.html
           cp _site/portal.html _site/index.html
           rm -f _site/login.html
+          # 밴드 자동 입력 확장 프로그램 설치 파일
+          (cd extension && zip -qr ../_site/sbe-band-extension.zip .)
           # 새 버전을 올렸을 때 브라우저가 예전 파일을 계속 쓰지 않도록 파일 주소 뒤에 버전 표시를 붙인다
           V=${GITHUB_SHA::7}
           sed -i -E "s#(src|href)=\"([^\":]+\.(js|css|svg))\"#\1=\"\2?v=$V\"#g" _site/*.html

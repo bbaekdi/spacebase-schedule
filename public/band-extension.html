@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>밴드 자동 입력 설치 · SPACEBASE</title>
+<link rel="stylesheet" href="ws.css">
+<style>
+  .guide { max-width: 760px; }
+  .guide h1 { font-size: 20px; margin: 0 0 6px; }
+  .guide ol { padding-left: 20px; line-height: 1.9; margin: 8px 0 0; }
+  .guide code { background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 13px; }
+  .guide .card + .card { margin-top: 14px; }
+  .dl { margin: 14px 0 4px; }
+</style>
+</head>
+<body data-page="calendar">
+  <main class="wrap guide">
+    <section class="card">
+      <h1>밴드 자동 입력 설치</h1>
+      <p class="note">설치하면 캘린더의 <b>＋ 밴드에 일정 추가</b>에서 일정을 쓰고 "밴드에 입력하기"를 누를 때, 밴드가 열리면서 <b>일정 만들기 창이 자동으로 채워져요</b>.
+      PC의 크롬·엣지·웨일에서만 되고, 휴대폰에서는 지금처럼 밴드에서 직접 추가해요. PC마다 한 번씩 설치해야 해요.</p>
+      <div class="dl"><a class="btn primary" href="sbe-band-extension.zip" download>설치 파일 받기 (zip)</a></div>
+    </section>
+    <section class="card">
+      <h2>설치 방법 (1분)</h2>
+      <ol>
+        <li>위 <b>설치 파일 받기</b>를 눌러 받은 zip 파일을 <b>마우스 오른쪽 → 압축 풀기</b>로 풀어요. 풀린 폴더는 지우지 말고 그대로 두세요. (예: 문서 폴더)</li>
+        <li>주소창에 아래 주소를 넣고 엔터를 눌러요.<br>
+          크롬: <code>chrome://extensions</code> · 엣지: <code>edge://extensions</code> · 웨일: <code>whale://extensions</code></li>
+        <li>오른쪽 위(엣지는 왼쪽 아래) <b>개발자 모드</b>를 켜요.</li>
+        <li><b>압축해제된 확장 프로그램을 로드합니다</b>(엣지: "압축 풀린 항목 로드")를 누르고, 1번에서 푼 폴더를 골라요.</li>
+        <li>"SPACEBASE 밴드 일정 자동 입력"이 목록에 보이면 끝! 캘린더 화면을 새로고침(Ctrl+F5)하세요.</li>
+      </ol>
+      <p class="note">밴드에는 미리 로그인해 두세요. 자동 입력은 내용을 채우기만 하고 <b>완료</b>는 직접 눌러요. 혹시 채워지지 않은 칸이 있으면 밴드 화면 오른쪽 위에 알려 줘요.</p>
+    </section>
+  </main>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="ws-common.js"></script>
+</body>
+</html>
