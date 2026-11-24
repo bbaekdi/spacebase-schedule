@@ -1,10 +1,10 @@
 # 밴드 캘린더 중계(worker/band-relay.js)를 Cloudflare Workers 에 올린다.
-# 필요한 저장소 Secrets: CF_API_TOKEN, CF_ACCOUNT_ID (Cloudflare), BAND_ICAL_URL, SB_CODE
+# 필요한 저장소 Secrets: CF_API_TOKEN, CF_ACCOUNT_ID (Cloudflare), BAND_ICAL_URL, SB_CODE, (선택) GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 name: band-worker
 on:
   push:
     branches: [main]
-    paths: ['worker/band-relay.js', 'worker/band.toml', '.github/workflows/band-worker.yml']
+    paths: ['worker/band-relay.js', 'worker/google.js', 'worker/band.toml', '.github/workflows/band-worker.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,6 +17,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
       BAND_ICAL_URL: ${{ secrets.BAND_ICAL_URL }}
       SB_CODE: ${{ secrets.SB_CODE }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,4 +34,10 @@ jobs:
             printf '%s' "$SB_CODE" | npx --yes wrangler@3 secret put SB_CODE -c band.toml
           else
             echo "BAND_ICAL_URL, SB_CODE 가 없습니다."
+          fi
+          if [ -n "$GOOGLE_CLIENT_ID" ] && [ -n "$GOOGLE_CLIENT_SECRET" ]; then
+            printf '%s' "$GOOGLE_CLIENT_ID" | npx --yes wrangler@3 secret put GOOGLE_CLIENT_ID -c band.toml
+            printf '%s' "$GOOGLE_CLIENT_SECRET" | npx --yes wrangler@3 secret put GOOGLE_CLIENT_SECRET -c band.toml
+          else
+            echo "구글 연결 설정(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)이 아직 없습니다."
           fi

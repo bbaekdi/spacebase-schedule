@@ -127,6 +127,90 @@
     gcalCache = { url, at: now, events };
     return events;
   }
+  // 개인 구글 캘린더 "구글 계정으로 연결": 연결 정보(암호화된 것)는 이 브라우저(이름별)에만 저장하고,
+  // 일정은 구글 캘린더 API 에서 직접 읽는다. 다른 사람 화면에는 보이지 않는다. (중계: worker/google.js)
+  const relay = () => String(window.SB_BAND_API || '').replace(/\/$/, '');
+  const myName = () => (getCred() || {}).name || '';
+  const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+  const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const gAcc = () => lsGet('sb_google:' + myName(), null);
+  let gTok = null, gCache = null, gCals = null;
+  const gReset = () => { gTok = null; gCache = null; gCals = null; };
+  // 구글 연결 후 돌아왔을 때 (#gconn=...)
+  (() => {
+    const hp = new URLSearchParams(location.hash.slice(1));
+    if (!hp.has('gconn')) return;
+    const blob = hp.get('gconn');
+    history.replaceState(null, '', location.pathname + location.search);
+    if (blob && blob !== 'cancel') { lsSet('sb_google_pending', { blob, email: hp.get('gemail') || '', name: hp.get('gname') || '', at: Date.now() }); }
+  })();
+  function gClaimPending() {
+    const p = lsGet('sb_google_pending', null);
+    if (!p || !myName()) return;
+    lsSet('sb_google_pending', null);
+    if (Date.now() - p.at < 10 * 60 * 1000) { lsSet('sb_google:' + myName(), { blob: p.blob, email: p.email, name: p.name }); lsSet('sb_gsel:' + myName(), null); gReset(); }
+  }
+  async function gToken() {
+    const acc = gAcc();
+    if (!acc) return null;
+    if (gTok && gTok.exp > Date.now() + 60000) return gTok.tok;
+    const r = await fetch(relay() + '/google/token', { method: 'POST', headers: { 'X-G-Token': acc.blob }, cache: 'no-store' });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) throw new Error('구글 연결이 끊겼어요. "내 구글 캘린더"에서 다시 연결해 주세요.');
+    if (!r.ok || !j.access_token) throw new Error(j.error || '응답 ' + r.status);
+    gTok = { tok: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 };
+    return gTok.tok;
+  }
+  async function gApi(path) {
+    const r = await fetch('https://www.googleapis.com/calendar/v3' + path, { headers: { Authorization: 'Bearer ' + await gToken() } });
+    if (!r.ok) throw new Error('구글 캘린더 응답 ' + r.status);
+    return r.json();
+  }
+  async function gCalendars(force) {
+    if (gCals && !force) return gCals;
+    const j = await gApi('/users/me/calendarList?minAccessRole=reader&maxResults=250');
+    gCals = (j.items || []).map((c) => ({ id: c.id, name: c.summaryOverride || c.summary || c.id, color: c.backgroundColor || '#2f9e5b', primary: !!c.primary, selected: !!c.selected, readOnly: !/owner|writer/.test(c.accessRole) }));
+    gCals.sort((a, b) => (b.primary - a.primary));
+    return gCals;
+  }
+  const gSel = (cals) => { const v = lsGet('sb_gsel:' + myName(), null); return Array.isArray(v) ? v : cals.filter((c) => c.primary || c.selected).map((c) => c.id); };
+  const kst = (d) => new Date(d + 'T00:00:00+09:00');
+  async function googleEvents(from, to) {
+    const key = from + '|' + to + '|' + JSON.stringify(lsGet('sb_gsel:' + myName(), null));
+    if (gCache && gCache.key === key && Date.now() - gCache.at < 60000) return gCache.events;
+    const cals = await gCalendars(), sel = new Set(gSel(cals));
+    const q = `timeMin=${encodeURIComponent(new Date(from).toISOString())}&timeMax=${encodeURIComponent(new Date(to).toISOString())}&singleEvents=true&orderBy=startTime&maxResults=2500`;
+    const lists = await Promise.all(cals.filter((c) => sel.has(c.id)).map(async (c) => {
+      const j = await gApi(`/calendars/${encodeURIComponent(c.id)}/events?${q}`);
+      return (j.items || []).filter((it) => it.status !== 'cancelled' && it.start).map((it) => {
+        const allDay = !!it.start.date;
+        const s = allDay ? kst(it.start.date) : new Date(it.start.dateTime);
+        let e = allDay ? kst(it.end.date) : new Date(it.end.dateTime);
+        if (e <= s) e = new Date(s.getTime() + 1000);
+        return { id: 'g:' + c.id + ':' + it.id, title: it.summary || '(제목 없음)', start: s.toISOString(), end: e.toISOString(), allDay, source: 'google',
+          description: it.description || '', location: it.location || '', url: it.htmlLink || '', color: it.colorId ? '' : c.color, calName: c.name };
+      });
+    }));
+    const events = lists.flat();
+    gCache = { key, at: Date.now(), events };
+    lsSet('sb_gsync:' + myName(), new Date().toISOString());
+    return events;
+  }
+  const googleApi = {
+    enabled: () => !!window.SB_GOOGLE_LOGIN && !!relay(),
+    account: () => gAcc(),
+    lastSync: () => lsGet('sb_gsync:' + myName(), null),
+    connect: () => { location.href = relay() + '/google/login?return=' + encodeURIComponent(location.origin + location.pathname); },
+    async disconnect() {
+      const acc = gAcc();
+      if (acc) await fetch(relay() + '/google/revoke', { method: 'POST', headers: { 'X-G-Token': acc.blob } }).catch(() => {});
+      lsSet('sb_google:' + myName(), null); lsSet('sb_gsel:' + myName(), null); lsSet('sb_gsync:' + myName(), null); gReset();
+    },
+    calendars: (force) => gCalendars(force),
+    selected: async () => gSel(await gCalendars()),
+    setSelected: (ids) => { lsSet('sb_gsel:' + myName(), ids); gCache = null; },
+    refresh: () => { gCache = null; gCals = null; },
+  };
   async function liveBand(saved) {
     const api = String(window.SB_BAND_API || '').replace(/\/$/, '');
     if (!api || !window.BandIcs || !window.ICAL) return null;
@@ -155,6 +239,7 @@
         // 주간 스케줄이 없는 비밀번호 = 잘못 입력한 비밀번호
         cred = await askCred('회사 비밀번호가 맞지 않아요. 주간 스케줄에서 쓰는 비밀번호를 넣어 주세요.');
       }
+      gClaimPending();
       return { id: 'n:' + cred.name, name: cred.name };
     },
     // 주간 스케줄의 "구성원" 표에서 내 이름을 찾아 직급·팀을 가져온다
@@ -172,7 +257,7 @@
       let b = band.val() || {};
       try { b = (await liveBand(b)) || b; } catch (e) { console.warn('밴드 바로 읽기 실패, 저장된 일정 표시:', e.message); }
       let mine = [], gcalError = '';
-      try { mine = (await liveGcal()) || []; } catch (e) { gcalError = '내 구글 캘린더를 읽지 못했어요: ' + e.message; }
+      try { mine = (gAcc() ? await googleEvents(from, to) : await liveGcal()) || []; } catch (e) { gcalError = '내 구글 캘린더를 읽지 못했어요: ' + e.message; }
       const f = new Date(from), t = new Date(to);
       const inRange = (e) => e && e.start && new Date(e.start) < t && new Date(e.end) > f;
       const list = [
@@ -183,10 +268,10 @@
       list.sort((x, y) => x.start.localeCompare(y.start));
       return {
         events: list,
-        status: { bandConnected: !!b.lastSync, error: b.error || '', lastSync: b.lastSync || null, bandCount: b.count || 0, bandUrl: b.bandUrl || '', cloud: true, live: !!b.live, gcal: !!getGcal(), gcalCount: mine.length, gcalError },
+        status: { bandConnected: !!b.lastSync, error: b.error || '', lastSync: b.lastSync || null, bandCount: b.count || 0, bandUrl: b.bandUrl || '', cloud: true, live: !!b.live, gcal: !!(gAcc() || getGcal()), gcalCount: mine.length, gcalError },
       };
     },
-    getGcal, setGcal,
+    getGcal, setGcal, google: googleApi,
     async add(body) { const r = space.child('calendar/items').push(); await r.set(cleanItem(body, cred.name)); return { id: r.key }; },
     async update(id, body) { await space.child('calendar/items/' + id).set(cleanItem(body, cred.name)); return { id }; },
     async remove(id) { await space.child('calendar/items/' + id).remove(); return { ok: true }; },
@@ -234,7 +319,7 @@
       document.getElementById('wsLogout').addEventListener('click', (e) => {
         e.preventDefault();
         if (!confirm('이 기기에서 로그아웃할까요? 다음에 회사 비밀번호와 이름을 다시 입력해야 해요.')) return;
-        try { localStorage.removeItem(gcalKey()); localStorage.removeItem('sb_cred'); } catch {}
+        try { localStorage.removeItem(gcalKey()); localStorage.removeItem('sb_google:' + myName()); localStorage.removeItem('sb_gsel:' + myName()); localStorage.removeItem('sb_cred'); } catch {}
         location.reload();
       });
     }
@@ -265,13 +350,14 @@
     const sd = ymd(e.start), ed = ymd(new Date(new Date(e.end).getTime() - (e.allDay ? 1 : 0)));
     const when = e.allDay ? (sd === ed ? dayLabel(sd) + ' 종일' : `${dayLabel(sd)} ~ ${dayLabel(ed)}`)
       : (sd === ymd(e.end) ? `${dayLabel(sd)} ${hm(e.start)} ~ ${hm(e.end)}` : `${dayLabel(sd)} ${hm(e.start)} ~ ${dayLabel(ymd(e.end))} ${hm(e.end)}`);
-    const src = e.source === 'band' ? '밴드 캘린더' : e.source === 'google' ? '내 구글 캘린더 (나만 보여요)' : `직접 추가 · ${esc(e.by || '')}`;
+    const src = e.source === 'band' ? '밴드 캘린더' : e.source === 'google' ? `내 구글 캘린더${e.calName ? ' · ' + esc(e.calName) : ''} (나만 보여요)` : `직접 추가 · ${esc(e.by || '')}`;
     dlg.querySelector('#evBody').innerHTML = `<div class="meta">${when}</div>
       <div class="meta"><span class="dot ${srcCls(e)}"></span> ${src}</div>
       ${e.location ? `<div>📍 ${esc(e.location)}</div>` : ''}
       ${e.description ? `<div>${esc(e.description)}</div>` : ''}`;
     const foot = dlg.querySelector('#evFoot');
     foot.innerHTML = '';
+    if (e.source === 'google' && /^https:\/\//.test(e.url || '')) { const a = document.createElement('a'); a.className = 'btn'; a.href = e.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '구글 캘린더에서 보기'; foot.append(a); }
     if (e.source === 'band' && /^https:\/\//.test(e.url || '')) { const a = document.createElement('a'); a.className = 'btn'; a.href = e.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '밴드에서 보기'; foot.append(a); }
     (actions || []).forEach((x) => foot.append(x));
     const sp = document.createElement('span'); sp.className = 'spacer'; foot.append(sp);

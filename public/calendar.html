@@ -42,10 +42,23 @@
   .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--band); }
   .dots i.web { background: var(--web); }
   .dots i.gc { background: var(--gcal); }
-  .chip.gc { background: #e3f4ea; color: #1d6a3d; }
-  .chip.timed.gc::before { background: var(--gcal); }
+  .chip.gc { background: color-mix(in srgb, var(--c, #2f9e5b) 16%, #fff); color: color-mix(in srgb, var(--c, #2f9e5b) 70%, #000); }
+  .chip.timed.gc { background: none; color: var(--ink); }
+  .chip.timed.gc::before { background: var(--c, var(--gcal)); }
   .gsteps { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--ink); }
   .gsteps b { color: var(--ink); }
+  #gcalDlg { width: min(560px, calc(100vw - 32px)); }
+  .gbtn { width: 100%; padding: 12px; font-size: 15px; }
+  .gacc { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .gav { flex: 0 0 52px; height: 52px; border-radius: 50%; background: var(--gcal); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 16px; }
+  .gwho { flex: 1; min-width: 160px; display: grid; gap: 2px; }
+  .gwho small { color: var(--sub); font-size: 12px; overflow-wrap: anywhere; }
+  .gh { margin: 18px 0 8px; font-size: 14px; }
+  .gcals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+  .gcals label { display: flex !important; align-items: center; gap: 8px; font-size: 13px !important; color: var(--ink) !important; cursor: pointer; }
+  .gcals input { width: 18px; height: 18px; padding: 0 !important; accent-color: var(--c); }
+  .gcals small { color: var(--sub); font-size: 11px; margin-left: auto; }
+  @media (max-width: 520px) { .gcals { grid-template-columns: minmax(0, 1fr); } }
 
   .side h2 small { font-weight: 400; color: var(--sub); font-size: 12px; }
   .listview .daygroup { font-size: 13px; font-weight: 800; margin: 18px 0 4px; }
@@ -123,9 +136,25 @@
   </dialog>
 
   <dialog id="gcalDlg">
-    <form method="dialog" id="gcalForm">
-      <div class="dlg-head"><h3>내 구글 캘린더 연결</h3><button type="button" class="x" data-close>✕</button></div>
-      <div class="dlg-body">
+    <div class="dlg-head"><h3>내 구글 캘린더</h3><button type="button" class="x" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div id="gLogin" class="hidden">
+        <p class="note" style="margin:0 0 12px">구글 계정으로 연결하면 내 구글 캘린더 일정이 이 캘린더에 함께 보여요. <b>나에게만</b> 보이고 다른 사람 화면에는 안 나와요.</p>
+        <button type="button" class="btn primary gbtn" id="gConnect">G&nbsp; 구글 계정으로 연결</button>
+        <p class="note" style="margin:12px 0 0"><a href="#" id="gUseIcal">또는 iCal 주소로 연결</a></p>
+      </div>
+      <div id="gAccount" class="hidden">
+        <div class="gacc">
+          <div class="gav" id="gAv"></div>
+          <div class="gwho"><b id="gName"></b><small id="gEmail"></small><small id="gSync"></small></div>
+          <button type="button" class="btn" id="gSyncNow">지금 동기화</button>
+          <button type="button" class="btn danger" id="gOff">연동해제</button>
+        </div>
+        <h4 class="gh">보고 싶은 캘린더를 선택하세요.</h4>
+        <div class="gcals" id="gCals"><div class="note">불러오는 중…</div></div>
+        <p class="note">체크한 캘린더의 일정이 달력에 표시돼요. 나에게만 보여요. 연결 정보는 지금 쓰는 이 기기(브라우저)에만 저장돼요.</p>
+      </div>
+      <form id="gcalForm" class="hidden">
         <ol class="gsteps">
           <li>PC에서 <a href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noopener"><b>구글 캘린더 설정</b></a>을 열어요.</li>
           <li>왼쪽 <b>내 캘린더의 설정</b>에서 내 이름 캘린더를 눌러요.</li>
@@ -133,14 +162,16 @@
           <li>아래 칸에 붙여넣고 저장해요.</li>
         </ol>
         <label>iCal 형식의 비공개 주소<input name="url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" autocomplete="off"></label>
-        <div class="note">이 주소는 <b>지금 쓰는 이 기기(브라우저)에만</b> 저장돼요. 회사 서버나 다른 사람에게는 저장·공유되지 않아서 일정은 나에게만 보여요. 휴대폰에서도 보려면 휴대폰에서 한 번 더 넣어 주세요.</div>
+        <div class="note">이 주소는 <b>지금 쓰는 이 기기(브라우저)에만</b> 저장돼요. 일정은 나에게만 보여요.</div>
         <div class="dlg-err" id="gcalErr"></div>
-      </div>
-      <div class="dlg-foot">
-        <button type="button" class="btn danger" id="gcalOff">연결 끊기</button><span class="spacer"></span>
-        <button type="button" class="btn" data-close>취소</button><button class="btn primary" id="gcalSave">저장</button>
-      </div>
-    </form>
+        <div class="dlg-foot" style="padding:10px 0 0">
+          <button type="button" class="btn danger" id="gcalOff">연결 끊기</button><span class="spacer"></span>
+          <button type="button" class="btn" data-close>취소</button><button class="btn primary">저장</button>
+        </div>
+      </form>
+      <div class="dlg-err" id="gErr"></div>
+    </div>
+    <div class="dlg-foot"></div>
   </dialog>
 
   <dialog id="bandDlg">
@@ -244,7 +275,7 @@
       const open = expanded.has(d);
       const chips = (open ? list : list.slice(0, 3)).map((e) => {
         const multi = e.allDay || daysOf(e).length > 1;
-        return `<span class="chip ${WS.srcCls(e)} ${multi ? '' : 'timed'}" data-id="${esc(e.id)}" title="${esc(e.title)}">${multi ? '' : hm(e.start) + ' '}${esc(e.title)}</span>`;
+        return `<span class="chip ${WS.srcCls(e)} ${multi ? '' : 'timed'}" ${e.color ? `style="--c:${esc(e.color)}"` : ''} data-id="${esc(e.id)}" title="${esc(e.title)}">${multi ? '' : hm(e.start) + ' '}${esc(e.title)}</span>`;
       }).join('');
       const more = list.length > 3 ? `<div class="more" data-more="${d}">${open ? '접기 ▲' : `+${list.length - 3}개`}</div>` : '';
       const dots = list.slice(0, 4).map((e) => `<i class="${WS.srcCls(e)}"></i>`).join('');
@@ -377,13 +408,39 @@
 
   // 내 구글 캘린더 (나만 보이는 개인 일정)
   const gDlg = $('#gcalDlg'), gForm = $('#gcalForm');
+  const show = (id) => ['gLogin', 'gAccount', 'gcalForm'].forEach((x) => $('#' + x).classList.toggle('hidden', x !== id));
+  async function gRender(force) {
+    const be = await ready, G = be.google;
+    $('#gErr').textContent = '';
+    const acc = G && G.account();
+    if (acc) {
+      show('gAccount');
+      const nm = acc.name || acc.email.split('@')[0] || '구글';
+      $('#gAv').textContent = nm.replace(/\s/g, '').slice(-2);
+      $('#gName').textContent = nm; $('#gEmail').textContent = acc.email;
+      const ls = G.lastSync(); $('#gSync').textContent = ls ? '마지막 동기화: ' + dayLabel(ymd(ls)) + ' ' + hm(ls) : '';
+      try {
+        const cals = await G.calendars(force), sel = new Set(await G.selected());
+        $('#gCals').innerHTML = cals.map((c) => `<label style="--c:${esc(c.color)}"><input type="checkbox" value="${esc(c.id)}" ${sel.has(c.id) ? 'checked' : ''}> ${esc(c.name)}${c.primary ? ' (기본)' : ''}${c.readOnly ? '<small>읽기 전용</small>' : ''}</label>`).join('') || '<div class="note">캘린더가 없어요.</div>';
+      } catch (e) { $('#gCals').innerHTML = ''; $('#gErr').textContent = e.message; }
+    } else if (G && G.enabled() && !gDlg.dataset.ical) show('gLogin');
+    else {
+      show('gcalForm');
+      gForm.url.value = be.getGcal(); $('#gcalErr').textContent = '';
+      $('#gcalOff').classList.toggle('hidden', !be.getGcal());
+    }
+  }
   $('#gcalBtn').onclick = async () => {
     const be = await ready;
     if (!be.getGcal) { alert('내 구글 캘린더는 웹사이트(인터넷 주소)로 접속했을 때만 쓸 수 있어요.'); return; }
-    gForm.url.value = be.getGcal(); $('#gcalErr').textContent = '';
-    $('#gcalOff').classList.toggle('hidden', !be.getGcal());
-    gDlg.showModal();
+    delete gDlg.dataset.ical;
+    gDlg.showModal(); gRender();
   };
+  $('#gConnect').onclick = async () => { try { sessionStorage.setItem('sb_gjust', '1'); } catch {} (await ready).google.connect(); };
+  $('#gUseIcal').onclick = (ev) => { ev.preventDefault(); gDlg.dataset.ical = '1'; gRender(); };
+  $('#gSyncNow').onclick = async () => { const G = (await ready).google; G.refresh(); await load(); gRender(true); };
+  $('#gOff').onclick = async () => { if (!confirm('구글 캘린더 연결을 해제할까요?')) return; await (await ready).google.disconnect(); load(); gRender(); };
+  $('#gCals').onchange = async () => { (await ready).google.setSelected([...$('#gCals').querySelectorAll('input:checked')].map((x) => x.value)); load(); };
   gForm.onsubmit = async (ev) => {
     ev.preventDefault();
     const be = await ready, v = gForm.url.value.trim().replace(/^webcal:/i, 'https:');
@@ -392,6 +449,8 @@
     be.setGcal(v); gDlg.close(); load();
   };
   $('#gcalOff').onclick = async () => { (await ready).setGcal(''); gDlg.close(); load(); };
+  // 구글 연결 후 돌아오면 창을 다시 열어 캘린더 선택을 보여 준다
+  ready.then((be) => { let just = false; try { just = sessionStorage.getItem('sb_gjust') === '1'; sessionStorage.removeItem('sb_gjust'); } catch {} if (just && be.google && be.google.account()) { gDlg.showModal(); gRender(); } }).catch(() => {});
   gDlg.addEventListener('click', (ev) => { if (ev.target === gDlg || ev.target.hasAttribute('data-close')) gDlg.close(); });
   async function copyText(t) {
     try { await navigator.clipboard.writeText(t); return true; } catch {}
