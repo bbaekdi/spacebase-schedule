@@ -7,9 +7,9 @@
 //   밴드 일정은 GitHub Actions(.github/workflows/band-calendar.yml)가 15분마다 spaces/<해시>/band 에 넣어 준다.
 (function () {
   const TABS = [
-    { href: './', key: 'home', label: '홈', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5"/></svg>' },
-    { href: 'schedule.html', key: 'schedule', label: '주간 스케줄', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M7 13h6M10 16.5h7"/></svg>' },
-    { href: 'calendar.html', key: 'calendar', label: '캘린더', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="8" cy="14.5" r="1" fill="currentColor"/><circle cx="12" cy="14.5" r="1" fill="currentColor"/><circle cx="16" cy="14.5" r="1" fill="currentColor"/><circle cx="8" cy="18" r="1" fill="currentColor"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg>' },
+    { href: './', key: 'home', label: 'Home', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5"/></svg>' },
+    { href: 'schedule.html', key: 'schedule', label: 'Weekly Schedule', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M7 13h6M10 16.5h7"/></svg>' },
+    { href: 'calendar.html', key: 'calendar', label: 'Calendar', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="8" cy="14.5" r="1" fill="currentColor"/><circle cx="12" cy="14.5" r="1" fill="currentColor"/><circle cx="16" cy="14.5" r="1" fill="currentColor"/><circle cx="8" cy="18" r="1" fill="currentColor"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg>' },
   ];
   const page = document.body.dataset.page || 'home';
   const tab = (t) => `<a href="${t.href}" class="${t.key === page ? 'on' : ''}">`;
