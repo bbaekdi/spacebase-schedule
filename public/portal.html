@@ -70,6 +70,7 @@
         <div class="links">
           <a href="https://works.worksmobile.com/" target="_blank" rel="noopener"><span class="lk"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 12h18"/></svg>NAVER WORKS</span></a>
           <a href="https://www.band.us" id="bandHome" target="_blank" rel="noopener"><span class="lk"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.4 5 2.8 5 5.8"/></svg>NAVER BAND</span></a>
+          <a href="#" id="band2" class="hidden" target="_blank" rel="noopener"><span class="lk"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.4 5 2.8 5 5.8"/></svg>NAVER BAND 2</span></a>
           <a href="https://www.spacebase.co.kr/ko" target="_blank" rel="noopener"><span class="lk"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg>SPACEBASE Website</span></a>
           <a href="https://www.spacebase.co.kr/ko/blog" target="_blank" rel="noopener"><span class="lk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>Blog</span></a>
           <a href="https://www.instagram.com/sbe_spacebase/" target="_blank" rel="noopener"><span class="lk"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".8" fill="currentColor"/></svg>Instagram</span></a>
@@ -118,6 +119,10 @@
 <script src="vendor/ical.min.js"></script>
 <script src="band-ics.js"></script>
 <script src="band-config.js"></script>
+<script>
+  // 두 번째 밴드 바로가기: 주소는 저장소가 아니라 Secret BAND2_URL 에서 (pages.yml 이 넣어 줌)
+  if (window.SB_BAND2_URL) { const a = document.getElementById('band2'); a.href = window.SB_BAND2_URL; a.classList.remove('hidden'); }
+</script>
 <script src="ws-common.js"></script>
 <script>
 // 네이버웍스 메일 (중계 서버: worker/naverworks-mail.js)

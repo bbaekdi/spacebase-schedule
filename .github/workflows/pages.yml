@@ -31,6 +31,12 @@ jobs:
           V=${GITHUB_SHA::7}
           sed -i -E "s#(src|href)=\"([^\":]+\.(js|css|svg))\"#\1=\"\2?v=$V\"#g" _site/*.html
           sed -i "s#logo.svg#logo.svg?v=$V#" _site/ws-common.js
+          # 홈 바로가기의 두 번째 밴드 (공개 저장소라 밴드 주소는 Secret BAND2_URL 에만 둔다)
+          if printf '%s' "$BAND2_URL" | grep -Eq '^https://(www\.)?band\.us/band/[0-9]+(/post)?$'; then
+            printf '\nwindow.SB_BAND2_URL = "%s";\n' "$BAND2_URL" >> _site/band-config.js
+          fi
+        env:
+          BAND2_URL: ${{ secrets.BAND2_URL }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
