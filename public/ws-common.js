@@ -90,6 +90,23 @@
     };
   }
   let space = null, cred = null;
+  // 밴드 일정을 열 때마다 바로 읽기: 중계(worker/band-relay.js)에서 최신 iCal 을 받아 브라우저에서 바꾼다.
+  // 바뀐 내용은 Firebase 에도 저장해 둔다 (중계가 안 될 때 대신 보여줄 내용).
+  let liveCache = null;
+  async function liveBand(saved) {
+    const api = String(window.SB_BAND_API || '').replace(/\/$/, '');
+    if (!api || !window.BandIcs || !window.ICAL) return null;
+    if (liveCache && Date.now() - liveCache.at < 30000) return liveCache.band;
+    const r = await fetch(api + '/ics', { headers: { 'X-SB-Key': space.key }, cache: 'no-store' });
+    if (!r.ok) throw new Error('중계 응답 ' + r.status);
+    const now = Date.now();
+    const events = BandIcs.parseIcs(await r.text(), new Date(now - 100 * 864e5), new Date(now + 400 * 864e5), saved.bandUrl || 'https://www.band.us');
+    const rev = BandIcs.key(JSON.stringify(events));
+    const band = { ...saved, events, count: events.length, lastSync: new Date(now).toISOString(), error: '', rev, live: true };
+    if (saved.rev !== rev) space.child('band').update({ events, count: events.length, lastSync: band.lastSync, error: '', rev }).catch(() => {});
+    liveCache = { at: now, band };
+    return band;
+  }
   const cloudBackend = {
     mode: 'cloud',
     async start() {
@@ -117,7 +134,8 @@
     },
     async events(from, to) {
       const [band, items] = await Promise.all([space.child('band').once('value'), space.child('calendar/items').once('value')]);
-      const b = band.val() || {};
+      let b = band.val() || {};
+      try { b = (await liveBand(b)) || b; } catch (e) { console.warn('밴드 바로 읽기 실패, 저장된 일정 표시:', e.message); }
       const f = new Date(from), t = new Date(to);
       const inRange = (e) => e && e.start && new Date(e.start) < t && new Date(e.end) > f;
       const list = [
@@ -127,7 +145,7 @@
       list.sort((x, y) => x.start.localeCompare(y.start));
       return {
         events: list,
-        status: { bandConnected: !!b.lastSync, error: b.error || '', lastSync: b.lastSync || null, bandCount: b.count || 0, bandUrl: b.bandUrl || '', cloud: true },
+        status: { bandConnected: !!b.lastSync, error: b.error || '', lastSync: b.lastSync || null, bandCount: b.count || 0, bandUrl: b.bandUrl || '', cloud: true, live: !!b.live },
       };
     },
     async add(body) { const r = space.child('calendar/items').push(); await r.set(cleanItem(body, cred.name)); return { id: r.key }; },
@@ -223,7 +241,7 @@
   }
 
   const bandMissingText = (st) => st.cloud
-    ? '밴드 캘린더가 아직 연결되지 않았어요. GitHub 저장소 설정에 밴드 구독 주소(BAND_ICAL_URL)와 회사 비밀번호(SB_CODE)를 넣으면 5분마다 밴드 일정이 자동으로 들어와요.'
+    ? '밴드 캘린더가 아직 연결되지 않았어요. GitHub 저장소 설정에 밴드 구독 주소(BAND_ICAL_URL)와 회사 비밀번호(SB_CODE)를 넣으면 밴드 일정이 자동으로 들어와요.'
     : '밴드 캘린더가 아직 연결되지 않았어요. 관리자가 서버 설정에 밴드 구독 주소(BAND_ICAL_URL)를 넣으면 밴드 일정이 자동으로 보여요.';
 
   window.WS = { esc, ymd, hm, dayLabel, addDays, daysOf, whenText, data, showEvent, WD, bandMissingText, closeEvent: () => dlg.close() };

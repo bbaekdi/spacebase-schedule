@@ -4,7 +4,7 @@ name: mail-worker
 on:
   push:
     branches: [main]
-    paths: ['worker/**', '.github/workflows/mail-worker.yml']
+    paths: ['worker/naverworks-mail.js', 'worker/wrangler.toml', '.github/workflows/mail-worker.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -136,6 +136,9 @@
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="vendor/ical.min.js"></script>
+<script src="band-ics.js"></script>
+<script src="band-config.js"></script>
 <script src="ws-common.js"></script>
 <script>
 (function () {
@@ -190,7 +193,7 @@
       else if (status.error) { w.textContent = status.error; w.classList.remove('hidden'); }
       else w.classList.add('hidden');
       $('#status').textContent = status.bandConnected
-        ? `밴드 일정 ${status.bandCount}개 · 마지막 갱신 ${status.lastSync ? dayLabel(ymd(status.lastSync)) + ' ' + hm(status.lastSync) : '-'} · ${status.cloud ? '5분' : '10분'}마다 자동 갱신`
+        ? `밴드 일정 ${status.bandCount}개 · 마지막 갱신 ${status.lastSync ? dayLabel(ymd(status.lastSync)) + ' ' + hm(status.lastSync) : '-'} · ${status.live ? '열 때마다 바로 갱신' : status.cloud ? '자동 갱신' : '10분마다 자동 갱신'}`
         : '';
     }
     if (view === 'month') renderMonth(); else renderList();
@@ -258,6 +261,9 @@
   $('#todayBtn').onclick = () => { cursor = monthStart(today); selected = today; load(); };
   $('#viewSeg').onclick = (ev) => { const v = ev.target.dataset.v; if (!v) return; view = v; try { localStorage.setItem('ws_cal_view', v); } catch {} load(); };
   $('#search').oninput = () => render();
+  // 화면을 켜 두면 1분마다, 다른 창에 있다가 돌아오면 바로 밴드 일정을 새로 읽는다
+  setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) load(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 
   // 일정 추가/수정
   const dlg = $('#edit'), f = $('#editForm');

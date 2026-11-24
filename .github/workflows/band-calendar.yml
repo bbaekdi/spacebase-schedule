@@ -1,4 +1,5 @@
-# 밴드 캘린더 일정을 5분마다 Firebase 에 옮긴다 (서버 없이 쓰는 웹사이트용).
+# 밴드 캘린더 일정을 Firebase 에 옮긴다 (서버 없이 쓰는 웹사이트용, 예비용).
+# 평소에는 웹사이트가 열 때마다 worker/band-relay.js 를 통해 바로 읽는다. GitHub 예약 실행은 실제로는 1시간에 한 번 정도만 돈다.
 # 저장소 Settings → Secrets and variables → Actions 에 BAND_ICAL_URL, SB_CODE 를 넣어야 동작한다.
 name: band-calendar
 on:

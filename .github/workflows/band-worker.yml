@@ -1,0 +1,35 @@
+# 밴드 캘린더 중계(worker/band-relay.js)를 Cloudflare Workers 에 올린다.
+# 필요한 저장소 Secrets: CF_API_TOKEN, CF_ACCOUNT_ID (Cloudflare), BAND_ICAL_URL, SB_CODE
+name: band-worker
+on:
+  push:
+    branches: [main]
+    paths: ['worker/band-relay.js', 'worker/band.toml', '.github/workflows/band-worker.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      BAND_ICAL_URL: ${{ secrets.BAND_ICAL_URL }}
+      SB_CODE: ${{ secrets.SB_CODE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 배포
+        working-directory: worker
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "Cloudflare 설정(CF_API_TOKEN, CF_ACCOUNT_ID)이 없어 건너뜁니다."; exit 0; fi
+          npx --yes wrangler@3 deploy -c band.toml
+          if [ -n "$BAND_ICAL_URL" ] && [ -n "$SB_CODE" ]; then
+            printf '%s' "$BAND_ICAL_URL" | npx --yes wrangler@3 secret put BAND_ICAL_URL -c band.toml
+            printf '%s' "$SB_CODE" | npx --yes wrangler@3 secret put SB_CODE -c band.toml
+          else
+            echo "BAND_ICAL_URL, SB_CODE 가 없습니다."
+          fi
