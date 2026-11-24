@@ -23,8 +23,14 @@ export default {
     if ((req.headers.get('X-SB-Key') || '') !== (await sha256('spacebase:' + env.SB_CODE.trim()))) return reply('forbidden', 403);
     const u = new URL(env.BAND_ICAL_URL.trim().replace(/^webcal:/i, 'https:'));
     if (u.hostname !== 'api.band.us' || u.pathname !== '/ical') return reply('밴드 구독 주소 형식이 아닙니다.', 500);
-    const r = await fetch(u.toString(), { headers: { 'Cache-Control': 'no-cache' } });
+    // 중간 저장(캐시)된 옛 내용이 오지 않도록 매번 밴드에서 새로 받는다
+    const r = await fetch(u.toString(), { cache: 'no-store', headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } });
     if (!r.ok) return reply('밴드 응답 오류 ' + r.status, 502);
-    return reply(await r.text(), 200, 'text/calendar; charset=utf-8');
+    const res = reply(await r.text(), 200, 'text/calendar; charset=utf-8');
+    // 확인용: 밴드가 보낸 캐시 관련 정보
+    const info = ['age', 'cache-control', 'last-modified', 'date', 'cf-cache-status', 'etag'].map((h) => h + '=' + (r.headers.get(h) || '')).join('; ');
+    res.headers.set('X-Band-Info', info);
+    res.headers.set('Access-Control-Expose-Headers', 'X-Band-Info');
+    return res;
   },
 };

@@ -99,6 +99,7 @@
     if (liveCache && Date.now() - liveCache.at < 30000) return liveCache.band;
     const r = await fetch(api + '/ics', { headers: { 'X-SB-Key': space.key }, cache: 'no-store' });
     if (!r.ok) throw new Error('중계 응답 ' + r.status);
+    console.info('[밴드]', r.headers.get('X-Band-Info') || '');
     const now = Date.now();
     const events = BandIcs.parseIcs(await r.text(), new Date(now - 100 * 864e5), new Date(now + 400 * 864e5), saved.bandUrl || 'https://www.band.us');
     const rev = BandIcs.key(JSON.stringify(events));
