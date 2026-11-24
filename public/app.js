@@ -374,6 +374,41 @@
   }
 
   const SHADE = '#D9D9D9';
+  // 공사기간 글자(예: 12.05-1.22, 10/26-12/7, 27.01.02-)를 날짜 범위로 읽는다. 못 읽으면 null.
+  // 연도가 없으면 지금 보고 있는 날짜에 가장 가까운 해로 정하고, 끝 날짜가 시작보다 앞이면 다음 해로 본다.
+  function periodRange(text, ref) {
+    const s = String(text || '').trim();
+    if (!s) return null;
+    const parts = s.split(/\s*[-~∼–]\s*/);
+    if (parts.length !== 2) return null;
+    const one = (t) => {
+      if (!t) return { none: true };
+      const m = t.match(/^(?:(\d{2}|\d{4})[./])?(\d{1,2})[./](\d{1,2})(?!\d)/);
+      if (!m) return null;
+      const mo = +m[2], da = +m[3];
+      if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+      return { y: m[1] ? (m[1].length === 2 ? 2000 + +m[1] : +m[1]) : null, mo, da };
+    };
+    const a = one(parts[0]), b = one(parts[1]);
+    if (!a || !b || (a.none && b.none)) return null;
+    const mk = (y, x) => new Date(y, x.mo - 1, x.da);
+    const md = (x) => x.mo * 100 + x.da;
+    let best = null;
+    const ry = ref.getFullYear();
+    for (const y of [ry - 1, ry, ry + 1]) {
+      let st = null, en = null;
+      if (!a.none) st = mk(a.y || y, a);
+      if (!b.none) {
+        let ey = b.y || (a.none ? y : st.getFullYear() + (md(b) < md(a) ? 1 : 0));
+        en = mk(ey, b);
+      }
+      const dist = st && ref < st ? st - ref : en && ref > en ? ref - en : 0;
+      const near = Math.abs(ref - (st || en)); // 같은 거리면 시작(또는 끝) 날짜가 가까운 해
+      if (!best || dist < best.dist || (dist === best.dist && near < best.near)) best = { st, en, dist, near };
+      if ((a.none || a.y) && (b.none || b.y)) break; // 연도가 다 적혀 있으면 한 번만
+    }
+    return { st: best.st, en: best.en };
+  }
   let shadeMigrated = false;
   function migrateShade() {
     // 처음 한 번: 'PROJECT' 구분은 날짜칸 기본 회색 (엑셀처럼). 이후엔 오른쪽 클릭으로 끄고 켤 수 있다
@@ -443,12 +478,14 @@
         h += `<td class="info">${inp(p, 'build')}</td>`;
         // 칸 텍스트가 옆 빈칸으로 넘쳐 보이게 (엑셀처럼)
         const cells = dateKeys.map((k) => db.cells[p.id + '|' + k] || {});
+        // 회색 구분이라도 공사기간이 적혀 있으면 그 기간의 날짜칸만 회색
+        const range = g.shade ? periodRange(p.period, days[Math.floor(days.length / 2)]) : null;
         cells.forEach((cell, c) => {
           const d = days[c];
           const we = d.getDay() === 0 || d.getDay() === 6 || !!holName(d);
           const cat = cell.c && catOf(cell.c);
           // 회색 구분(PROJECT 등): 색을 안 칠한 칸도 기본 회색 (새 행·새 날짜도 자동)
-          let style = cat ? `background:${cat.color}` : (g.shade ? `background:${SHADE}` : '');
+          let style = cat ? `background:${cat.color}` : (g.shade && (!range || ((!range.st || d >= range.st) && (!range.en || d <= range.en))) ? `background:${SHADE}` : '');
           let inner = '';
           if (cell.t) {
             let L = 0, R = 0;
