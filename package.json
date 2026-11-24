@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "ical.js": "^2.2.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -28,6 +29,7 @@
     "productName": "SPACEBASE 주간 스케줄",
     "files": [
       "server.js",
+      "calendar.js",
       "seed.js",
       "seed-data.json",
       "public/**",

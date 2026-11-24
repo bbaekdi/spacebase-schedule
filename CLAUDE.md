@@ -4,6 +4,9 @@
 
 - `server.js`: Express + WebSocket 서버. 데이터는 `DATA_DIR/db.json` (회사 PC: 문서\SPACEBASE 스케줄 데이터).
 - `public/`: 스케줄 화면 (vanilla JS). `public/ops.js` 는 서버/브라우저 공용 변경 로직.
+- 워크스페이스(웹): `/` 홈(`public/portal.html`), `/schedule` 주간 스케줄(`public/index.html`), `/calendar` 회사 캘린더(`public/calendar.html`).
+  캘린더 서버 로직은 `calendar.js` (밴드 iCal 구독 주소 `BAND_ICAL_URL` 을 10분마다 읽음, 직접 추가한 일정은 `DATA_DIR/calendar.json`). 공통 화면은 `public/ws.css`, `public/ws-common.js`.
+  원본은 별도 데스크톱 앱 "회사 밴드 캘린더"(Electron). 밴드 게시글 수집/사진 글자 인식/구글 캘린더 연동은 아직 웹으로 옮기지 않았다.
 - `desktop/`: Electron 앱. 회사 PC 1대는 "서버 모드", 나머지는 "접속 모드"(같은 네트워크에서 UDP 41234 로 자동 찾기).
 - 로그인: 기본은 이름만 1회 입력(로그인 없음). 고급 설정에서 회사 비밀번호(ACCESS_CODE) 또는 밴드 OAuth(BAND_CLIENT_ID/SECRET) 를 켤 수 있다.
 
