@@ -16,7 +16,7 @@
 
   const top = document.createElement('header');
   top.className = 'topbar';
-  top.innerHTML = `<a class="logo" href="./">SPACEBASE</a>
+  top.innerHTML = `<a class="logo" href="./" title="SPACEBASE 홈"><img src="logo.svg" alt="SPACEBASE"></a>
     <nav class="tabs">${TABS.map((t) => tab(t) + t.label + '</a>').join('')}</nav>
     <div class="spacer"></div>
     <div class="user"><span class="name" id="wsName"></span><a href="logout" id="wsLogout">로그아웃</a></div>`;
