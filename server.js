@@ -9,6 +9,7 @@ const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
+const { createCalendar } = require('./calendar.js');
 
 // ---------- 설정 ----------
 loadDotEnv();
@@ -27,6 +28,9 @@ const ACCESS_TAG = ACCESS_CODE ? crypto.createHash('sha256').update('sb:' + ACCE
 const BAND_REDIRECT_URI = process.env.BAND_REDIRECT_URI || `${BASE_URL}/auth/band/callback`;
 const DISCOVERY_PORT = 41234;
 
+if (BASE_URL.startsWith('https') && DEV_LOGIN && !ACCESS_CODE) {
+  console.warn('[경고] 인터넷에 공개된 주소인데 로그인 비밀번호가 없습니다. ACCESS_CODE 또는 밴드 로그인을 설정하세요.');
+}
 if (SESSION_SECRET === 'dev-secret-change-me' && !DEV_LOGIN) {
   console.warn('[경고] SESSION_SECRET 을 반드시 설정하세요.');
 }
@@ -204,6 +208,22 @@ app.get('/api/export.json', (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="schedule-backup.json"');
   res.json(db);
 });
+// ---------- 워크스페이스 (홈 · 주간 스케줄 · 캘린더를 한 사이트에서) ----------
+const pub = (f) => (req, res) => res.sendFile(path.join(__dirname, 'public', f));
+app.get('/', pub('portal.html'));
+app.get(['/schedule', '/schedule.html'], pub('index.html'));
+app.get('/calendar', pub('calendar.html'));
+
+const calendar = createCalendar({ dataDir: DATA_DIR });
+const wrap = (fn) => async (req, res) => {
+  try { res.json(await fn(req, res)); } catch (e) { res.status(400).json({ error: String(e.message || e) }); }
+};
+app.get('/api/calendar/events', wrap((req) => calendar.events(req.query.from, req.query.to)));
+app.post('/api/calendar/refresh', wrap(async () => { await calendar.refresh(); return calendar.status(); }));
+app.post('/api/calendar/items', express.json(), wrap((req) => calendar.addItem(req.body || {}, getUser(req))));
+app.put('/api/calendar/items/:id', express.json(), wrap((req) => calendar.updateItem(req.params.id, req.body || {}, getUser(req))));
+app.delete('/api/calendar/items/:id', wrap((req) => { calendar.deleteItem(req.params.id); return { ok: true }; }));
+
 app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
 
 function page(title, msg) {

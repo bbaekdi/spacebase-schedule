@@ -8,6 +8,7 @@
 </head>
 <body>
   <header class="toolbar">
+    <a href="./" id="homeLink" class="homelink hidden" title="워크스페이스 홈으로">⌂ 홈</a>
     <div class="brand" id="title">SPACEBASE SCHEDULE</div>
     <div class="weeknav">
       <button id="prevWeek" title="이전 주">◀</button>
@@ -92,6 +93,7 @@
       <input id="gateName" type="text" placeholder="이름 (예: 홍길동)" maxlength="20">
       <div class="gate-err" id="gateErr"></div>
       <button>시작하기</button>
+      <a href="./" class="gate-home hidden" id="gateHome">← 워크스페이스 홈으로</a>
     </form>
   </div>
 
@@ -102,5 +104,6 @@
   <script src="holidays.js"></script>
   <script src="ops.js"></script>
   <script src="app.js"></script>
+  <script>if (/^https?:$/.test(location.protocol)) { document.getElementById('homeLink').classList.remove('hidden'); document.getElementById('gateHome').classList.remove('hidden'); }</script>
 </body>
 </html>

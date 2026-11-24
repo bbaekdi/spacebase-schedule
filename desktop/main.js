@@ -98,7 +98,7 @@ function buildMenu() {
       submenu: [
         { label: '새로고침', accelerator: 'F5', click: () => win && win.webContents.reload() },
         { label: '인쇄 (A4)', accelerator: 'CmdOrCtrl+P', click: () => openPrintPreview() },
-        { label: '이번 주로', click: () => win && (CLOUD ? win.loadFile(PUBLIC_INDEX) : serverOrigin && win.loadURL(serverOrigin + '/')) },
+        { label: '이번 주로', click: () => win && (CLOUD ? win.loadFile(PUBLIC_INDEX) : serverOrigin && win.loadURL(serverOrigin + '/schedule')) },
         { type: 'separator' },
         ...(CLOUD ? [] : [{ label: '접속 설정…', click: () => showSetup() }]),
         { label: CLOUD ? '이름 / 회사 비밀번호 바꾸기' : '로그아웃 / 이름 바꾸기', click: () => {
@@ -148,7 +148,7 @@ async function openServer(origin, rediscover) {
     return showSetup(`서버(${serverOrigin})에 연결하지 못했습니다. 회사 PC에서 프로그램이 켜져 있는지 확인해 주세요.`);
   }
   if ((loadConfig() || {}).mode !== 'server' && await checkUpdate(true)) return;
-  win.loadURL(serverOrigin + '/');
+  win.loadURL(serverOrigin + '/schedule');
 }
 
 let serverStarted = false;
