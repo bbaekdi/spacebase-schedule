@@ -212,7 +212,7 @@
   }
 
   const bandMissingText = (st) => st.cloud
-    ? '밴드 캘린더가 아직 연결되지 않았어요. GitHub 저장소 설정에 밴드 구독 주소(BAND_ICAL_URL)와 회사 비밀번호(SB_CODE)를 넣으면 15분마다 밴드 일정이 자동으로 들어와요.'
+    ? '밴드 캘린더가 아직 연결되지 않았어요. GitHub 저장소 설정에 밴드 구독 주소(BAND_ICAL_URL)와 회사 비밀번호(SB_CODE)를 넣으면 5분마다 밴드 일정이 자동으로 들어와요.'
     : '밴드 캘린더가 아직 연결되지 않았어요. 관리자가 서버 설정에 밴드 구독 주소(BAND_ICAL_URL)를 넣으면 밴드 일정이 자동으로 보여요.';
 
   window.WS = { esc, ymd, hm, dayLabel, addDays, daysOf, whenText, data, showEvent, WD, bandMissingText, closeEvent: () => dlg.close() };

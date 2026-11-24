@@ -44,10 +44,10 @@
 2. 저장소 **Settings → Secrets and variables → Actions → New repository secret** 에 두 개를 넣습니다.
    - `BAND_ICAL_URL`: 밴드 캘린더 구독 주소 (webcal://api.band.us/ical?...)
    - `SB_CODE`: 주간 스케줄에서 쓰는 회사 비밀번호
-   그러면 `.github/workflows/band-calendar.yml` 이 15분마다 밴드 일정을 Firebase 에 넣어 줍니다. (Actions 탭에서 "band-calendar" → Run workflow 로 바로 실행할 수도 있습니다)
+   그러면 `.github/workflows/band-calendar.yml` 이 5분마다 밴드 일정을 Firebase 에 넣어 줍니다. (Actions 탭에서 "band-calendar" → Run workflow 로 바로 실행할 수도 있습니다)
 
 로그인은 주간 스케줄과 같이 "회사 비밀번호 + 이름" 입니다. 비밀번호를 아는 사람만 일정을 볼 수 있습니다.
-참고: GitHub 는 저장소에 60일 동안 변경이 없으면 자동 작업(15분마다)을 멈추고 메일을 보냅니다. 메일의 버튼을 누르면 다시 켜집니다.
+참고: GitHub 는 저장소에 60일 동안 변경이 없으면 자동 작업(5분마다)을 멈추고 메일을 보냅니다. 메일의 버튼을 누르면 다시 켜집니다.
 
 ### 서버로 직접 돌리는 방법
 Render, Railway, Fly.io 같은 곳이나 회사 PC(Cloudflare Tunnel)에서 `server.js` 를 돌릴 수도 있습니다. `Dockerfile` 이 있고, 데이터용 영구 디스크를 `/data` 에 붙여야 합니다.

@@ -69,7 +69,7 @@
       <input type="search" id="search" placeholder="일정 검색">
       <button class="btn primary" id="addBtn">＋ 일정 추가</button>
     </div>
-    <div class="legend"><span><i class="dot"></i>밴드 캘린더</span><span><i class="dot web"></i>직접 추가한 일정 (모두에게 공유)</span></div>
+    <div class="legend"><span><i class="dot"></i>밴드 캘린더</span><span><i class="dot web"></i>직접 추가한 일정 (모두에게 공유)</span><span id="bandHint" class="hidden">· 일정은 밴드에서 추가해요. 밴드에 저장하면 보통 5~10분 안에 여기에도 보여요.</span></div>
     <div id="warn" class="warn hidden" style="margin-bottom:14px"></div>
 
     <div class="layout">
@@ -181,12 +181,15 @@
     $('#monthView').classList.toggle('hidden', view !== 'month');
     $('#listView').classList.toggle('hidden', view !== 'list');
     if (status) {
+      const viaBand = !!bandAddUrl();
+      $('#addBtn').textContent = viaBand ? '＋ 밴드에서 일정 추가' : '＋ 일정 추가';
+      $('#bandHint').classList.toggle('hidden', !viaBand);
       const w = $('#warn');
       if (!status.bandConnected) { w.innerHTML = '지금은 직접 추가한 일정만 보여요. ' + esc(bandMissingText(status)) + (status.configError ? `<br>(${esc(status.configError)})` : ''); w.classList.remove('hidden'); }
       else if (status.error) { w.textContent = status.error; w.classList.remove('hidden'); }
       else w.classList.add('hidden');
       $('#status').textContent = status.bandConnected
-        ? `밴드 일정 ${status.bandCount}개 · 마지막 갱신 ${status.lastSync ? dayLabel(ymd(status.lastSync)) + ' ' + hm(status.lastSync) : '-'} · ${status.cloud ? '15분' : '10분'}마다 자동 갱신`
+        ? `밴드 일정 ${status.bandCount}개 · 마지막 갱신 ${status.lastSync ? dayLabel(ymd(status.lastSync)) + ' ' + hm(status.lastSync) : '-'} · ${status.cloud ? '5분' : '10분'}마다 자동 갱신`
         : '';
     }
     if (view === 'month') renderMonth(); else renderList();
@@ -273,7 +276,13 @@
     dlg.showModal();
     setTimeout(() => f.title.focus(), 30);
   }
-  $('#addBtn').onclick = () => openEdit(null);
+  // 밴드 주소가 있으면 "일정 추가"는 밴드 일정 화면을 바로 연다 (밴드에 한 번만 입력 → 15분 안에 여기에도 보임)
+  const bandAddUrl = () => (status && status.bandConnected && status.bandUrl) || '';
+  $('#addBtn').onclick = () => {
+    const url = bandAddUrl();
+    if (!url) return openEdit(null);
+    window.open(url, '_blank', 'noopener');
+  };
   dlg.addEventListener('click', (ev) => { if (ev.target === dlg || ev.target.hasAttribute('data-close')) dlg.close(); });
   f.sd.onchange = () => { if (!f.ed.value || f.ed.value < f.sd.value) f.ed.value = f.sd.value; };
   f.addEventListener('submit', async (ev) => {

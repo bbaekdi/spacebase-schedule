@@ -44,7 +44,7 @@
 
     <div class="grid">
       <section class="card">
-        <h2>오늘 일정 <a class="more" href="calendar.html">캘린더 열기 ›</a></h2>
+        <h2>오늘 일정 <a class="more hidden" id="bandAdd" target="_blank" rel="noopener">＋ 밴드에서 일정 추가</a><a class="more" href="calendar.html" id="calOpen">캘린더 열기 ›</a></h2>
         <ul class="events" id="todayList"><li class="empty">불러오는 중…</li></ul>
       </section>
       <section class="card">
@@ -90,6 +90,7 @@
   }
   const byId = new Map(data.events.map((e) => [e.id, e]));
   const st = data.status, warn = document.getElementById('calWarn');
+  if (st.bandConnected && st.bandUrl) { const a = document.getElementById('bandAdd'); a.href = st.bandUrl; a.classList.remove('hidden'); document.getElementById('calOpen').style.marginLeft = '10px'; }
   if (!st.bandConnected) { warn.innerHTML = esc(bandMissingText(st)) + (st.configError ? `<br>(${esc(st.configError)})` : ''); warn.classList.remove('hidden'); }
   else if (st.error) { warn.textContent = st.error; warn.classList.remove('hidden'); }
 

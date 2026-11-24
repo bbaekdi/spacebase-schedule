@@ -1,4 +1,4 @@
-// 밴드 캘린더 → Firebase 옮기기 (GitHub Actions 가 15분마다 실행)
+// 밴드 캘린더 → Firebase 옮기기 (GitHub Actions 가 5분마다 실행)
 // 서버 없이 쓰는 웹사이트(GitHub Pages)에서도 밴드 일정이 보이도록,
 // 밴드 구독 주소를 읽어 Firebase 의 spaces/<회사 비밀번호 해시>/band 에 넣는다.
 //
