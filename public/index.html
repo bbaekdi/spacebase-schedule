@@ -104,6 +104,16 @@
   <script src="holidays.js"></script>
   <script src="ops.js"></script>
   <script src="app.js"></script>
-  <script>if (/^https?:$/.test(location.protocol)) { document.getElementById('homeLink').classList.remove('hidden'); document.getElementById('gateHome').classList.remove('hidden'); }</script>
+  <script>
+  // 웹사이트로 열었을 때: 홈·캘린더와 같은 상단 메뉴(로고 + Home / Weekly Schedule / Calendar)를 붙인다. 데스크톱 앱(file:)에서는 안 붙임.
+  if (/^https?:$/.test(location.protocol)) {
+    document.getElementById('gateHome').classList.remove('hidden');
+    const nav = document.createElement('header');
+    nav.className = 'wsnav';
+    nav.innerHTML = '<a class="wslogo" href="./" title="SPACEBASE 홈"><img src="logo.svg" alt="SPACEBASE"></a>'
+      + '<nav><a href="./">Home</a><a href="schedule.html" class="on">Weekly Schedule</a><a href="calendar.html">Calendar</a></nav>';
+    document.body.prepend(nav);
+  }
+  </script>
 </body>
 </html>

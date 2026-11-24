@@ -27,6 +27,17 @@ button { font-family: inherit; font-size: inherit; }
 .gate-home { display: block; margin-top: 14px; text-align: center; color: #666; font-size: 13px; text-decoration: none; }
 .gate-home:hover { color: #9a6b00; }
 @media print { .homelink { display: none !important; } }
+/* 웹사이트 상단 메뉴 (홈·캘린더 화면과 같은 모양) */
+.wsnav { display: flex; align-items: center; gap: 18px; height: 56px; padding: 0 20px; background: #fff; border-bottom: 1px solid #dedbd0;
+  font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: 14px; }
+.wsnav .wslogo { display: flex; align-items: center; }
+.wsnav .wslogo img { height: 30px; width: auto; display: block; }
+.wsnav nav { display: flex; gap: 4px; height: 100%; }
+.wsnav nav a { display: flex; align-items: center; padding: 0 14px; text-decoration: none; color: #6b6b66; font-weight: 700; border-bottom: 3px solid transparent; }
+.wsnav nav a:hover { color: #222; }
+.wsnav nav a.on { color: #222; border-bottom-color: #f1bf52; }
+@media (max-width: 720px) { .wsnav { padding: 0 12px; gap: 6px; } .wsnav nav a { padding: 0 8px; font-size: 13px; } }
+@media print { .wsnav { display: none !important; } }
 .brand { font-weight: 800; letter-spacing: .6px; font-size: 15px; }
 .weeknav { display: flex; align-items: center; gap: 4px; }
 .weeknav button, .menu button, .menu a {
@@ -298,3 +309,4 @@ body.printing .abbr-pop { display: none !important; }
 .pp-dash { padding-bottom: 5px; }
 .pp-note { color: #888; font-size: 11px; margin-bottom: 4px; max-width: 320px; }
 @media print { .abbr-pop { display: none !important; } }
+.weeknav button { white-space: nowrap; }
