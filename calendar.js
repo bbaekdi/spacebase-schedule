@@ -114,6 +114,7 @@ function createCalendar({ dataDir }) {
     return {
       bandConnected: !!icalUrl, configError, error: cache.error,
       lastSync: cache.at ? new Date(cache.at).toISOString() : null, bandCount: cache.events.length,
+      bandUrl: process.env.BAND_URL || '',
     };
   }
 
