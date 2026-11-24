@@ -36,7 +36,8 @@
   .chip.timed { background: none; padding-left: 2px; color: var(--ink); }
   .chip.timed::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--band); margin-right: 4px; vertical-align: 1px; }
   .chip.timed.web::before { background: var(--web); }
-  .more { font-size: 11px; color: var(--sub); padding-left: 4px; }
+  .more { display: inline-block; font-size: 11px; color: var(--sub); padding: 1px 6px; margin-top: 2px; border-radius: 4px; cursor: pointer; }
+  .more:hover { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
   .dots { display: none; gap: 3px; justify-content: center; margin-top: 4px; flex-wrap: wrap; }
   .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--band); }
   .dots i.web { background: var(--web); }
@@ -196,6 +197,7 @@
     renderSide();
   }
 
+  const expanded = new Set(); // "+N개"를 눌러 펼친 날짜
   function renderMonth() {
     const [first] = range();
     const thisMonth = cursor.slice(0, 7);
@@ -204,11 +206,12 @@
       const d = addDays(first, i), wd = i % 7;
       const list = filtered(byDay.get(d) || []);
       const cls = ['cell', d.slice(0, 7) !== thisMonth && 'other', d === today && 'today', d === selected && 'sel', wd === 0 && 'sun', wd === 6 && 'sat'].filter(Boolean).join(' ');
-      const chips = list.slice(0, 3).map((e) => {
+      const open = expanded.has(d);
+      const chips = (open ? list : list.slice(0, 3)).map((e) => {
         const multi = e.allDay || daysOf(e).length > 1;
         return `<span class="chip ${e.source === 'web' ? 'web' : ''} ${multi ? '' : 'timed'}" data-id="${esc(e.id)}" title="${esc(e.title)}">${multi ? '' : hm(e.start) + ' '}${esc(e.title)}</span>`;
       }).join('');
-      const more = list.length > 3 ? `<div class="more">+${list.length - 3}개</div>` : '';
+      const more = list.length > 3 ? `<div class="more" data-more="${d}">${open ? '접기 ▲' : `+${list.length - 3}개`}</div>` : '';
       const dots = list.slice(0, 4).map((e) => `<i class="${e.source === 'web' ? 'web' : ''}"></i>`).join('');
       html += `<div class="${cls}" data-day="${d}"><span class="num">${+d.slice(8)}</span>${chips}${more}<div class="dots">${dots}</div></div>`;
     }
@@ -245,6 +248,8 @@
   document.addEventListener('click', (ev) => {
     const hit = ev.target.closest('[data-id]');
     if (hit && hit.closest('main')) { const e = findEvent(hit.dataset.id); if (e) { ev.stopPropagation(); open(e); return; } }
+    const moreBtn = ev.target.closest('[data-more]');
+    if (moreBtn) { const d = moreBtn.dataset.more; expanded.has(d) ? expanded.delete(d) : expanded.add(d); }
     const cell = ev.target.closest('.cell[data-day]');
     if (cell) { selected = cell.dataset.day; if (selected.slice(0, 7) !== cursor.slice(0, 7)) { cursor = monthStart(selected); load(); } else render(); }
   });
