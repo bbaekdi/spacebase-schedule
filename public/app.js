@@ -409,6 +409,20 @@
     }
     return { st: best.st, en: best.en };
   }
+  // 달력으로 고른 공사기간은 "2026.12.05-2027.01.22" (끝 없으면 "2026.12.05-") 로 저장하고, 화면에는 "12.05-01.22" 로 보인다.
+  const PERIOD_RE = /^(\d{4})\.(\d{2})\.(\d{2})-(?:(\d{4})\.(\d{2})\.(\d{2}))?$/;
+  function isPeriodDates(v) { return PERIOD_RE.test(String(v || '').trim()); }
+  function fmtPeriod(v) {
+    const m = String(v || '').trim().match(PERIOD_RE);
+    if (!m) return v || '';
+    const thisY = new Date().getFullYear();
+    const a = (+m[1] !== thisY ? m[1].slice(2) + '.' : '') + m[2] + '.' + m[3];
+    if (!m[4]) return a + '-';
+    const wraps = m[5] + m[6] < m[2] + m[3]; // 끝 날짜가 시작보다 앞이면 다음 해인 게 보임
+    const showY = +m[4] !== +m[1] && !(wraps && +m[4] === +m[1] + 1);
+    return a + '-' + (showY ? m[4].slice(2) + '.' : '') + m[5] + '.' + m[6];
+  }
+  const isoDot = (d) => ymd(d).replace(/-/g, '.');
   let shadeMigrated = false;
   function migrateShade() {
     // 처음 한 번: 'PROJECT' 구분은 날짜칸 기본 회색 (엑셀처럼). 이후엔 오른쪽 클릭으로 끄고 켤 수 있다
@@ -536,7 +550,10 @@
     let shown = v;
     if (field === 'amount') shown = fmtAmount(v);
     if (field === 'area') shown = fmtArea(v);
-    return `<input class="cell ${align}" data-key="p|${p.id}|${field}" data-pid="${p.id}" data-field="${field}" value="${esc(shown)}" ${field === 'amount' ? 'inputmode="numeric"' : ''}>`;
+    if (field === 'period') shown = fmtPeriod(v);
+    // 공사기간: 날짜로 적힌 칸은 달력으로만 고친다 (글자로 적힌 진행업무는 그대로 입력)
+    const ro = field === 'period' && (!v || periodRange(v, new Date())) ? ' readonly' : '';
+    return `<input class="cell ${align}${field === 'period' ? ' period' : ''}" data-key="p|${p.id}|${field}" data-pid="${p.id}" data-field="${field}" value="${esc(shown)}" ${field === 'amount' ? 'inputmode="numeric"' : ''}${ro}>`;
   }
 
   function placeThisWeekBox() {
@@ -760,7 +777,7 @@
     if (!p) return;
     if (el.dataset.field === 'area') el.value = p.area || '';
     if (el.dataset.field === 'amount') el.value = fmtAmount(p.amount || '');
-    el.select();
+    if (!el.readOnly) el.select();
     sel = null; paintSel();
   });
   sheet.addEventListener('input', (e) => {
@@ -830,6 +847,66 @@
     if (!a || !a.dataset || a.dataset.key !== abbrKey) closeAbbrPop();
   }, 0));
   sheet.addEventListener('input', (e) => { if (abbrKey && e.target.dataset && e.target.dataset.key === abbrKey) renderAbbrPop(); });
+  // ---------- 공사기간 칸: 달력으로 시작일·종료일 고르기 ----------
+  const perPop = document.createElement('div');
+  perPop.className = 'abbr-pop period-pop hidden';
+  document.body.appendChild(perPop);
+  let perKey = null;
+  function perInput() { return perKey ? document.querySelector(`[data-key="${CSS.escape(perKey)}"]`) : null; }
+  function closePerPop() { perKey = null; perPop.classList.add('hidden'); }
+  function openPerPop(el) {
+    perKey = el.dataset.key;
+    const p = db.projects.find((x) => x.id === el.dataset.pid);
+    const v = (p && p.period) || '';
+    const r0 = periodRange(v, days[Math.floor(days.length / 2)] || new Date());
+    const text = !!v && !r0; // 날짜로 읽을 수 없는 글자 (진행업무 등)
+    perPop.innerHTML = `<div class="pp-row"><label>시작일<input type="date" class="pp-st" value="${r0 && r0.st ? ymd(r0.st) : ''}"></label>`
+      + `<span class="pp-dash">~</span><label>종료일<input type="date" class="pp-en" value="${r0 && r0.en ? ymd(r0.en) : ''}"></label></div>`
+      + (text ? `<div class="pp-note">지금은 글자로 적혀 있어요: “${esc(v)}”<br>날짜를 고르면 날짜로 바뀌어요.</div>` : '')
+      + `<div class="ap-foot"><button type="button" class="ap-clear pp-clear">비우기</button>`
+      + `${text ? '' : '<button type="button" class="ap-clear pp-text">글자로 입력 (진행업무)</button>'}<span>날짜를 고르면 바로 저장돼요</span></div>`;
+    const r = el.getBoundingClientRect();
+    perPop.classList.remove('hidden');
+    const w = perPop.offsetWidth;
+    perPop.style.left = Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - w - 8)) + 'px';
+    perPop.style.top = window.scrollY + r.bottom + 2 + 'px';
+  }
+  function savePeriod(value) {
+    const el = perInput();
+    if (!el) return;
+    const id = el.dataset.pid, p = db.projects.find((x) => x.id === id);
+    if (!p) return;
+    if ((p.period || '') !== value) send({ k: 'proj', id, field: 'period', value });
+    renderSheet();
+  }
+  perPop.addEventListener('change', (e) => {
+    const st = perPop.querySelector('.pp-st'), en = perPop.querySelector('.pp-en');
+    if (!st.value) { if (e.target === en && en.value) { st.value = en.value; } else return; } // 시작일 없이 종료일만 고르면 같은 날로
+    if (en.value && en.value < st.value) { if (e.target === st) en.value = st.value; else st.value = en.value; }
+    en.min = st.value;
+    savePeriod(isoDot(new Date(st.value + 'T00:00')) + '-' + (en.value ? isoDot(new Date(en.value + 'T00:00')) : ''));
+  });
+  perPop.addEventListener('click', (e) => {
+    if (e.target.closest('.pp-clear')) { savePeriod(''); closePerPop(); return; }
+    if (e.target.closest('.pp-text')) {
+      const key = perKey; closePerPop();
+      const el = document.querySelector(`[data-key="${CSS.escape(key)}"]`);
+      if (el) { el.readOnly = false; el._noPop = true; el.focus(); el.select(); }
+    }
+  });
+  sheet.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (el.dataset && el.dataset.field === 'period' && !el._noPop) openPerPop(el);
+    else if (el._noPop) { delete el._noPop; closePerPop(); }
+    else if (!perPop.contains(el)) closePerPop();
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (perPop.classList.contains('hidden') || perPop.contains(e.target)) return;
+    const el = perInput();
+    if (el && e.target === el) return;
+    closePerPop();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !perPop.classList.contains('hidden')) closePerPop(); });
   sheet.addEventListener('keydown', (e) => {
     const el = e.target;
     if (el.tagName !== 'INPUT') return;
