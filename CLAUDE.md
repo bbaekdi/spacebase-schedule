@@ -7,6 +7,7 @@
 - 워크스페이스(웹): `/` 홈(`public/portal.html`), `/schedule` 주간 스케줄(`public/index.html`), `/calendar` 회사 캘린더(`public/calendar.html`).
   캘린더 서버 로직은 `calendar.js` (밴드 iCal 구독 주소 `BAND_ICAL_URL` 을 10분마다 읽음, 직접 추가한 일정은 `DATA_DIR/calendar.json`). 공통 화면은 `public/ws.css`, `public/ws-common.js`.
   서버 없이(GitHub Pages, `.github/workflows/pages.yml`) 열면 `ws-common.js` 가 Firebase 방식으로 바뀐다: 로그인은 주간 스케줄과 같은 회사 비밀번호+이름(localStorage `sb_cred`), 일정은 `spaces/<해시>/calendar/items`, 밴드 일정은 화면을 열 때마다 브라우저가 중계 `worker/band-relay.js`(Cloudflare, `band-worker.yml` 로 배포, 주소는 `public/band-config.js`)에서 최신 iCal 을 받아 `public/band-ics.js` 로 바꾸고 `spaces/<해시>/band` 에도 저장한다. 예비로 `band-calendar.yml` 이 `tools/sync-band.js` 를 돌린다 (GitHub 예약 실행은 실제로 약 1시간 간격) (Secrets: BAND_ICAL_URL, SB_CODE).
+  개인 구글 캘린더: 각자 "iCal 형식의 비공개 주소"를 캘린더 화면 "내 구글 캘린더"에서 넣으면 그 브라우저 localStorage `sb_gcal:<이름>` 에만 저장되고, `worker/band-relay.js` 의 POST /gcal 중계로 읽어 본인 화면에만 보인다 (Firebase·서버에 저장 안 함, 클라우드 방식에서만).
   밴드는 바깥에서 캘린더에 일정을 써넣는 API 가 없다. 사이트에서 추가한 일정은 "밴드에도 등록" 창(내용 복사 + 밴드 열기, Secret BAND_URL)으로 사람이 붙여넣고, 밴드에 들어온 뒤 같은 날·같은 제목의 사이트 일정은 숨긴다.
   네이버웍스 메일: `worker/naverworks-mail.js` (Cloudflare Workers 중계, DB 없음, refresh token 은 암호화해 브라우저 localStorage `nw_mail_token`), `mail-worker.yml` 로 배포 (Secrets CF_API_TOKEN, CF_ACCOUNT_ID, NW_CLIENT_ID, NW_CLIENT_SECRET), 사이트는 `public/mail-config.js` 의 SB_MAIL_API 주소를 씀.
   원본은 별도 데스크톱 앱 "회사 밴드 캘린더"(Electron). 밴드 게시글 수집/사진 글자 인식/구글 캘린더 연동은 아직 웹으로 옮기지 않았다.

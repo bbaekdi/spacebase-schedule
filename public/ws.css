@@ -2,7 +2,7 @@
 :root {
   color-scheme: light;
   --bg: #f3f2ee; --card: #fff; --line: #dedbd0; --ink: #222; --sub: #6b6b66;
-  --accent: #f1bf52; --accent-hover: #e6ab35; --accent-ink: #1d1d1b; --accent-text: #9a6b00; --accent-soft: #fdf3dc; --band: #e8a92a; --web: #3b6fd8; --today: #e03b3b;
+  --accent: #f1bf52; --accent-hover: #e6ab35; --accent-ink: #1d1d1b; --accent-text: #9a6b00; --accent-soft: #fdf3dc; --band: #e8a92a; --web: #3b6fd8; --today: #e03b3b; --gcal: #2f9e5b;
   --font: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
 }
 * { box-sizing: border-box; }
@@ -66,6 +66,7 @@ a { color: inherit; }
 .events .what small { color: var(--sub); font-size: 12px; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--band); flex: 0 0 auto; }
 .dot.web { background: var(--web); }
+.dot.gc { background: var(--gcal); }
 .empty { color: var(--sub); font-size: 13px; padding: 10px 0; }
 .note { color: var(--sub); font-size: 12px; line-height: 1.6; }
 .warn { background: #fff7e0; border: 1px solid #f0d890; color: #6a5300; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.55; }

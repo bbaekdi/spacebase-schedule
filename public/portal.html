@@ -164,7 +164,7 @@
   }).catch(() => {});
 
   const item = (e, day) => `<li data-id="${esc(e.id)}"><span class="when">${whenText(e, day)}</span>
-    <span class="what"><b><span class="dot ${e.source === 'web' ? 'web' : ''}"></span> ${esc(e.title)}</b>${e.location ? `<small>${esc(e.location)}</small>` : ''}</span></li>`;
+    <span class="what"><b><span class="dot ${WS.srcCls(e)}"></span> ${esc(e.title)}</b>${e.location ? `<small>${esc(e.location)}</small>` : ''}</span></li>`;
 
   let data;
   try {

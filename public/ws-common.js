@@ -89,10 +89,28 @@
       by: name, updatedAt: new Date().toISOString(),
     };
   }
+  const srcCls = (e) => (e.source === 'web' ? 'web' : e.source === 'google' ? 'gc' : '');
   let space = null, cred = null;
   // 밴드 일정을 열 때마다 바로 읽기: 중계(worker/band-relay.js)에서 최신 iCal 을 받아 브라우저에서 바꾼다.
   // 바뀐 내용은 Firebase 에도 저장해 둔다 (중계가 안 될 때 대신 보여줄 내용).
   let liveCache = null;
+  // 개인 구글 캘린더: 비공개 iCal 주소를 이 브라우저(이름별)에만 저장 → 본인 화면에만 보인다. 서버·Firebase 에는 저장하지 않는다.
+  const gcalKey = () => 'sb_gcal:' + ((getCred() || {}).name || '');
+  const getGcal = () => { try { return localStorage.getItem(gcalKey()) || ''; } catch { return ''; } };
+  const setGcal = (v) => { try { v ? localStorage.setItem(gcalKey(), v) : localStorage.removeItem(gcalKey()); } catch {} gcalCache = null; };
+  let gcalCache = null;
+  async function liveGcal() {
+    const api = String(window.SB_BAND_API || '').replace(/\/$/, ''), url = getGcal();
+    if (!url || !api || !window.BandIcs || !window.ICAL) return null;
+    if (gcalCache && gcalCache.url === url && Date.now() - gcalCache.at < 60000) return gcalCache.events;
+    const r = await fetch(api + '/gcal', { method: 'POST', headers: { 'X-SB-Key': space.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), cache: 'no-store' });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 120) || '응답 ' + r.status);
+    const now = Date.now();
+    const events = BandIcs.parseIcs(await r.text(), new Date(now - 100 * 864e5), new Date(now + 400 * 864e5), '')
+      .map((e) => ({ ...e, id: 'gcal:' + e.id.slice(5), source: 'google', url: '' }));
+    gcalCache = { url, at: now, events };
+    return events;
+  }
   async function liveBand(saved) {
     const api = String(window.SB_BAND_API || '').replace(/\/$/, '');
     if (!api || !window.BandIcs || !window.ICAL) return null;
@@ -137,18 +155,22 @@
       const [band, items] = await Promise.all([space.child('band').once('value'), space.child('calendar/items').once('value')]);
       let b = band.val() || {};
       try { b = (await liveBand(b)) || b; } catch (e) { console.warn('밴드 바로 읽기 실패, 저장된 일정 표시:', e.message); }
+      let mine = [], gcalError = '';
+      try { mine = (await liveGcal()) || []; } catch (e) { gcalError = '내 구글 캘린더를 읽지 못했어요: ' + e.message; }
       const f = new Date(from), t = new Date(to);
       const inRange = (e) => e && e.start && new Date(e.start) < t && new Date(e.end) > f;
       const list = [
         ...(Array.isArray(b.events) ? b.events : Object.values(b.events || {})).filter(inRange).map((e) => ({ ...e, source: 'band' })),
         ...Object.entries(items.val() || {}).map(([id, e]) => ({ ...e, id, source: 'web' })).filter(inRange),
+        ...mine.filter(inRange),
       ];
       list.sort((x, y) => x.start.localeCompare(y.start));
       return {
         events: list,
-        status: { bandConnected: !!b.lastSync, error: b.error || '', lastSync: b.lastSync || null, bandCount: b.count || 0, bandUrl: b.bandUrl || '', cloud: true, live: !!b.live },
+        status: { bandConnected: !!b.lastSync, error: b.error || '', lastSync: b.lastSync || null, bandCount: b.count || 0, bandUrl: b.bandUrl || '', cloud: true, live: !!b.live, gcal: !!getGcal(), gcalCount: mine.length, gcalError },
       };
     },
+    getGcal, setGcal,
     async add(body) { const r = space.child('calendar/items').push(); await r.set(cleanItem(body, cred.name)); return { id: r.key }; },
     async update(id, body) { await space.child('calendar/items/' + id).set(cleanItem(body, cred.name)); return { id }; },
     async remove(id) { await space.child('calendar/items/' + id).remove(); return { ok: true }; },
@@ -196,7 +218,7 @@
       document.getElementById('wsLogout').addEventListener('click', (e) => {
         e.preventDefault();
         if (!confirm('이 기기에서 로그아웃할까요? 다음에 회사 비밀번호와 이름을 다시 입력해야 해요.')) return;
-        try { localStorage.removeItem('sb_cred'); } catch {}
+        try { localStorage.removeItem(gcalKey()); localStorage.removeItem('sb_cred'); } catch {}
         location.reload();
       });
     }
@@ -227,9 +249,9 @@
     const sd = ymd(e.start), ed = ymd(new Date(new Date(e.end).getTime() - (e.allDay ? 1 : 0)));
     const when = e.allDay ? (sd === ed ? dayLabel(sd) + ' 종일' : `${dayLabel(sd)} ~ ${dayLabel(ed)}`)
       : (sd === ymd(e.end) ? `${dayLabel(sd)} ${hm(e.start)} ~ ${hm(e.end)}` : `${dayLabel(sd)} ${hm(e.start)} ~ ${dayLabel(ymd(e.end))} ${hm(e.end)}`);
-    const src = e.source === 'band' ? '밴드 캘린더' : `직접 추가 · ${esc(e.by || '')}`;
+    const src = e.source === 'band' ? '밴드 캘린더' : e.source === 'google' ? '내 구글 캘린더 (나만 보여요)' : `직접 추가 · ${esc(e.by || '')}`;
     dlg.querySelector('#evBody').innerHTML = `<div class="meta">${when}</div>
-      <div class="meta"><span class="dot ${e.source === 'web' ? 'web' : ''}"></span> ${src}</div>
+      <div class="meta"><span class="dot ${srcCls(e)}"></span> ${src}</div>
       ${e.location ? `<div>📍 ${esc(e.location)}</div>` : ''}
       ${e.description ? `<div>${esc(e.description)}</div>` : ''}`;
     const foot = dlg.querySelector('#evFoot');
@@ -245,5 +267,5 @@
     ? '밴드 캘린더가 아직 연결되지 않았어요. GitHub 저장소 설정에 밴드 구독 주소(BAND_ICAL_URL)와 회사 비밀번호(SB_CODE)를 넣으면 밴드 일정이 자동으로 들어와요.'
     : '밴드 캘린더가 아직 연결되지 않았어요. 관리자가 서버 설정에 밴드 구독 주소(BAND_ICAL_URL)를 넣으면 밴드 일정이 자동으로 보여요.';
 
-  window.WS = { esc, ymd, hm, dayLabel, addDays, daysOf, whenText, data, showEvent, WD, bandMissingText, closeEvent: () => dlg.close() };
+  window.WS = { srcCls, esc, ymd, hm, dayLabel, addDays, daysOf, whenText, data, showEvent, WD, bandMissingText, closeEvent: () => dlg.close() };
 })();

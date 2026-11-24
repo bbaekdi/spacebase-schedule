@@ -41,6 +41,11 @@
   .dots { display: none; gap: 3px; justify-content: center; margin-top: 4px; flex-wrap: wrap; }
   .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--band); }
   .dots i.web { background: var(--web); }
+  .dots i.gc { background: var(--gcal); }
+  .chip.gc { background: #e3f4ea; color: #1d6a3d; }
+  .chip.timed.gc::before { background: var(--gcal); }
+  .gsteps { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--ink); }
+  .gsteps b { color: var(--ink); }
 
   .side h2 small { font-weight: 400; color: var(--sub); font-size: 12px; }
   .listview .daygroup { font-size: 13px; font-weight: 800; margin: 18px 0 4px; }
@@ -68,9 +73,10 @@
       <div class="seg" id="viewSeg"><button data-v="month" class="on">월</button><button data-v="list">목록</button></div>
       <span class="spacer"></span>
       <input type="search" id="search" placeholder="일정 검색">
+      <button class="btn" id="gcalBtn">내 구글 캘린더</button>
       <button class="btn primary" id="addBtn">＋ 일정 추가</button>
     </div>
-    <div class="legend"><span><i class="dot"></i>밴드 캘린더</span><span><i class="dot web"></i>직접 추가한 일정 (모두에게 공유)</span><span id="bandHint" class="hidden">· 일정은 밴드에서 추가해요. 밴드에 저장하면 보통 5~10분 안에 여기에도 보여요.</span></div>
+    <div class="legend"><span><i class="dot"></i>밴드 캘린더</span><span><i class="dot web"></i>직접 추가한 일정 (모두에게 공유)</span><span id="gcalLegend" class="hidden"><i class="dot gc"></i>내 구글 캘린더 (나만 보여요)</span><span id="bandHint" class="hidden">· 일정은 밴드에서 추가해요. 밴드에 저장하면 보통 몇 분 안에 여기에도 보여요.</span></div>
     <div id="warn" class="warn hidden" style="margin-bottom:14px"></div>
 
     <div class="layout">
@@ -111,6 +117,27 @@
         <span class="spacer"></span>
         <button type="button" class="btn" data-close>취소</button>
         <button class="btn primary">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="gcalDlg">
+    <form method="dialog" id="gcalForm">
+      <div class="dlg-head"><h3>내 구글 캘린더 연결</h3><button type="button" class="x" data-close>✕</button></div>
+      <div class="dlg-body">
+        <ol class="gsteps">
+          <li>PC에서 <a href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noopener"><b>구글 캘린더 설정</b></a>을 열어요.</li>
+          <li>왼쪽 <b>내 캘린더의 설정</b>에서 내 이름 캘린더를 눌러요.</li>
+          <li>아래로 내려 <b>캘린더 통합 → iCal 형식의 비공개 주소</b> 옆 복사 버튼을 눌러요.</li>
+          <li>아래 칸에 붙여넣고 저장해요.</li>
+        </ol>
+        <label>iCal 형식의 비공개 주소<input name="url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" autocomplete="off"></label>
+        <div class="note">이 주소는 <b>지금 쓰는 이 기기(브라우저)에만</b> 저장돼요. 회사 서버나 다른 사람에게는 저장·공유되지 않아서 일정은 나에게만 보여요. 휴대폰에서도 보려면 휴대폰에서 한 번 더 넣어 주세요.</div>
+        <div class="dlg-err" id="gcalErr"></div>
+      </div>
+      <div class="dlg-foot">
+        <button type="button" class="btn danger" id="gcalOff">연결 끊기</button><span class="spacer"></span>
+        <button type="button" class="btn" data-close>취소</button><button class="btn primary" id="gcalSave">저장</button>
       </div>
     </form>
   </dialog>
@@ -190,11 +217,14 @@
       $('#bandHint').classList.toggle('hidden', !viaBand);
       const w = $('#warn');
       if (!status.bandConnected) { w.innerHTML = '지금은 직접 추가한 일정만 보여요. ' + esc(bandMissingText(status)) + (status.configError ? `<br>(${esc(status.configError)})` : ''); w.classList.remove('hidden'); }
-      else if (status.error) { w.textContent = status.error; w.classList.remove('hidden'); }
+      else if (status.error || status.gcalError) { w.textContent = [status.error, status.gcalError].filter(Boolean).join(' / '); w.classList.remove('hidden'); }
       else w.classList.add('hidden');
+      $('#gcalLegend').classList.toggle('hidden', !status.gcal);
+      $('#gcalBtn').textContent = status.gcal ? '내 구글 캘린더 ✓' : '내 구글 캘린더';
       $('#status').textContent = status.bandConnected
         ? `밴드 일정 ${status.bandCount}개 · 마지막 갱신 ${status.lastSync ? dayLabel(ymd(status.lastSync)) + ' ' + hm(status.lastSync) : '-'} · ${status.live ? '열 때마다 바로 갱신' : status.cloud ? '자동 갱신' : '10분마다 자동 갱신'}`
         : '';
+      if (status.gcal) $('#status').textContent += ` · 내 구글 일정 ${status.gcalCount || 0}개 (나만 보여요)`;
     }
     if (view === 'month') renderMonth(); else renderList();
     renderSide();
@@ -212,17 +242,17 @@
       const open = expanded.has(d);
       const chips = (open ? list : list.slice(0, 3)).map((e) => {
         const multi = e.allDay || daysOf(e).length > 1;
-        return `<span class="chip ${e.source === 'web' ? 'web' : ''} ${multi ? '' : 'timed'}" data-id="${esc(e.id)}" title="${esc(e.title)}">${multi ? '' : hm(e.start) + ' '}${esc(e.title)}</span>`;
+        return `<span class="chip ${WS.srcCls(e)} ${multi ? '' : 'timed'}" data-id="${esc(e.id)}" title="${esc(e.title)}">${multi ? '' : hm(e.start) + ' '}${esc(e.title)}</span>`;
       }).join('');
       const more = list.length > 3 ? `<div class="more" data-more="${d}">${open ? '접기 ▲' : `+${list.length - 3}개`}</div>` : '';
-      const dots = list.slice(0, 4).map((e) => `<i class="${e.source === 'web' ? 'web' : ''}"></i>`).join('');
+      const dots = list.slice(0, 4).map((e) => `<i class="${WS.srcCls(e)}"></i>`).join('');
       html += `<div class="${cls}" data-day="${d}"><span class="num">${+d.slice(8)}</span>${chips}${more}<div class="dots">${dots}</div></div>`;
     }
     $('#grid').innerHTML = html;
   }
 
   const item = (e, d) => `<li data-id="${esc(e.id)}"><span class="when">${whenText(e, d)}</span>
-    <span class="what"><b><span class="dot ${e.source === 'web' ? 'web' : ''}"></span> ${esc(e.title)}</b>${e.location ? `<small>${esc(e.location)}</small>` : ''}</span></li>`;
+    <span class="what"><b><span class="dot ${WS.srcCls(e)}"></span> ${esc(e.title)}</b>${e.location ? `<small>${esc(e.location)}</small>` : ''}</span></li>`;
 
   function renderList() {
     let html = '';
@@ -321,6 +351,25 @@
   // 그래서 일정 내용을 복사해 두고 밴드 일정 화면을 열어, 사람이 붙여넣게 돕는다.
   const bandDlg = $('#bandDlg');
   bandDlg.addEventListener('click', (ev) => { if (ev.target === bandDlg || ev.target.hasAttribute('data-close')) bandDlg.close(); });
+
+  // 내 구글 캘린더 (나만 보이는 개인 일정)
+  const gDlg = $('#gcalDlg'), gForm = $('#gcalForm');
+  $('#gcalBtn').onclick = async () => {
+    const be = await ready;
+    if (!be.getGcal) { alert('내 구글 캘린더는 웹사이트(인터넷 주소)로 접속했을 때만 쓸 수 있어요.'); return; }
+    gForm.url.value = be.getGcal(); $('#gcalErr').textContent = '';
+    $('#gcalOff').classList.toggle('hidden', !be.getGcal());
+    gDlg.showModal();
+  };
+  gForm.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const be = await ready, v = gForm.url.value.trim().replace(/^webcal:/i, 'https:');
+    if (!/^https:\/\/calendar\.google\.com\/calendar\/ical\/.+\.ics(\?.*)?$/.test(v)) { $('#gcalErr').textContent = '"iCal 형식의 비공개 주소"를 붙여 넣어 주세요. https://calendar.google.com/calendar/ical/ 로 시작해요.'; return; }
+    if (/\/public\/basic\.ics$/.test(v)) { $('#gcalErr').textContent = '이건 "공개 주소"예요. 바로 아래의 "비공개 주소"를 복사해 주세요.'; return; }
+    be.setGcal(v); gDlg.close(); load();
+  };
+  $('#gcalOff').onclick = async () => { (await ready).setGcal(''); gDlg.close(); load(); };
+  gDlg.addEventListener('click', (ev) => { if (ev.target === gDlg || ev.target.hasAttribute('data-close')) gDlg.close(); });
   async function copyText(t) {
     try { await navigator.clipboard.writeText(t); return true; } catch {}
     try { const ta = $('#bandText'); ta.focus(); ta.select(); return document.execCommand('copy'); } catch { return false; }
