@@ -57,7 +57,7 @@ button { font-family: inherit; font-size: inherit; }
 /* ---------- 시트 ---------- */
 .page { padding: 18px 16px 60px 16px; }
 .sheet-wrap { position: relative; overflow-x: auto; overflow-y: visible; padding-bottom: 4px; }
-.sheet { border-collapse: collapse; table-layout: fixed; font-size: 13.67px; } /* 화면: 10.25pt (0.5pt 키움) */
+.sheet { border-collapse: collapse; table-layout: fixed; font-size: 13px; } /* 화면 글씨: 9.75pt (칸 크기는 키운 그대로, 글씨만 원래 크기 — 여유 있게) */
 .sheet td, .sheet th { border: 1px solid var(--grid); padding: 0; height: var(--row-h); white-space: nowrap; text-align: center; vertical-align: middle; }
 .sheet th { background: var(--head); font-weight: 700; }
 .sheet th.day { background: var(--dayhead); font-weight: 700; }
@@ -89,7 +89,7 @@ button { font-family: inherit; font-size: inherit; }
 .sheet td.d.we { background: var(--weekend); }
 .sheet td.d .txt {
   position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center;
-  white-space: nowrap; overflow: hidden; pointer-events: none; z-index: 2; line-height: 1; font-size: 12.67px;
+  white-space: nowrap; overflow: hidden; pointer-events: none; z-index: 2; line-height: 1; font-size: 12px;
 }
 .sheet td.d .txt.l { justify-content: flex-start; padding-left: 3px; }
 /* 옆 칸으로 넘친 글자를 눌러도 글자 주인 칸이 선택되게 (빈 부분은 그 칸 그대로) */

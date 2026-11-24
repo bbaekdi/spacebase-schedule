@@ -368,7 +368,7 @@
   }
 
   const measureCtx = document.createElement('canvas').getContext('2d');
-  const SCREEN_TXT = 12.67; // 화면 날짜칸 글씨 크기(px) = 9.5pt
+  const SCREEN_TXT = 12; // 화면 날짜칸 글씨 크기(px) = 9pt (칸은 53px 로 키운 그대로)
   function textWidth(t) {
     measureCtx.font = `12px ${getComputedStyle(document.body).fontFamily}`;
     return measureCtx.measureText(t).width + 4;
