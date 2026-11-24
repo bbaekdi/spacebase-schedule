@@ -548,8 +548,24 @@
     if (sel) clampSel();
     paintSel();
     renderPeers();
+    fitScreen();
     placeThisWeekBox();
   }
+
+  // 화면: 창 너비(100%)에 표 전체(NOTE 칸까지)가 다 보이게 화면 내용만 같이 줄인다. 인쇄할 때는 쓰지 않음.
+  let screenZoom = 1;
+  function fitScreen() {
+    const page = $('.page');
+    if (document.body.classList.contains('printing')) { page.style.zoom = ''; screenZoom = 1; return; }
+    page.style.zoom = '';
+    const cs = getComputedStyle(page);
+    const natural = $('#sheetWrap').scrollWidth + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight); // 표가 들어 있는 칸(옆으로 넘친 부분 포함)
+    const avail = document.documentElement.clientWidth;
+    const z = natural > avail ? Math.max(0.6, avail / natural) : 1; // 너무 좁은 창(휴대폰)은 0.6배까지만, 나머지는 옆으로 밀어서
+    screenZoom = z;
+    page.style.zoom = z === 1 ? '' : String(Math.floor(z * 1000) / 1000);
+  }
+  window.addEventListener('resize', () => { if (db && !document.body.classList.contains('printing')) { fitScreen(); placeThisWeekBox(); } });
 
   function inp(p, field, align = '') {
     let v = p[field] || '';
@@ -958,7 +974,7 @@
     const wr = $('#sheetWrap').getBoundingClientRect();
     const r = tr.getBoundingClientRect();
     rowTools.style.display = 'flex';
-    rowTools.style.top = r.top - wr.top + (r.height - 22) / 2 + 'px';
+    rowTools.style.top = (r.top - wr.top) / screenZoom + (r.height / screenZoom - 22) / 2 + 'px'; // 화면 축소(fitScreen) 반영
     rowTools.style.left = $('#sheetWrap').scrollLeft + 2 + 'px';
   });
   $('#sheetWrap').addEventListener('mouseleave', () => { rowTools.style.display = 'none'; });
@@ -1200,6 +1216,7 @@
     $('.etc-memo').classList.toggle('empty', !$('#memoEtc').value.trim());
     document.body.style.zoom = 1;
     const page = $('.page');
+    page.style.zoom = ''; screenZoom = 1;
     page.style.minHeight = '';
     if (db) renderSheet(); // 인쇄용 칸 너비로 다시 그림
     page.style.width = $('#sheet').offsetWidth + 'px'; // 메모 등도 표 너비에 맞춤
