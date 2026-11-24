@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPACEBASE 워크스페이스 사용 안내</title>
+<style>
+  :root {
+    --bg: #f3f2ee; --card: #fff; --line: #e4e1d8; --text: #1d1d1b; --sub: #6b6a64;
+    --brand: #f1bf52; --brand-soft: #fdf3dc; --g: #2f9e5b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.7 -apple-system, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  a { color: inherit; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 32px 16px 64px; }
+  header.hero { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px; display: flex; gap: 20px; align-items: center; }
+  .mark { flex: none; width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--text); display: grid; place-items: center; font-weight: 800; letter-spacing: -1px; font-size: 20px; }
+  h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: -.3px; }
+  .lead { margin: 0; color: var(--sub); }
+  .url { display: inline-block; margin-top: 10px; background: var(--brand); color: #1d1d1b; text-decoration: none; font-weight: 700; padding: 8px 14px; border-radius: 10px; }
+  nav.toc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 8px; }
+  nav.toc a { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; text-decoration: none; }
+  nav.toc b { display: block; font-size: 13px; color: var(--sub); font-weight: 600; }
+  section.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px; margin-top: 16px; }
+  h2 { margin: 0 0 4px; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .num { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--brand); display: grid; place-items: center; font-size: 15px; }
+  .who { margin: 0 0 16px; color: var(--sub); font-size: 14px; }
+  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; }
+  ol.steps > li { counter-increment: s; position: relative; padding: 0 0 16px 40px; }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--text); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+  ol.steps > li + li { border-top: 1px dashed var(--line); padding-top: 14px; }
+  ol.steps > li + li::before { top: 15px; }
+  code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; font-size: 13.5px; }
+  .btnlike { display: inline-block; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: #fff; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+  .btnlike.y { background: var(--brand); border-color: var(--brand); }
+  .tip { background: var(--brand-soft); border-radius: 12px; padding: 12px 16px; margin-top: 8px; font-size: 14px; }
+  .tip.g { background: #e8f5ee; }
+  .tip b:first-child { margin-right: 4px; }
+  ul.plain { margin: 6px 0 0; padding-left: 18px; }
+  footer { text-align: center; color: var(--sub); font-size: 13px; margin-top: 28px; }
+  @media (max-width: 640px) {
+    header.hero { flex-direction: column; align-items: flex-start; padding: 22px; }
+    section.card { padding: 22px 18px; }
+    nav.toc { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: #fff; }
+    section.card, header.hero { break-inside: avoid; border-color: #ccc; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <header class="hero">
+    <div class="mark">SB</div>
+    <div>
+      <h1>SPACEBASE 워크스페이스 사용 안내</h1>
+      <p class="lead">주간 스케줄, 회사 캘린더(밴드 일정), 내 구글 캘린더와 할 일을 한 곳에서 보는 사내 웹사이트예요.
+        PC, 태블릿, 휴대폰 어디서든 인터넷 주소로 열면 돼요.</p>
+      <a class="url" href="https://bbaekdi.github.io/spacebase-schedule/" target="_blank" rel="noopener">bbaekdi.github.io/spacebase-schedule ↗</a>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#login"><b>1단계 · 모두</b>처음 로그인하기</a>
+    <a href="#ext"><b>2단계 · PC 사용자</b>밴드 자동 입력 설치</a>
+    <a href="#google"><b>3단계 · 원하는 사람</b>내 구글 캘린더 연결</a>
+  </nav>
+
+  <section class="card" id="login">
+    <h2><span class="num">1</span>처음 로그인하기</h2>
+    <p class="who">모두 해 주세요. 기기마다 처음 한 번만 하면 돼요.</p>
+    <ol class="steps">
+      <li>위의 노란 주소 버튼을 눌러 웹사이트를 열어요. 자주 쓰니 <b>즐겨찾기</b>(PC는 <code>Ctrl + D</code>)나 휴대폰 <b>홈 화면에 추가</b>를 해 두면 편해요.</li>
+      <li>로그인 창이 뜨면 <b>회사 비밀번호</b>와 <b>내 이름</b>(예: 홍길동)을 넣고 시작해요.
+        <div class="tip"><b>회사 비밀번호</b>는 주간 스케줄 프로그램에서 쓰던 것과 같아요. 모르면 담당자에게 물어보세요. 비밀번호는 단체방이나 메일에 그대로 올리지 말아 주세요.</div>
+      </li>
+      <li>이름은 주간 스케줄 <b>구성원</b> 표에 적힌 이름과 똑같이 써 주세요. 그래야 홈 화면에 직급과 팀이 함께 나와요.</li>
+      <li>홈 화면이 열리면 끝이에요. 위쪽 메뉴에서 <span class="btnlike">Home</span> <span class="btnlike">Weekly Schedule</span> <span class="btnlike">Calendar</span>로 옮겨 다녀요. (휴대폰은 화면 아래쪽 메뉴)</li>
+    </ol>
+    <div class="tip g"><b>알아두기</b> 한 번 로그인하면 그 기기에서는 다음부터 바로 열려요. 공용 PC라면 오른쪽 위 <span class="btnlike">로그아웃</span>을 눌러 주세요.</div>
+  </section>
+
+  <section class="card" id="ext">
+    <h2><span class="num">2</span>밴드 자동 입력 설치 (확장 프로그램)</h2>
+    <p class="who">PC의 크롬, 엣지, 웨일에서 일정을 추가할 사람만 해 주세요. PC마다 한 번, 1분이면 돼요.</p>
+    <p style="margin-top:0">밴드는 바깥에서 일정을 바로 써 넣는 기능을 열어 주지 않아요. 그래서 이 확장 프로그램이 대신,
+      우리 사이트에서 쓴 일정을 밴드의 <b>일정 만들기</b> 창에 자동으로 채워 줘요. <b>완료</b>는 내가 직접 눌러요.</p>
+    <ol class="steps">
+      <li>웹사이트를 PC에서 열면 화면 아래에 <span class="btnlike y">설치하기</span> 안내가 떠요. 누르면 설치 안내 화면으로 가요.
+        (안내가 안 보이면 <a href="https://bbaekdi.github.io/spacebase-schedule/band-extension.html" target="_blank" rel="noopener">설치 안내 화면</a>을 바로 열어도 돼요.)</li>
+      <li><span class="btnlike y">설치 파일 받기 (zip)</span>를 눌러 파일을 받고, <b>마우스 오른쪽 → 압축 풀기</b>로 풀어요.
+        <div class="tip"><b>중요</b> 풀린 폴더는 지우지 말고 문서 폴더 같은 곳에 그대로 두세요. 폴더를 지우면 확장 프로그램도 꺼져요.</div>
+      </li>
+      <li>주소창에 아래 주소를 넣고 엔터를 눌러요.<br>
+        크롬 <code>chrome://extensions</code> · 엣지 <code>edge://extensions</code> · 웨일 <code>whale://extensions</code></li>
+      <li>오른쪽 위(엣지는 왼쪽 아래)의 <b>개발자 모드</b>를 켜요.</li>
+      <li><b>압축해제된 확장 프로그램을 로드합니다</b>(엣지는 "압축 풀린 항목 로드")를 누르고, 2번에서 푼 폴더를 골라요.</li>
+      <li>목록에 <b>SPACEBASE 밴드 일정 자동 입력</b>이 보이면 끝이에요. 사이트로 돌아가 <code>Ctrl + F5</code>로 새로고침해요.</li>
+    </ol>
+    <div class="tip g"><b>이렇게 써요</b> 홈의 <span class="btnlike">+ 일정 추가</span> 또는 캘린더의 <span class="btnlike">+ 밴드에 일정 추가</span>에서 일정을 쓰고 <b>밴드에 입력하기</b>를 누르면,
+      밴드가 열리면서 칸이 채워져요. 확인하고 <b>완료</b>만 누르면 모두의 캘린더에 들어가요. 밴드에는 미리 로그인해 두세요.</div>
+    <ul class="plain" style="color:var(--sub);font-size:14px">
+      <li>휴대폰에서는 확장 프로그램을 쓸 수 없어요. 휴대폰에서는 밴드 앱에서 직접 일정을 추가해 주세요.</li>
+      <li>화면 아래 설치 안내를 지금 하고 싶지 않으면 <span class="btnlike">나중에</span>를 누르세요. 7일 뒤에 다시 알려 줘요.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="google">
+    <h2><span class="num">3</span>내 구글 캘린더 · 할 일 연결</h2>
+    <p class="who">원하는 사람만 해 주세요. 연결한 내용은 <b>나에게만</b> 보이고, 다른 팀원 화면에는 나오지 않아요.</p>
+    <ol class="steps">
+      <li>위쪽 메뉴에서 <span class="btnlike">Calendar</span>로 가서 <span class="btnlike">내 구글 캘린더</span> 버튼을 눌러요.</li>
+      <li><span class="btnlike">G&nbsp; 구글 계정으로 연결</span>을 누르고, 내 구글 계정을 골라요.</li>
+      <li>구글이 권한을 물어보면 <b>캘린더 보기</b>와 <b>할 일(Tasks)</b>에 체크하고 <b>계속</b>을 눌러요.
+        <div class="tip"><b>참고</b> "Google에서 확인하지 않은 앱"이라는 화면이 나오면 회사에서 직접 만든 사이트라서 그래요.
+          <b>고급</b> → <b>SPACEBASE(으)로 이동</b>을 누르면 계속할 수 있어요.</div>
+      </li>
+      <li>사이트로 돌아오면 내 캘린더 목록이 나와요. <b>보고 싶은 캘린더만 체크</b>하면 바로 반영돼요.</li>
+      <li>이제 캘린더에 내 구글 일정이 <b style="color:var(--g)">초록색</b>으로 함께 보이고, 홈과 캘린더 화면의 <b>TO DO LIST</b>에 구글 할 일이 나와요.
+        <span class="btnlike">+ 할 일 추가</span> 칸에 쓰고 엔터를 누르면 구글 할 일에도 바로 들어가요.</li>
+    </ol>
+    <div class="tip g"><b>알아두기</b>
+    <ul class="plain">
+      <li>구글에서 바꾼 일정이 늦게 보이면 <span class="btnlike">내 구글 캘린더</span> → <span class="btnlike">지금 동기화</span>를 눌러요.</li>
+      <li>잠깐 숨기고 싶으면 캘린더 화면의 <b>구글 캘린더 보기</b>를 끄면 돼요. 연결을 끊으려면 <span class="btnlike">연동해제</span>를 눌러요.</li>
+      <li>연결 정보는 그 기기의 브라우저에만 저장돼요. 다른 PC나 휴대폰에서도 보려면 그 기기에서 한 번 더 연결해 주세요.</li>
+    </ul></div>
+  </section>
+
+  <footer>궁금한 점이나 고쳤으면 하는 부분은 담당자에게 알려 주세요.</footer>
+</main>
+</body>
+</html>
