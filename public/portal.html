@@ -36,14 +36,13 @@
   .app .ico { flex: 0 0 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; font-size: 26px; background: var(--accent); color: var(--accent-ink); }
   .app b { display: block; font-size: 16px; margin-bottom: 3px; }
   .app span { color: var(--sub); font-size: 13px; line-height: 1.45; }
-  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
   .daygroup { font-size: 12px; font-weight: 700; color: var(--sub); margin: 10px 0 2px; }
   .daygroup:first-child { margin-top: 0; }
   .links { display: grid; gap: 8px; }
   .links a { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; }
   .links a:hover { background: var(--bg); }
   .links a::after { content: '↗'; color: var(--sub); font-weight: 400; }
-  @media (max-width: 1180px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 860px) { .home { grid-template-columns: minmax(0, 1fr); } .left { display: contents; } .profile { min-height: 0; order: 0; } .right { order: 1; } .linkcard { order: 2; } }
   @media (max-width: 720px) { .apps, .grid { grid-template-columns: minmax(0, 1fr); } .app { padding: 16px; } }
 </style>
@@ -95,7 +94,7 @@
           <h2>다가오는 일정 (7일)</h2>
           <div id="weekList"><div class="empty">불러오는 중…</div></div>
         </section>
-        <section class="card mail">
+        <section class="card mail hidden" id="mailCard">
           <h2><a href="https://mail.worksmobile.com/" target="_blank" rel="noopener" style="text-decoration:none">메일 ›</a><span class="more" id="mailUnread"></span></h2>
           <div id="mailBox"><div class="mail-body"><div><div class="mail-ic">✉</div>네이버웍스 메일은 아직 이 화면에 연결되지 않았어요.<br>아래 버튼으로 메일함을 바로 열 수 있어요.</div></div></div>
           <div class="mail-acts"><a class="btn" href="https://mail.worksmobile.com/" target="_blank" rel="noopener">전체보기</a><a class="btn primary" id="mailMain" href="https://mail.worksmobile.com/" target="_blank" rel="noopener">네이버웍스 메일 열기</a></div>
@@ -114,6 +113,7 @@
 (function () {
   const API = (window.SB_MAIL_API || '').replace(/\/$/, '');
   if (!API) return;
+  document.getElementById('mailCard').classList.remove('hidden');
   const box = document.getElementById('mailBox'), main = document.getElementById('mailMain');
   const KEY = 'nw_mail_token';
   const get = () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } };
