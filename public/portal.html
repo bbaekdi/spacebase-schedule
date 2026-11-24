@@ -23,6 +23,13 @@
   .profile .acts a:hover { background: var(--bg); }
   .mail .mail-body { min-height: 120px; display: grid; place-items: center; text-align: center; color: var(--sub); font-size: 13px; line-height: 1.6; padding: 10px 0 16px; }
   .mail .mail-ic { font-size: 30px; margin-bottom: 6px; }
+  .mail-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .mails { list-style: none; margin: 0; padding: 0; }
+  .mails li a { display: block; padding: 9px 0; border-top: 1px solid #efede6; text-decoration: none; }
+  .mails li:first-child a { border-top: 0; }
+  .mails .subj { display: block; font-size: 13px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mails .unread .subj { color: var(--ink); font-weight: 700; }
+  .mails small { color: var(--sub); font-size: 11px; }
   .apps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
   .app { display: flex; gap: 16px; align-items: center; text-decoration: none; padding: 20px; }
   .app:hover { border-color: var(--accent); }
@@ -88,9 +95,9 @@
           <div id="weekList"><div class="empty">불러오는 중…</div></div>
         </section>
         <section class="card mail">
-          <h2><a href="https://mail.worksmobile.com/" target="_blank" rel="noopener" style="text-decoration:none">메일 ›</a></h2>
-          <div class="mail-body"><div><div class="mail-ic">✉</div>네이버웍스 메일은 아직 이 화면에 연결되지 않았어요.<br>아래 버튼으로 메일함을 바로 열 수 있어요.</div></div>
-          <a class="btn primary" style="width:100%" href="https://mail.worksmobile.com/" target="_blank" rel="noopener">네이버웍스 메일 열기</a>
+          <h2><a href="https://mail.worksmobile.com/" target="_blank" rel="noopener" style="text-decoration:none">메일 ›</a><span class="more" id="mailUnread"></span></h2>
+          <div id="mailBox"><div class="mail-body"><div><div class="mail-ic">✉</div>네이버웍스 메일은 아직 이 화면에 연결되지 않았어요.<br>아래 버튼으로 메일함을 바로 열 수 있어요.</div></div></div>
+          <div class="mail-acts"><a class="btn" href="https://mail.worksmobile.com/" target="_blank" rel="noopener">전체보기</a><a class="btn primary" id="mailMain" href="https://mail.worksmobile.com/" target="_blank" rel="noopener">네이버웍스 메일 열기</a></div>
         </section>
       </div>
     </div>
@@ -99,8 +106,43 @@
 <script src="vendor/firebase-app-compat.js"></script>
 <script src="vendor/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="mail-config.js"></script>
 <script src="ws-common.js"></script>
 <script>
+// 네이버웍스 메일 (중계 서버: worker/naverworks-mail.js)
+(function () {
+  const API = (window.SB_MAIL_API || '').replace(/\/$/, '');
+  if (!API) return;
+  const box = document.getElementById('mailBox'), main = document.getElementById('mailMain');
+  const KEY = 'nw_mail_token';
+  const get = () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } };
+  const set = (v) => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} };
+  const m = location.hash.match(/nwmail=([\w.-]+)/);
+  if (m) { set(m[1]); history.replaceState(null, '', location.pathname + location.search); }
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function needLogin(msg) {
+    box.innerHTML = `<div class="mail-body"><div><div class="mail-ic">✉</div>${msg || '네이버웍스로 한 번 로그인하면<br>받은 메일이 여기에 보여요.'}</div></div>`;
+    main.textContent = '네이버웍스로 로그인';
+    main.removeAttribute('target');
+    main.href = API + '/login?return=' + encodeURIComponent(location.href.split('#')[0]);
+  }
+  const tok = get();
+  if (!tok) return needLogin();
+  box.innerHTML = '<div class="mail-body">메일 불러오는 중…</div>';
+  main.textContent = '메일 쓰기';
+  fetch(API + '/mail', { headers: { 'X-NW-Token': tok } }).then(async (r) => {
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) { set(''); return needLogin('네이버웍스 로그인이 만료됐어요.<br>다시 한 번 로그인해 주세요.'); }
+    if (!r.ok) throw new Error(j.error || r.status);
+    if (j.token) set(j.token);
+    document.getElementById('mailUnread').textContent = `안 읽은 메일 ${j.unreadCount || 0}`;
+    const when = (t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }); };
+    box.innerHTML = j.mails && j.mails.length
+      ? '<ul class="mails">' + j.mails.slice(0, 6).map((x) => `<li class="${x.unread ? 'unread' : ''}"><a href="https://mail.worksmobile.com/" target="_blank" rel="noopener"><span class="subj">${x.important ? '★ ' : ''}${esc(x.subject)}</span><small>${esc(x.from)} · ${when(x.receivedTime)}</small></a></li>`).join('') + '</ul>'
+      : '<div class="mail-body">받은 메일이 없어요.</div>';
+  }).catch((e) => { box.innerHTML = `<div class="mail-body">메일을 불러오지 못했어요.<br><small>${esc(e.message)}</small></div>`; });
+})();
+
 (async function () {
   const { esc, ymd, dayLabel, addDays, daysOf, whenText, data: ready, showEvent, bandMissingText } = WS;
   const today = ymd(new Date());
