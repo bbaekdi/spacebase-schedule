@@ -77,10 +77,15 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await new Promise((r) => setTimeout(r, 700));
   const m3 = await get(`site/p1/tasks/${mokId}`);
   log(m3.start === plus(1) && m3.end === plus(5), `막대 끌어 옮기기 → 하루 뒤로, 기간은 그대로 (${m3.start}~${m3.end})`);
-  await a.locator(`${li('목공')} .grip`).dragTo(a.locator(`.st-day[data-day="${TODAY}"]`), { force: true }); // 막대 위에 놓아도 됨
+  log((await a.locator(`${li('목공')} .grip:not(.off)`).count()) === 0 && (await a.locator(`${li('목공')}[draggable="true"]`).count()) === 0, '일정이 있는 공정은 목록에서 끌 수 없음 (옮기기는 막대 끌기 하나)');
+  { // 막대를 다시 하루 앞으로
+    const bar = await a.locator(`.st-seg[data-t="${mokId}"] >> nth=0`).boundingBox(), c1 = await a.locator(segIn(plus(1))).boundingBox(), c0 = await a.locator(segIn(TODAY)).boundingBox();
+    const y = bar.y + bar.height / 2;
+    await a.mouse.move(c1.x + c1.width / 2, y); await a.mouse.down(); await a.mouse.move(c0.x + c0.width / 2, y, { steps: 8 }); await a.mouse.up();
+  }
   await new Promise((r) => setTimeout(r, 700));
   const m4 = await get(`site/p1/tasks/${mokId}`);
-  log(m4.start === TODAY && m4.end === plus(4), '목록에서 다시 놓으면 첫날이 그날이 되게 옮김');
+  log(m4.start === TODAY && m4.end === plus(4), '막대를 다시 끌어 오늘~4일 뒤로');
   await a.waitForSelector('.st-wk.now .st-seg.now:has-text("목공")');
   log(true, '캘린더: 이번 주 목공 막대가 색으로');
   await a.waitForFunction(() => /오늘: 목공/.test(document.querySelector('.st-head').innerText), null, { timeout: 5000 }).catch(() => {});
@@ -122,21 +127,18 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await new Promise((r) => setTimeout(r, 600));
   const ta1 = await get(`site/p1/tasks/${taId}`);
   log(!ta1.start && !ta1.end && ta1.name === '타일' && (await a.locator(li('타일')).count()) === 1, '막대 ✕ → 일정만 지워지고 공정은 목록에 남음');
-  // 다시 넣고 → 막대를 왼쪽 목록으로 끌어다 놓기
+  // 다시 넣기 (일정이 없으니 목록에서 끌 수 있음) → 막대를 왼쪽 목록에 놓아도 안 지워짐
   await a.locator(`${li('타일')} .grip`).dragTo(a.locator(`.st-day[data-day="${plus(8)}"]`), { force: true });
   await a.waitForSelector(taBar);
   { const b = await a.locator(`${taBar} >> nth=0`).boundingBox(), t = await a.locator('#side .st-tl').boundingBox();
-    await a.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await a.mouse.down(); await a.mouse.move(b.x - 60, b.y, { steps: 4 }); await a.mouse.move(t.x + t.width / 2, t.y + 20, { steps: 10 });
-    log((await a.locator('#side .st-tp.drop-clear').count()) === 1, '막대를 왼쪽 목록 위로 끌면 "놓으면 일정이 지워져요" 표시');
-    await a.mouse.up(); }
+    await a.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await a.mouse.down(); await a.mouse.move(t.x + t.width / 2, t.y + 20, { steps: 10 }); await a.mouse.up(); }
   await new Promise((r) => setTimeout(r, 600));
-  log(!(await get(`site/p1/tasks/${taId}/start`)), '막대를 왼쪽 목록에 놓으면 일정 지우기');
-  // 휴대폰처럼: 날짜 눌러 목록에서 "일정 지우기"
-  await a.locator(`${li('타일')} .grip`).dragTo(a.locator(`.st-day[data-day="${plus(8)}"]`), { force: true });
-  await a.waitForSelector(taBar);
-  await a.locator(`button.st-day[data-day="${plus(8)}"]`).click({ position: { x: 12, y: 10 } }); await a.waitForSelector('.st-daypop');
-  await a.click(`.st-daypop [data-clear-t="${taId}"]`); await new Promise((r) => setTimeout(r, 600));
-  log(!(await get(`site/p1/tasks/${taId}/start`)), '날짜 누른 목록의 "일정 지우기"');
+  log(!!(await get(`site/p1/tasks/${taId}/start`)) && (await a.locator('.st-tp.drop-clear').count()) === 0, '막대를 왼쪽 목록에 놓아도 안 지워짐 (지우기는 ✕ 하나)');
+  // PC 날짜 누르기: 일정 있는 공정의 쉬는 날만, "일정 지우기" 없음
+  await a.locator(`button.st-day[data-day="${TODAY}"]`).click({ position: { x: 12, y: 10 } }); await a.waitForSelector('.st-daypop');
+  const pcPop = await a.locator('.st-daypop').innerText();
+  log((await a.locator('.st-daypop [data-clear-t]').count()) === 0 && !/전기/.test(pcPop) && /목공/.test(pcPop), 'PC 날짜 누르기: 일정 있는 공정의 쉬는 날만 (일정 지우기·일정 없는 공정 없음)');
+  await a.click('.st-daypop [data-close]');
   log((await a.locator(`${li('타일')} [data-clear]`).count()) === 0, '왼쪽 목록에는 일정 지우기 버튼 없음');
   // 출근 (+ 새 글 알림 요청)
   let notifyReq = null;
@@ -179,6 +181,12 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await m.waitForSelector('.st-head h1'); await m.waitForTimeout(500);
   log(await m.locator('#pick').isVisible(), '휴대폰: 현장 고르기 칸');
   log(await m.locator('.st-mobonly .st-ti').first().isVisible() && (await m.locator('.st-ti[draggable="true"]').count()) === 0 && (await m.locator('.st-seg.drag').count()) === 0, '휴대폰: 공정 목록은 위쪽, 끌기 없음 (날짜 눌러 고치기)');
+  // 휴대폰: 날짜 눌러 일정 지우기·일정 없는 공정 시작
+  const mch = await m.getAttribute('.st-mobonly .st-ti:has(.nmc:text-is("철거")), .st-mobonly .st-ti:has(input.nmc[value="철거"])', 'data-t');
+  await m.locator(`button.st-day[data-day="${plus(-1)}"]`).click({ position: { x: 10, y: 10 } }); await m.waitForSelector('.st-daypop');
+  log(/전기/.test(await m.locator('.st-daypop').innerText()), '휴대폰 날짜 누르기: 일정 없는 공정도 보임 (그날로 시작)');
+  await m.click(`.st-daypop [data-clear-t="${mch}"]`); await new Promise((r) => setTimeout(r, 600));
+  log(!(await get(`site/p1/tasks/${mch}/start`)), '휴대폰 날짜 누르기: "일정 지우기"');
   await m.screenshot({ path: SH + '/s3-mobile.png', fullPage: true });
   // 구글 로그인 꺼진 기기
   const P = await br.newContext(); await P.addInitScript(() => { try { localStorage.setItem('sb_emu', '1'); } catch {} });

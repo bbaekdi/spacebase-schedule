@@ -36,8 +36,9 @@
     const thisWeek = sundayOf(S.today());
     const items = tl.map((t, i) => {
       const ds = S.daysOf(t), now = ds.some((d) => d >= thisWeek && d <= S.addDays(thisWeek, 6));
-      return `<li class="st-ti ${t.done ? 'done' : ''}" data-t="${esc(t.id)}" ${drag ? 'draggable="true" title="캘린더 날짜로 끌어다 놓으세요"' : ''}>
-        ${drag ? '<span class="grip" aria-hidden="true">⋮⋮</span>' : ''}<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} ${edit ? '' : 'disabled'} aria-label="${esc(t.name)} 완료">
+      const canPlace = drag && !ds.length; // 일정 없는 공정만 목록에서 끌어다 놓기 (옮기기는 막대 끌기로)
+      return `<li class="st-ti ${t.done ? 'done' : ''} ${drag && !canPlace ? 'placed' : ''}" data-t="${esc(t.id)}" ${canPlace ? 'draggable="true" title="캘린더 날짜로 끌어다 놓으세요"' : ''}>
+        ${canPlace ? '<span class="grip" aria-hidden="true">⋮⋮</span>' : drag ? '<span class="grip off" aria-hidden="true"></span>' : ''}<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} ${edit ? '' : 'disabled'} aria-label="${esc(t.name)} 완료">
         <i class="dot" style="background:${now && !t.done ? colorOf(tl, t) : '#c9c5b6'}"></i>
         ${edit ? `<input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공정 이름">` : `<span class="nmc">${esc(t.name)}</span>`}
         <span class="dd">${ds.length ? ds.length + '일' : '일정 없음'}</span>
@@ -124,7 +125,7 @@
     const a = weeks[0][0], b = weeks[3][6];
     return `<div class="card st-calcard"><div class="card-h"><div class="st-nav" style="margin-left:0"><button type="button" data-wk="-7" aria-label="한 주 앞">‹</button></div>
       <h2>${S.md(a)} ~ ${S.md(b)} 공정 일정</h2><div class="st-nav" style="margin-left:0"><button type="button" data-wk="7" aria-label="한 주 뒤">›</button><button type="button" data-wk="0">이번 주</button></div>
-      <span class="st-ro" style="margin-left:auto">이번 주 공정만 색으로 보여요${edit ? (drag ? ' · 막대를 끌어 옮기고 끝을 끌어 늘려요 · ✕ 또는 왼쪽 목록으로 끌면 일정 지우기 · 날짜를 누르면 그날 공정 고르기' : ' · 날짜를 누르면 그날 공정 고르기') : ''}</span></div>
+      <span class="st-ro" style="margin-left:auto">이번 주 공정만 색으로 보여요${edit ? (drag ? ' · 막대를 끌어 옮기고 끝을 끌어 늘려요 · ✕ 로 일정 지우기 · 날짜를 누르면 그날 쉬는 날 정하기' : ' · 날짜를 누르면 그날 공정 고르기') : ''}</span></div>
       <div class="st-scroll"><div class="st-month"><div class="st-wh">${WD.map((d, i) => `<span class="${i === 0 ? 'red' : i === 6 ? 'blue' : ''}">${d}</span>`).join('')}</div>${rows}</div></div></div>`;
   }
 
@@ -145,12 +146,10 @@
     if (!confirm(`"${t.name}" 일정을 지울까요?\n공정은 왼쪽 목록에 그대로 남아요.`)) return;
     return tRef(id).update({ start: null, end: null, plus: null, minus: null, ...stamp() }).catch(fail);
   }
-  // 목록에서 날짜로 놓기: 일정이 없으면 그날 하루, 있으면 첫날이 그날이 되게 옮기기
+  // 목록에서 날짜로 놓기: 일정 없는 공정을 그날 하루로
   function placeTask(id, day) {
-    const t = tasksOf(cur.id)[id]; if (!t) return;
-    const ds = S.daysOf(t);
-    if (!ds.length) return tRef(id).update({ start: day, end: day, ...stamp() }).catch(fail);
-    return shiftTask(id, S.diffDays(ds[0], day));
+    const t = tasksOf(cur.id)[id]; if (!t || S.daysOf(t).length) return;
+    return tRef(id).update({ start: day, end: day, ...stamp() }).catch(fail);
   }
   // 끝 잡아 늘리기/줄이기한 모습 (기간 밖의 더한 날·쉬는 날은 정리)
   function resized(t, edge, day) {
@@ -203,7 +202,6 @@
 
   // ---------- 끌기 (PC) ----------
   const dayAt = (x, y) => { const el = document.elementsFromPoint(x, y).find((n) => n.matches && n.matches('.st-day[data-day]')); return el ? el.dataset.day : null; };
-  const overList = (x, y) => document.elementsFromPoint(x, y).some((n) => n.matches && n.matches('#side .st-tp'));
   // 캘린더만 다시 그림 (끄는 동안)
   const renderCal = () => { const el = document.querySelector('.st-calcard'); if (el && cur) el.outerHTML = calCard(cur, withPreview(S.taskList(tasksOf(cur.id))), canEdit(cur)); };
   // 목록 → 날짜 (HTML 끌어다 놓기)
@@ -229,8 +227,6 @@
   });
   document.addEventListener('pointermove', (e) => {
     if (!drag) return;
-    const tp = document.querySelector('#side .st-tp'), ol = overList(e.clientX, e.clientY);
-    if (tp) tp.classList.toggle('drop-clear', ol); // 왼쪽 목록 위 = 놓으면 일정 지우기
     const d = dayAt(e.clientX, e.clientY); if (!d || d === drag.to) return;
     drag.to = d;
     const next = drag.edge ? resized(drag.t, drag.edge, d) : shifted(drag.t, S.diffDays(drag.from, d));
@@ -240,11 +236,9 @@
   document.addEventListener('pointerup', (e) => {
     if (!drag) return;
     const g = drag; drag = null; document.body.classList.remove('st-dragging');
-    const tp = document.querySelector('#side .st-tp'); if (tp) tp.classList.remove('drop-clear');
     const commit = preview && preview.id === g.id ? preview.task : null;
     preview = null;
     justDragged = true; setTimeout(() => (justDragged = false), 0);
-    if (overList(e.clientX, e.clientY)) { renderCal(); return clearSchedule(g.id); }
     if (g.to === g.from || !commit) { renderCal(); const c = document.querySelector(`.st-day[data-day="${g.from}"]`); if (c && c.tagName === 'BUTTON') openDayPop(c); return; }
     tRef(g.id).update({ ...commit, ...stamp() }).catch(fail);
     renderCal();
@@ -255,9 +249,12 @@
   const closeDayPop = () => { if (dayPop) { dayPop.remove(); dayPop = null; } };
   function openDayPop(cell) {
     closeDayPop();
-    const d = cell.dataset.day, tl = S.taskList(tasksOf(cur.id));
+    const d = cell.dataset.day, all = S.taskList(tasksOf(cur.id)), pc = canDrag();
+    // PC: 넣기는 목록 끌기, 지우기는 막대 ✕ → 여기서는 일정 있는 공정의 그날 켜고 끄기(쉬는 날)만
+    const tl = pc ? all.filter((t) => S.daysOf(t).length) : all;
     dayPop = document.createElement('div'); dayPop.className = 'st-cal st-daypop';
-    dayPop.innerHTML = `<b>${S.yy(d)} 하는 공정</b>${tl.length ? `<div class="st-dpl">${tl.map((t) => `<label><input type="checkbox" data-t="${esc(t.id)}" ${S.activeOn(t, d) ? 'checked' : ''}><i style="background:${colorOf(tl, t)}"></i>${esc(t.name)}${S.daysOf(t).length ? `<button type="button" class="clr" data-clear-t="${esc(t.id)}">일정 지우기</button>` : ''}</label>`).join('')}</div>` : '<div class="st-none">왼쪽(휴대폰은 위쪽) 공정 목록에 공정을 먼저 넣어 주세요.</div>'}<div class="st-calf"><span></span><button type="button" data-close>닫기</button></div>`;
+    dayPop.innerHTML = `<b>${S.yy(d)} 하는 공정</b>${tl.length ? `<div class="st-dpl">${tl.map((t) => `<label><input type="checkbox" data-t="${esc(t.id)}" ${S.activeOn(t, d) ? 'checked' : ''}><i style="background:${colorOf(all, t)}"></i>${esc(t.name)}${!pc && S.daysOf(t).length ? `<button type="button" class="clr" data-clear-t="${esc(t.id)}">일정 지우기</button>` : ''}</label>`).join('')}</div>`
+      : `<div class="st-none">${pc ? '일정이 있는 공정이 없어요. 왼쪽 목록의 공정(⋮⋮)을 날짜로 끌어다 놓으세요.' : '위쪽 공정 목록에 공정을 먼저 넣어 주세요.'}</div>`}<div class="st-calf"><span>${pc ? '<small class="st-ro">끄면 그날만 쉬는 날</small>' : ''}</span><button type="button" data-close>닫기</button></div>`;
     dayPop.addEventListener('click', (e) => {
       e.stopPropagation();
       if (e.target.closest('[data-close]')) closeDayPop();
@@ -266,7 +263,7 @@
     dayPop.addEventListener('change', (e) => {
       const id = e.target.dataset.t, t = tasksOf(cur.id)[id]; if (!t) return;
       const up = { ...stamp() };
-      if (!t.start && !Object.keys(t.plus || {}).length) { up.start = d; up.end = d; } // 일정 없는 공정은 그날로 시작
+      if (!t.start && !Object.keys(t.plus || {}).length) { if (canDrag()) return; up.start = d; up.end = d; } // 휴대폰: 일정 없는 공정은 그날로 시작
       else if (S.activeOn(t, d)) { if (t.plus && t.plus[d]) up['plus/' + d] = null; else up['minus/' + d] = true; }
       else { if (t.minus && t.minus[d]) up['minus/' + d] = null; else up['plus/' + d] = true; }
       tRef(id).update(up).catch(fail);
