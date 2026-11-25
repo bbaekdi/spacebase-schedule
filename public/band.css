@@ -156,13 +156,6 @@
 
 /* 읽음 확인 · 휴지통 */
 .bd-new { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: #e5484d; color: #fff; }
-.bd-reads { margin-top: 12px; font-size: 13px; }
-.bd-reads .bd-link { margin: 0; font-size: 13px; }
-.bd-readlist { margin-top: 8px; padding: 10px 12px; background: var(--bg); border-radius: 10px; display: flex; flex-direction: column; gap: 8px; }
-.bd-readlist b { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
-.bd-readlist span { display: inline-block; background: #fff; border: 1px solid var(--line); border-radius: 99px; padding: 2px 9px; margin: 0 4px 4px 0; font-size: 12px; }
-.bd-readlist span small { color: var(--sub); }
-.bd-readlist span.none { border: 0; background: none; color: var(--sub); padding: 0; }
 .bd-tools { display: flex; justify-content: flex-end; margin-top: 6px; }
 .bd-trashlink { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--sub); text-decoration: none; font-weight: 700; }
 .bd-trashlink:hover { color: var(--ink); }
@@ -171,3 +164,7 @@ body.bd-intrash .bd-head, body.bd-intrash #write, body.bd-intrash .bd-more, body
 .bd-trashhead { border-left-color: #6b6b66; }
 .bd-trashed { cursor: default; opacity: .92; }
 .bd-trashed .bd-foot b { color: #b42318; }
+
+.bd-tools { justify-content: space-between; align-items: center; }
+.bd-bell { border: 1px solid var(--line); background: #fff; border-radius: 99px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: var(--sub); cursor: pointer; }
+.bd-bell[data-on="on"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-text); }

@@ -44,18 +44,21 @@ public/
                      자동 양식: 프로젝트·A/S 는 항목별 칸(form) → 지금 밴드 글 모양의 번호 줄 글(text)로 저장. 날짜는 자체 달력(일요일·공휴일 빨강, 토요일 파랑, holidays.js),
                      위치는 카카오 우편번호 검색(외부 스크립트 t1.kakaocdn.net, 누를 때만 불러옴). A/S 현장 직접 입력, A/S 예정일, A/S 담당자 = 주간 스케줄 직원표(팀별, 여러 명)
                      읽음 확인: board/reads/<글>/<uid>, board/myreads/<uid>/<글> (안 읽은 최근 14일 글 "새 글"). 휴지통(#trash): 삭제 표시 글 30일 보관, 관리자가 열 때 30일 지난 글 정리
+  manifest.webmanifest, icons/, sw.js, pwa.js  휴대폰에 앱처럼 설치(홈 화면 아이콘) + 새 글 알림 받기·켜고 끄기.
+                     안드로이드는 "설치하기", 아이폰은 공유 → 홈 화면에 추가 안내(아이폰은 설치한 앱에서만 알림). 구독은 Firebase push/subs/<uid>/<id>
   members.html       회원 관리 (관리자: 승인/거절, 초대 링크, 이름 연결, 관리자 지정, 내보내기)
   ws.css, ws-common.js  워크스페이스 공통 (상단 탭, 휴대폰 아래 메뉴, 로그인, 일정 데이터, 구글 연동, TO DO 위젯, 확장 안내 띠)
   band-config.js     SB_BAND_API(밴드 중계 주소), SB_GOOGLE_LOGIN
   mail-config.js     SB_MAIL_API (비어 있음 → 메일 카드 숨김)
   band-ics.js, band-extension.html, guide.html, privacy.html, login.html
 desktop/             Electron (main.js, preload.js, preview.html=인쇄 미리보기, setup.html)
-worker/              band-relay.js, google.js, naverworks-mail.js (+ band.toml, wrangler.toml)
+worker/              band-relay.js, google.js, push.js(Band 새 글 알림 보내기), naverworks-mail.js (+ band.toml, wrangler.toml)
 extension/           band-fill.js, bandform.js, site-bridge.js
 tools/sync-band.js   예비 밴드 동기화 (band-calendar.yml)
 firebase/            Firebase 규칙(database.rules.json) + 규칙 시험(rules.test.mjs). firebase-rules.yml 이 실제 Firebase 에 올림
+tools/vapid.mjs      알림 열쇠(VAPID)를 Secret FIREBASE_SERVICE_ACCOUNT 에서 만듦 (band-worker.yml 은 비밀 열쇠, pages.yml 은 공개 열쇠 SB_VAPID_PUBLIC)
 tools/test-rules.sh  규칙 시험 (연습용 Firebase), tools/fb-setup.mjs 규칙 올리기·회원 설정 (Actions 전용)
-tools/test/          화면 시험 (연습용 Firebase + 브라우저): emu-seed.mjs, e2e-auth.cjs(로그인), e2e-band.cjs(Band)
+tools/test/          시험 (연습용 Firebase): emu-seed.mjs, e2e-auth.cjs(로그인 화면), e2e-band.cjs(Band 화면), push.test.mjs(알림 보내기)
 tools/check.sh       배포 전 검토 (JS 문법, 비밀 값 의심 문자열, 버전↔릴리즈 노트)
 RELEASE-NOTES.md     바뀐 내용 기록 (최신이 위)
 build/               installer.nsi, release.sh, seticon.mjs
@@ -102,6 +105,7 @@ Doc/                 기획서·계획 일정표 (Todo / Doing / Done, 기획서
 ## 3. Cloudflare Workers
 - sbe-band: https://sbe-band.smbaek-1c4.workers.dev (`band-relay.js` + `google.js`, `band.toml`, `band-worker.yml`)
   - `/ics` (헤더 `X-SB-Key` = sha256('spacebase:' + SB_CODE)), POST `/gcal`, `/google/login|callback|token|revoke`. 캐시 없이(`no-store`).
+  - POST `/push/notify` {post} (헤더 Authorization: Firebase ID 토큰): 회원·자기 글·10분 안·처음만 → 알림 켠 다른 회원 기기에 Web Push. Secrets FIREBASE_SERVICE_ACCOUNT, VAPID_PRIVATE, VAPID_PUBLIC.
 - sbe-mail: https://sbe-mail.smbaek-1c4.workers.dev (`naverworks-mail.js`, `wrangler.toml`, `mail-worker.yml`), 콜백 `/callback`.
 
 ## 4. GitHub Secrets (이름만)

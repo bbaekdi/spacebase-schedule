@@ -108,6 +108,16 @@ await no('관리자도 휴지통에 없는 글은 완전 삭제 못 함', A.ref(
 await ok('관리자 완전 삭제 (글·댓글·읽음 기록 함께)', A.ref('board').update({ 'posts/proj3': null, 'comments/proj3': null, 'reads/proj3': null }));
 await ok('A/S 글에 댓글', A.ref('board/comments/as1/c9').set({ uid: 'a', name: '관리', text: '확인', at: 50 }));
 await no('휴지통에 없는 글의 댓글 통째 삭제', A.ref('board/comments/as1').remove());
+
+// ---------- 새 글 알림 구독 ----------
+const SUB = { endpoint: 'https://push.example.com/abc', p256dh: 'BPk', auth: 'x1', at: 1 };
+await ok('내 기기 알림 켜기', B.ref('push/subs/b/dev1').set(SUB));
+await no('남의 기기 알림 등록', B.ref('push/subs/a/dev1').set(SUB));
+await no('https 아닌 주소', B.ref('push/subs/b/dev2').set({ ...SUB, endpoint: 'http://x' }));
+await no('남의 알림 구독 보기', A.ref('push/subs/b').once('value'));
+await no('전체 구독 목록 보기', A.ref('push/subs').once('value'));
+await no('알림 보낸 기록 쓰기', A.ref('push/sent/x').set(1));
+await ok('내 기기 알림 끄기', B.ref('push/subs/b/dev1').remove());
 // 내보내기
 await ok('관리자가 내보내기', A.ref('ws/members/c').remove());
 await no('내보낸 사람 config 읽기', C.ref('ws/config').once('value'));

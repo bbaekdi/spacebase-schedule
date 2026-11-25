@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Band · SPACEBASE</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SPACEBASE">
 <link rel="stylesheet" href="ws.css">
 <link rel="stylesheet" href="band.css">
 </head>
@@ -13,7 +19,7 @@
     <div class="bd-head">
       <nav class="bd-cats" id="cats" aria-label="게시판"></nav>
       <div class="bd-search"><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input id="q" type="search" placeholder="글 내용·이름으로 찾기" autocomplete="off"></div>
-      <div class="bd-tools"><a class="bd-trashlink" href="#trash"><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>휴지통</a></div>
+      <div class="bd-tools"><button class="bd-bell" id="bell" type="button" data-on="off">🔕 새 글 알림 켜기</button><a class="bd-trashlink" href="#trash"><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>휴지통</a></div>
     </div>
     <div id="msg" class="bd-msg"></div>
     <div id="list" class="bd-list"></div>
@@ -45,7 +51,9 @@
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="auth.js"></script>
 <script src="firebase-config.js"></script>
+<script src="band-config.js"></script>
 <script src="ws-common.js"></script>
+<script src="pwa.js"></script>
 <script src="holidays.js"></script>
 <script src="band.js"></script>
 </body>

@@ -4,7 +4,7 @@ name: band-worker
 on:
   push:
     branches: [main]
-    paths: ['worker/band-relay.js', 'worker/google.js', 'worker/band.toml', '.github/workflows/band-worker.yml']
+    paths: ['worker/band-relay.js', 'worker/google.js', 'worker/push.js', 'worker/band.toml', 'tools/vapid.mjs', '.github/workflows/band-worker.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,7 @@ jobs:
       SB_CODE: ${{ secrets.SB_CODE }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,4 +41,12 @@ jobs:
             printf '%s' "$GOOGLE_CLIENT_SECRET" | npx --yes wrangler@3 secret put GOOGLE_CLIENT_SECRET -c band.toml
           else
             echo "구글 연결 설정(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)이 아직 없습니다."
+          fi
+          # Band 새 글 알림 (worker/push.js): Firebase 관리 열쇠 + 그것으로 만든 알림 열쇠
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT" | npx --yes wrangler@3 secret put FIREBASE_SERVICE_ACCOUNT -c band.toml
+            node ../tools/vapid.mjs private | npx --yes wrangler@3 secret put VAPID_PRIVATE -c band.toml
+            node ../tools/vapid.mjs public | npx --yes wrangler@3 secret put VAPID_PUBLIC -c band.toml
+          else
+            echo "FIREBASE_SERVICE_ACCOUNT 가 없어 알림 설정을 건너뜁니다."
           fi

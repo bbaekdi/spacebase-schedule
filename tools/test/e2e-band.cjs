@@ -186,7 +186,6 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   log(true, 'band.html#post=… 주소로 글 바로 열기');
 
   // ---------- 4단계: 읽음 확인 + 휴지통 ----------
-  await put('ws/members/fakeP', { name: '박연습', email: 'p@test.com', joinedAt: 1 });
   await a.goto(B + 'band.html'); await b.goto(B + 'band.html'); await a.waitForSelector('.bd-post'); await b.waitForSelector('.bd-post');
   await a.click('#write'); await a.click('#wCats label:has-text("공지·자유글")'); await a.fill('#fWrite textarea', '읽음 시험 공지'); await a.click('#wSave');
   await b.waitForSelector('.bd-post:has-text("읽음 시험 공지") .bd-new');
@@ -194,11 +193,8 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await b.click('.bd-post:has-text("읽음 시험 공지")'); await b.waitForSelector('#dlgPost[open]'); await b.click('#dlgPost [data-close]');
   await b.waitForFunction(() => !document.querySelector('.bd-post .bd-new') || ![...document.querySelectorAll('.bd-post')].find((x) => /읽음 시험 공지/.test(x.innerText))?.querySelector('.bd-new'));
   log(true, '글을 열어 보면 "새 글" 표시가 사라짐');
-  await a.click('.bd-post:has-text("읽음 시험 공지")'); await a.waitForSelector('#pBody .bd-reads');
-  await a.waitForFunction(() => /읽음 1명 · 안 읽음 \d+명/.test(document.querySelector('#pBody .bd-reads').innerText));
-  await a.click('#pBody [data-a=reads]');
-  const rl = await a.locator('#pBody .bd-readlist').innerText();
-  log(/읽은 사람\s*이시험/.test(rl) && /안 읽은 사람[\s\S]*박연습/.test(rl) && !/김테스트/.test(rl), '읽은 사람(이시험) / 안 읽은 사람(박연습), 글쓴이는 빠짐');
+  await a.click('.bd-post:has-text("읽음 시험 공지")'); await a.waitForSelector('#dlgPost[open]');
+  log((await a.locator('#pBody .bd-reads').count()) === 0, '읽은 사람 / 안 읽은 사람 목록은 안 보임');
   await a.screenshot({ path: SH + '/b12-reads.png' });
   // 휴지통
   await a.click('#pBody [data-a=del]'); await a.waitForFunction(() => !/읽음 시험 공지/.test(document.getElementById('list').innerText));
@@ -224,6 +220,37 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   const oldGone = await (await fetch(DB + 'board/posts/oldpost.json' + NS, { headers: { Authorization: 'Bearer owner' } })).json();
   log(oldGone === null && !/아주 오래된 글/.test(await a.locator('#list').innerText()), '30일 지난 글은 관리자가 휴지통을 열 때 자동 정리');
   await a.click('.bd-back');
+
+  // ---------- 5단계: 앱 설치 + 새 글 알림 ----------
+  const man = await a.evaluate(async () => { const l = document.querySelector('link[rel=manifest]'); const m = await (await fetch(l.href)).json(); const ok = await Promise.all(m.icons.map(async (i) => (await fetch(i.src)).ok)); return { name: m.name, display: m.display, icons: ok.every(Boolean) && ok.length === 3 }; });
+  log(man.name === 'SPACEBASE' && man.display === 'standalone' && man.icons, '앱 정보 파일 + 아이콘 3개');
+  const swOk = await a.evaluate(async () => { const r = await Promise.race([navigator.serviceWorker.ready, new Promise((ok) => setTimeout(() => ok(null), 5000))]); return !!(r && r.active); });
+  log(swOk, '서비스 워커(알림 받는 도우미) 등록됨');
+  log((await a.locator('#bell').innerText()).includes('새 글 알림 켜기'), 'Band 에 "새 글 알림 켜기" 버튼');
+  await a.evaluate(() => { window.__al = []; window.alert = (m) => window.__al.push(m); });
+  await a.context().grantPermissions(['notifications']);
+  await a.click('#bell'); await a.waitForTimeout(800);
+  log(/알림 설정이 아직 준비되지 않았어요/.test((await a.evaluate(() => window.__al)).join('|')), '알림 열쇠가 없는 곳(내 컴퓨터 시험)에서는 안내만 하고 멈춤');
+  // 글 올리면 알림 보내기 요청
+  let notifyReq = null;
+  await a.route('**/push/notify', (r) => { notifyReq = { auth: r.request().headers().authorization, body: r.request().postDataJSON() }; r.fulfill({ status: 200, body: '{"sent":0}' }); });
+  await a.click('#write'); await a.click('#wCats label:has-text("공지·자유글")'); await a.fill('#fWrite textarea', '알림 시험 글'); await a.click('#wSave');
+  await a.waitForSelector('.bd-post:has-text("알림 시험 글")'); await a.waitForTimeout(800);
+  log(!!notifyReq && /^Bearer .+/.test(notifyReq.auth || '') && /^-/.test(notifyReq.body.post || ''), '글 올리면 중계에 알림 보내기 요청 (로그인 확인 토큰 포함)');
+  // 아이폰: 설치 안내
+  const ip = await user('ip@test.com', '박연습', false, { ...devices['iPhone 13'] });
+  await ip.waitForSelector('#sbInstall', { timeout: 8000 });
+  await ip.screenshot({ path: SH + '/b14-install-bar.png' });
+  await ip.click('#sbInstall [data-i]'); await ip.waitForSelector('#sbIosGuide[open]');
+  log(/홈 화면에 추가/.test(await ip.locator('#sbIosGuide').innerText()), '아이폰: "앱 설치" 띠 → 홈 화면에 추가 안내');
+  await ip.screenshot({ path: SH + '/b15-ios-guide.png' });
+  await ip.click('#sbIosGuide button');
+  await ip.click('#bell'); await ip.waitForTimeout(500);
+  log(await ip.locator('#sbIosGuide[open]').count() === 1, '아이폰(설치 전)에서 알림 켜기 → 설치 안내부터');
+  await ip.click('#sbIosGuide button');
+  await ip.click('#sbInstall [data-l]');
+  log((await ip.locator('#sbInstall').count()) === 0, '"나중에" → 띠 닫힘');
+  await ip.context().close();
   // 휴대폰
   const m = await user('m@test.com', '박연습', false, { ...devices['iPhone 13'] });
   await m.waitForSelector('.bd-post'); await m.waitForTimeout(500);

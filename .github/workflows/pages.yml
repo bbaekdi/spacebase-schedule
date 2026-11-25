@@ -38,7 +38,12 @@ jobs:
               printf '\nwindow.SB_BAND%s_URL = "%s";\n' "$N" "$U" >> _site/band-config.js
             fi
           done
+          # Band 새 글 알림 공개 열쇠 (비밀 아님, Firebase 관리 열쇠에서 만듦: tools/vapid.mjs)
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            printf '\nwindow.SB_VAPID_PUBLIC = "%s";\n' "$(node tools/vapid.mjs public)" >> _site/band-config.js
+          fi
         env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           BAND2_URL: ${{ secrets.BAND2_URL }}
           BAND3_URL: ${{ secrets.BAND3_URL }}
       - uses: actions/upload-pages-artifact@v5

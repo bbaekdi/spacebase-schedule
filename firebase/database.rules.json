@@ -112,6 +112,17 @@
           }
         }
       }
+    },
+    "push": {
+      "subs": {
+        "$uid": {
+          ".read": "auth != null && root.child('ws/members').child(auth.uid).exists() && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid",
+          "$sid": {
+            ".validate": "$sid.length <= 40 && newData.hasChildren(['endpoint', 'p256dh', 'auth']) && newData.child('endpoint').isString() && newData.child('endpoint').val().beginsWith('https://') && newData.child('endpoint').val().length <= 1000 && newData.child('p256dh').isString() && newData.child('p256dh').val().length <= 200 && newData.child('auth').isString() && newData.child('auth').val().length <= 100"
+          }
+        }
+      }
     }
   }
 }

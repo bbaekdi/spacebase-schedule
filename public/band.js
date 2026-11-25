@@ -19,7 +19,7 @@
 
   let me = null, db = null, posts = [], limit = PAGE, cat = '', query = '', openId = null, cmtRef = null;
   // 읽음 확인 · 휴지통
-  let myReads = {}, members = {}, readers = {}, readRef = null, readsOpen = false, trash = false, trashPosts = [], trashRef = null;
+  let myReads = {}, trash = false, trashPosts = [], trashRef = null;
   const KEEP_DAYS = 30, NEW_DAYS = 14;
   const isNew = (p) => !!me && !myReads[p.id] && p.uid !== me.uid && Date.now() - p.at < NEW_DAYS * 864e5;
   let projects = {}, staff = [], site = null, sitePosts = [], siteRef = null, asOpenOnly = false;
@@ -521,7 +521,9 @@
           const o = [...fW.querySelectorAll('input[name=owner]:checked')].map((x) => x.value).join(', ');
           if (o) post.asState.owner = o.slice(0, 120);
         }
-        await db.ref('board/posts').push(post);
+        const ref = db.ref('board/posts').push();
+        await ref.set(post);
+        notifyPush(ref.key);
         if (!site && cat && cat !== c) { cat = c; drawCats(); }
       }
       dW.close();
@@ -556,22 +558,12 @@
       ${p.form ? formView(p) : `<div class="bd-text">${linkPhones(p.text)}</div>`}
       ${p.cat === 'project' && site !== p.id ? `<a class="btn" style="margin-top:12px" href="#site=${encodeURIComponent(p.id)}">현장 방 열기 ›</a>` : ''}
       ${asBox(p)}
-      ${readBox(p)}
       ${canEdit(p) ? '<div class="bd-acts"><button class="btn" type="button" data-a="edit">수정</button><button class="btn danger" type="button" data-a="del">삭제</button></div>' : ''}
       <ul class="bd-cmts">${cmts.length ? cmts.map((c) => `<li data-cid="${esc(c.id)}"><div class="who"><b>${esc(c.name)}</b><span>${ago(c.at)}</span>${me && (c.uid === me.uid || me.admin) ? '<button type="button" data-a="cdel">삭제</button>' : ''}</div><div class="t">${esc(c.text)}</div></li>`).join('') : '<li class="none">첫 댓글을 달아 보세요.</li>'}</ul>`;
     $('#pBody').querySelectorAll('input[name=asOwner]').forEach((x) => (x.onchange = () => {
       const o = [...$('#pBody').querySelectorAll('input[name=asOwner]:checked')].map((y) => y.value).join(', ');
       setAs(p, asStatus(p), o);
     }));
-  }
-  // 읽은 사람 / 안 읽은 사람 (회원 명단 기준, 글쓴이 빼고)
-  function readBox(p) {
-    const nm = (u) => (members[u] && members[u].name) || '(나간 사람)';
-    const rd = Object.entries(readers).filter(([u]) => u !== p.uid).sort((a, b) => a[1] - b[1]);
-    const unread = Object.entries(members).filter(([u]) => !readers[u] && u !== p.uid).map(([, m]) => m.name).sort((a, b) => a.localeCompare(b, 'ko'));
-    return `<div class="bd-reads"><button type="button" class="bd-link" data-a="reads">읽음 ${rd.length}명 · 안 읽음 ${unread.length}명 ${readsOpen ? '▴' : '▾'}</button>
-      ${readsOpen ? `<div class="bd-readlist"><div><b>읽은 사람</b>${rd.length ? rd.map(([u, t]) => `<span>${esc(nm(u))} <small>${ago(t)}</small></span>`).join('') : '<span class="none">아직 없어요</span>'}</div>
-      <div><b>안 읽은 사람</b>${unread.length ? unread.map((n) => `<span>${esc(n)}</span>`).join('') : '<span class="none">모두 읽었어요</span>'}</div></div>` : ''}</div>`;
   }
   function setAs(p, status, owner) {
     const v = { status, by: me.name, at: Date.now() };
@@ -580,13 +572,10 @@
   }
   function openPost(id) {
     const p = findPost(id); if (!p) return;
-    openId = id; cmts = []; readers = {}; readsOpen = false;
+    openId = id; cmts = [];
     drawPost(p);
-    // 읽음 기록 (처음 열 때 한 번)
-    if (!myReads[id]) { const now = Date.now(); myReads[id] = now; db.ref('board').update({ ['reads/' + id + '/' + me.uid]: now, ['myreads/' + me.uid + '/' + id]: now }).catch(() => {}); }
-    if (readRef) readRef.off();
-    readRef = db.ref('board/reads/' + id);
-    readRef.on('value', (s) => { readers = s.val() || {}; refreshOpen(); });
+    // 내가 읽은 글 기록 ("새 글" 표시용, 처음 열 때 한 번)
+    if (!myReads[id]) { const now = Date.now(); myReads[id] = now; db.ref('board/myreads/' + me.uid + '/' + id).set(now).catch(() => {}); }
     fC.text.value = '';
     if (cmtRef) cmtRef.off();
     cmtRef = db.ref('board/comments/' + id).orderByChild('at');
@@ -597,13 +586,12 @@
     });
     if (!dP.open) dP.showModal();
   }
-  dP.addEventListener('close', () => { openId = null; if (cmtRef) { cmtRef.off(); cmtRef = null; } if (readRef) { readRef.off(); readRef = null; } if (!site && !trash) drawList(); });
+  dP.addEventListener('close', () => { openId = null; if (cmtRef) { cmtRef.off(); cmtRef = null; } if (!site && !trash) drawList(); });
   $('#pBody').onclick = async (e) => {
     if (e.target.closest('a[href^="#site="]')) { dP.close(); return; }
     const b = e.target.closest('button[data-a], button[data-as]'); if (!b) return;
     const p = findPost(openId); if (!p) return;
     if (b.dataset.as) return setAs(p, b.dataset.as, ownersOf(p).join(', '));
-    if (b.dataset.a === 'reads') { readsOpen = !readsOpen; return drawPost(p); }
     if (b.dataset.a === 'edit') { dP.close(); openWrite(p); }
     if (b.dataset.a === 'del') {
       if (!confirm(p.cat === 'project' ? '이 현장(프로젝트) 글을 삭제할까요?\n현장에 올라온 사진·A/S 글은 삭제되지 않아요.\n삭제한 글은 휴지통에 30일 동안 보관돼요.' : '이 글을 삭제할까요?\n삭제한 글은 휴지통에 30일 동안 보관돼요.')) return;
@@ -636,6 +624,29 @@
   document.querySelectorAll('.bd-dlg [data-close]').forEach((b) => (b.onclick = () => b.closest('dialog').close()));
   [dW, dP].forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
 
+  // ---------- 새 글 알림 (켜기/끄기, 글 올린 뒤 알림 보내기: worker/push.js) ----------
+  async function drawBell() {
+    const b = $('#bell'); if (!b) return;
+    if (!window.SBPush || (!SBPush.supported() && !SBPush.ios)) { b.classList.add('hidden'); return; }
+    const st = await SBPush.status().catch(() => 'off');
+    b.dataset.on = st; b.textContent = st === 'on' ? '🔔 새 글 알림 켜짐' : '🔕 새 글 알림 켜기';
+  }
+  $('#bell').onclick = async () => {
+    const b = $('#bell');
+    try {
+      if (b.dataset.on === 'on') { if (!confirm('이 기기에서 새 글 알림을 끌까요?')) return; await SBPush.disable(db, me.uid); }
+      else { b.disabled = true; await SBPush.enable(db, me.uid); alert('이제 이 기기에서 Band 새 글 알림을 받아요.'); }
+    } catch (e) { if (e.code === 'ios-install') SBPush.iosGuide(); else alert(e.message); }
+    finally { b.disabled = false; drawBell(); }
+  };
+  async function notifyPush(id) {
+    try {
+      const api = String(window.SB_BAND_API || '').replace(/\/$/, ''); if (!api) return;
+      const t = await firebase.auth().currentUser.getIdToken();
+      fetch(api + '/push/notify', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ post: id }) }).catch(() => {});
+    } catch {}
+  }
+
   // ---------- 시작 ----------
   // 홈의 "안 끝난 A/S" 링크: band.html#cat=as&open=1
   { const h = new URLSearchParams(location.hash.slice(1)); if (h.has('cat')) { cat = h.get('cat') || ''; asOpenOnly = h.get('open') === '1'; history.replaceState(null, '', location.pathname + location.search); } }
@@ -648,8 +659,8 @@
   SBAuth.start().then((a) => {
     me = a; db = firebase.database();
     $('#list').innerHTML = '<div class="bd-empty">불러오는 중…</div>';
+    drawBell();
     db.ref('board/myreads/' + a.uid).on('value', (s) => { myReads = s.val() || {}; if (!site && !trash && !openId) drawList(); });
-    db.ref('ws/members').on('value', (s) => { members = s.val() || {}; refreshOpen(); });
     // A/S 담당자 목록 = 주간 스케줄 직원표 전 직원 (이름 + 직급)
     db.ref('spaces/' + a.spaceKey + '/data/members').once('value').then((s) => {
       const v = s.val(); staff = (Array.isArray(v) ? v : Object.values(v || {})).filter((m) => m && m.name).map((m) => ({ name: String(m.name).trim(), rank: String(m.rank || '').trim(), teamId: m.teamId || '' }));

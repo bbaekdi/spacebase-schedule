@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>회원 관리 · SPACEBASE</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SPACEBASE">
 <link rel="stylesheet" href="ws.css">
 <style>
   .mem { max-width: 860px; }
@@ -41,6 +47,7 @@
 <script src="auth.js"></script>
 <script src="firebase-config.js"></script>
 <script src="ws-common.js"></script>
+<script src="pwa.js"></script>
 <script>
 (async function () {
   const root = document.getElementById('root');

@@ -4,6 +4,7 @@
 // Secrets: BAND_ICAL_URL, SB_CODE (GitHub Secrets → .github/workflows/band-worker.yml 이 넣어 줌)
 
 import { google } from './google.js';
+import { push } from './push.js';
 
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 const sha256 = async (s) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
@@ -27,7 +28,7 @@ export default {
   async fetch(req, env) {
     const cors = {
       'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
-      'Access-Control-Allow-Headers': 'X-SB-Key, X-G-Token, Content-Type',
+      'Access-Control-Allow-Headers': 'X-SB-Key, X-G-Token, Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Max-Age': '86400',
     };
@@ -37,6 +38,7 @@ export default {
     const url = new URL(req.url);
     if (url.pathname === '/gcal') return gcal(req, env, reply);
     if (url.pathname.startsWith('/google/')) return google(req, env, url, reply);
+    if (url.pathname.startsWith('/push/')) return push(req, env, url, reply);
     if (url.pathname !== '/ics') return reply('SPACEBASE band relay');
     if (!env.BAND_ICAL_URL || !env.SB_CODE) return reply('밴드 중계 설정이 아직 없습니다.', 503);
     if ((req.headers.get('X-SB-Key') || '') !== (await sha256('spacebase:' + env.SB_CODE.trim()))) return reply('forbidden', 403);

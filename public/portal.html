@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <title>홈 · SPACEBASE</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SPACEBASE">
 <link rel="stylesheet" href="ws.css">
 <style>
   .wrap.home { max-width: 1320px; }
@@ -147,6 +153,7 @@
   [['band2', window.SB_BAND2_URL], ['band3', window.SB_BAND3_URL]].forEach(([id, url]) => { if (url) { const a = document.getElementById(id); a.href = url; a.classList.remove('hidden'); } });
 </script>
 <script src="ws-common.js"></script>
+<script src="pwa.js"></script>
 <script>
 // Band 새 글 (구글 로그인 회원만)
 (async function () {
