@@ -653,7 +653,8 @@
   drawCats();
   if (!window.SBAuth || !SBAuth.enabled()) {
     $('#write').classList.add('hidden');
-    $('#list').innerHTML = `<div class="bd-empty">Band 는 구글 로그인으로 들어온 회원만 볼 수 있어요. (지금은 시험 중)<br><br><a class="btn primary" href="band.html?login=google">구글 로그인으로 들어가기</a></div>`;
+    document.querySelector('.bd-head').classList.add('hidden');
+    $('#list').innerHTML = `<div class="bd-empty"><b>Band 는 지금 시험 중이에요.</b><br>관리자에게 초대받은 분은 아래 버튼을 눌러<br>구글 계정으로 로그인해 주세요.<br><br><a class="btn primary" href="band.html?login=google">구글 로그인으로 들어가기</a></div>`;
     return;
   }
   SBAuth.start().then((a) => {

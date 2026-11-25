@@ -11,8 +11,9 @@
     { href: 'schedule.html', key: 'schedule', label: 'Weekly Schedule', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M7 13h6M10 16.5h7"/></svg>' },
     { href: 'calendar.html', key: 'calendar', label: 'Calendar', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="8" cy="14.5" r="1" fill="currentColor"/><circle cx="12" cy="14.5" r="1" fill="currentColor"/><circle cx="16" cy="14.5" r="1" fill="currentColor"/><circle cx="8" cy="18" r="1" fill="currentColor"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg>' },
   ];
-  // Band(회사 게시판)는 구글 로그인 회원만 → 구글 로그인을 켰을 때만 메뉴에 보인다
-  if (window.SBAuth && SBAuth.enabled()) TABS.push({ href: 'band.html', key: 'band', label: 'Band', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>' });
+  // Band(회사 게시판): 메뉴는 항상 보이고, 구글 로그인이 꺼진 기기에서는 Band 화면이 "구글 로그인으로 들어가기" 버튼을 보여 준다
+  // (아이폰은 설치한 앱이 Safari 와 저장 공간을 따로 써서, 앱 안에서 켤 수 있어야 함)
+  if (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && location.protocol !== 'file:') TABS.push({ href: 'band.html', key: 'band', label: 'Band', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>' });
   const page = document.body.dataset.page || 'home';
   const tab = (t) => `<a href="${t.href}" class="${t.key === page ? 'on' : ''}">`;
 
@@ -370,6 +371,8 @@
       r.events = r.events.filter((e) => e.source !== 'web' || !band.has(key(e)));
       return r;
     };
+    // Band 화면인데 구글 로그인이 꺼져 있으면 회사 비밀번호 창을 띄우지 않는다 (Band 화면이 안내함)
+    if (be.mode === 'cloud' && page === 'band' && !(window.SBAuth && SBAuth.enabled())) return { ...be, user: null };
     const user = await be.start();
     if (user) document.getElementById('wsName').textContent = user.name + ' 님';
     // 관리자에게만 "회원 관리" 링크

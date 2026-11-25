@@ -251,6 +251,19 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await ip.click('#sbInstall [data-l]');
   log((await ip.locator('#sbInstall').count()) === 0, '"나중에" → 띠 닫힘');
   await ip.context().close();
+
+  // 구글 로그인이 꺼진 기기 (아이폰에 설치한 앱처럼 처음 여는 경우)
+  const P = await br.newContext({ ...devices['iPhone 13'] });
+  await P.addInitScript(() => { try { localStorage.setItem('sb_emu', '1'); } catch {} });
+  const pp = await P.newPage(); pp.on('pageerror', (e) => errs.push(e.message));
+  await pp.goto(B + 'portal.html'); await pp.waitForTimeout(1200);
+  log((await pp.locator('.bottomnav a', { hasText: 'Band' }).count()) === 1, '구글 로그인 꺼진 기기에도 Band 메뉴 보임');
+  await pp.goto(B + 'band.html'); await pp.waitForTimeout(1200);
+  log((await pp.locator('#wsGate:not(.hidden)').count()) === 0 && /시험 중/.test(await pp.locator('#list').innerText()), 'Band 화면: 회사 비밀번호 창 없이 "구글 로그인으로 들어가기" 안내');
+  await pp.screenshot({ path: SH + '/b16-band-off.png' });
+  await pp.click('#list a.btn'); await pp.waitForSelector('#sbG');
+  log(true, '버튼 누르면 구글 로그인 화면');
+  await P.close();
   // 휴대폰
   const m = await user('m@test.com', '박연습', false, { ...devices['iPhone 13'] });
   await m.waitForSelector('.bd-post'); await m.waitForTimeout(500);
