@@ -121,16 +121,15 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   log((await b.locator('.bd-f:has-text("A/S 형태")').count()) === 1, 'A/S 형태 칸 있음');
   await b.click('.bd-owners label:has-text("김테스트 대리")'); await b.click('.bd-owners label:has-text("박연습 과장")');
   await b.fill('[name=f_kind]', '추가공사'); await b.fill('[name=f_req]', '화장실 문 손잡이 고장');
-  await b.click('[data-cal=f_asStart]'); await b.click('.bd-cal [data-today]');
-  await b.click('[data-cal=f_asEnd]'); await b.click('.bd-cal [data-mv="1"]'); await b.click('.bd-cal [data-d$="-15"]');
-  await b.click('[data-cal=f_plan]'); await b.click('.bd-cal [data-today]');
-  log(/^\d{2}년 \d{2}월 \d{2}일$/.test(await b.locator('[data-cal=f_asEnd]').innerText()) && /^\d{2}년/.test(await b.locator('[data-cal=f_plan]').innerText()), 'A/S 기간·작업예정일 달력으로 고르기');
+  log((await b.locator('.bd-f > span').allInnerTexts()).slice(0, 4).join('|') === '발주처명 (현장)|A/S 형태|A/S 예정일|접수일' && !(await b.locator('[data-cal=f_asStart]').count()), 'A/S 순서: 발주처명 → A/S 형태 → A/S 예정일 → 접수일 (A/S 기간 없음)');
+  await b.click('[data-cal=f_plan]'); await b.click('.bd-cal [data-mv="1"]'); await b.click('.bd-cal [data-d$="-15"]');
+  log(/^\d{2}년 \d{2}월 15일$/.test(await b.locator('[data-cal=f_plan]').innerText()), 'A/S 예정일 달력으로 고르기');
   log(/고른 사람: 김테스트 대리, 박연습 과장/.test(await b.locator('#wExtra .bd-ownsel').innerText()), '고른 담당자 표시');
   await b.screenshot({ path: SH + '/b10-form-as.png' });
   await b.click('#wSave');
   await b.waitForSelector('.bd-post:has-text("손잡이") .bd-site');
   log((await b.locator('.bd-post:has-text("손잡이") .bd-as').innerText()) === '접수 · 김테스트 대리 외 1명', 'A/S 글: "접수 · 김테스트 대리 외 1명"');
-  log(/1\.발주처명 : 테스트빌딩 3층 사무실\n2\.A\/S 형태 : 추가공사\n3\.A\/S 기간 : \d{2}년 \d{2}월 \d{2}일~\d{2}년 \d{2}월 15일[\s\S]*요청내용 :\n화장실 문 손잡이 고장[\s\S]*작업예정일 : \d+월 \d+일/.test(await b.locator('.bd-post:has-text("손잡이") .bd-text').innerText()), 'A/S 글은 보내 준 모양(발주처명·접수일·요청내용·작업예정일)');
+  log(/1\.발주처명 : 테스트빌딩 3층 사무실\n2\.A\/S 형태 : 추가공사\n3\.A\/S 예정일 : \d+월 15일\n4\.접수일 : \d+월 \d+일\n5\.발주처 담당자 : 홍길동 팀장 010-1234-5678\n요청내용 :\n화장실 문 손잡이 고장$/.test(await b.locator('.bd-post:has-text("손잡이") .bd-text').innerText()), 'A/S 글 모양: 발주처명·A/S 형태·A/S 예정일·접수일·발주처 담당자·요청내용');
   // 현장 직접 입력
   await b.click('#write'); await b.click('#wCats label:has-text("A/S")');
   await b.selectOption('#wExtra select[name=site]', '__direct');

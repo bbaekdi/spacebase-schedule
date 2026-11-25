@@ -188,12 +188,11 @@
     ],
     as: [
       { k: 'kind', label: 'A/S 형태', ph: '예: 추가공사, 하자보수' },
-      { k: 'asPeriod', label: 'A/S 기간', range: 1, s: 'asStart', e: 'asEnd', ph: ['시작일', '종료일'], bad: 'A/S 기간의 종료일이 시작일보다 빨라요.' },
+      { k: 'plan', label: 'A/S 예정일', date: 1 },
       { k: 'recv', label: '접수일', date: 1 },
       { k: 'contact', label: '발주처 담당자', ph: '이름 직함 (예: 홍길동 팀장)' },
       { k: 'phone', label: '연락처', tel: 1, ph: '1234-5678' },
       { k: 'req', label: '요청내용', multi: 1, req: 1, ph: '예: 업무석 확장, 회의실 신설' },
-      { k: 'plan', label: '작업예정일', date: 1 },
     ],
   };
   const mdDay = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${+m[2]}월 ${+m[3]}일` : String(s || ''); };
@@ -204,10 +203,9 @@
       const rows = [['발주처명', f.client], ['형태', f.type], ['위치(현장주소)', [f.address, f.addr2].filter(Boolean).join(' ')], ['평수', f.area], ['공사기간', f.period], ['발주처 담당자', who(f)], ['기타', f.etc]].filter((r) => r[1]);
       return rows.map((r, i) => `${i + 1}. ${r[0]} _ ${r[1]}`).join('\n');
     }
-    const rows = [['발주처명', siteName], ['A/S 형태', f.kind], ['A/S 기간', f.asPeriod], ['접수일', mdDay(f.recv)], ['발주처 담당자', who(f)]].filter((r) => r[1]);
+    const rows = [['발주처명', siteName], ['A/S 형태', f.kind], ['A/S 예정일', mdDay(f.plan)], ['접수일', mdDay(f.recv)], ['발주처 담당자', who(f)]].filter((r) => r[1]);
     let t = rows.map((r, i) => `${i + 1}.${r[0]} : ${r[1]}`).join('\n');
     if (f.req) t += (t ? '\n' : '') + '요청내용 :\n' + f.req;
-    if (f.plan) t += (t ? '\n' : '') + '작업예정일 : ' + mdDay(f.plan);
     return t;
   }
   const staffLabel = (m) => [m.name, m.rank].filter(Boolean).join(' ');
@@ -343,7 +341,7 @@
     const input = fW[btn.dataset.cal];
     const pad = (n) => String(n).padStart(2, '0');
     const today = WS.ymd(new Date());
-    const pair = { f_end: 'f_start', f_asEnd: 'f_asStart' }[btn.dataset.cal];
+    const pair = { f_end: 'f_start' }[btn.dataset.cal];
     let base = (input.value || (pair && fW[pair] && fW[pair].value) || today).slice(0, 7);
     calEl = document.createElement('div');
     calEl.className = 'bd-cal'; calEl.dataset.for = btn.dataset.cal;
@@ -488,7 +486,7 @@
     const f = p.form || {};
     const rows = p.cat === 'project'
       ? [['발주처명', esc(f.client)], ['형태', esc(f.type)], ['위치(현장주소)', [f.address ? `<a href="https://map.naver.com/p/search/${encodeURIComponent(f.address)}" target="_blank" rel="noopener">${esc(f.address)}</a>` : '', esc(f.addr2)].filter(Boolean).join(' ')], ['평수', esc(f.area)], ['공사기간', esc(f.period)], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['기타', esc(f.etc)]]
-      : [['발주처명', esc(p.siteName)], ['A/S 형태', esc(f.kind)], ['A/S 기간', esc(f.asPeriod)], ['접수일', esc(mdDay(f.recv))], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['요청내용', esc(f.req)], ['작업예정일', esc(mdDay(f.plan))]];
+      : [['발주처명', esc(p.siteName)], ['A/S 형태', esc(f.kind)], ['A/S 예정일', esc(mdDay(f.plan))], ['접수일', esc(mdDay(f.recv))], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['요청내용', esc(f.req)]];
     return `<dl class="bd-form">${rows.filter((r) => r[1]).map((r) => `<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('')}</dl>`;
   }
   function drawPost(p) {
