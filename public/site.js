@@ -41,7 +41,7 @@
         <i class="dot" style="background:${now && !t.done ? colorOf(tl, t) : '#c9c5b6'}"></i>
         ${edit ? `<input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공정 이름">` : `<span class="nmc">${esc(t.name)}</span>`}
         <span class="dd">${ds.length ? ds.length + '일' : '일정 없음'}</span>
-        ${edit ? `<span class="acts">${ds.length ? '<button type="button" data-clear title="일정 지우기" aria-label="일정 지우기">⊘</button>' : ''}<button type="button" data-mv="-1" ${i ? '' : 'disabled'} aria-label="위로">▲</button><button type="button" data-mv="1" ${i < tl.length - 1 ? '' : 'disabled'} aria-label="아래로">▼</button><button type="button" class="del" data-del aria-label="삭제">✕</button></span>` : ''}
+        ${edit ? `<span class="acts"><button type="button" data-mv="-1" ${i ? '' : 'disabled'} aria-label="위로">▲</button><button type="button" data-mv="1" ${i < tl.length - 1 ? '' : 'disabled'} aria-label="아래로">▼</button><button type="button" class="del" data-del aria-label="삭제">✕</button></span>` : ''}
       </li>`;
     }).join('');
     return `<div class="st-tp ${mobile ? 'st-mobonly card' : ''}"><h3>공정 <small>${edit ? (drag ? '캘린더 날짜로 끌어다 놓기' : '날짜를 눌러 그날 공정 고르기') : '보기만 (수정: 소장님·관리자)'}</small></h3>

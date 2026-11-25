@@ -137,11 +137,7 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await a.locator(`button.st-day[data-day="${plus(8)}"]`).click({ position: { x: 12, y: 10 } }); await a.waitForSelector('.st-daypop');
   await a.click(`.st-daypop [data-clear-t="${taId}"]`); await new Promise((r) => setTimeout(r, 600));
   log(!(await get(`site/p1/tasks/${taId}/start`)), '날짜 누른 목록의 "일정 지우기"');
-  // 왼쪽 목록의 ⊘ 버튼
-  await put(`site/p1/tasks/${taId}/start`, plus(8)); await put(`site/p1/tasks/${taId}/end`, plus(9));
-  await a.waitForSelector(`${li('타일')} [data-clear]`, { state: 'attached' });
-  await a.hover(li('타일')); await a.click(`${li('타일')} [data-clear]`); await new Promise((r) => setTimeout(r, 600));
-  log(!(await get(`site/p1/tasks/${taId}/start`)), '왼쪽 목록의 ⊘ (일정 지우기)');
+  log((await a.locator(`${li('타일')} [data-clear]`).count()) === 0, '왼쪽 목록에는 일정 지우기 버튼 없음');
   // 출근 (+ 새 글 알림 요청)
   let notifyReq = null;
   await a.route('**/push/notify', (r) => { notifyReq = r.request().postDataJSON(); r.fulfill({ status: 200, body: '{}' }); });
