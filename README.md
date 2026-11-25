@@ -41,7 +41,8 @@ public/
   auth.js            구글 로그인 + 회원 확인 (승인 대기, 초대 링크, 관리자 비밀번호, 카톡 안 브라우저 안내)
   band.html, band.js, band.css  Band 회사 게시판 (구글 로그인 회원만): 게시판 4개, 글·댓글·찾기, 현장 방(#site=), A/S 처리 상태.
                      Firebase board/posts (프로젝트 글 siteName = 현장, 다른 글 site/siteName, A/S asState), board/comments. 홈(portal.html)에 "Band 새 글" 카드
-                     자동 양식: 프로젝트·A/S 는 항목별 칸(form) → 지금 밴드 글 모양의 번호 줄 글(text)로 저장. A/S 현장 직접 입력, A/S 담당자 = 주간 스케줄 직원표(이름+직급, 여러 명)
+                     자동 양식: 프로젝트·A/S 는 항목별 칸(form) → 지금 밴드 글 모양의 번호 줄 글(text)로 저장. 날짜는 자체 달력(일요일·공휴일 빨강, 토요일 파랑, holidays.js),
+                     위치는 카카오 우편번호 검색(외부 스크립트, 누를 때만 불러옴). A/S 현장 직접 입력, A/S 담당자 = 주간 스케줄 직원표(팀별, 여러 명)
   members.html       회원 관리 (관리자: 승인/거절, 초대 링크, 이름 연결, 관리자 지정, 내보내기)
   ws.css, ws-common.js  워크스페이스 공통 (상단 탭, 휴대폰 아래 메뉴, 로그인, 일정 데이터, 구글 연동, TO DO 위젯, 확장 안내 띠)
   band-config.js     SB_BAND_API(밴드 중계 주소), SB_GOOGLE_LOGIN

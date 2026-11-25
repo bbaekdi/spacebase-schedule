@@ -178,43 +178,51 @@
     project: [
       { k: 'client', label: '발주처명', req: 1 },
       { k: 'type', label: '형태', ph: '예: 오피스, 카페, 병원' },
-      { k: 'address', label: '위치(현장주소)', ph: '예: ○○시 ○○구 ○○로 00, ○동 ○호' },
+      { k: 'address', label: '위치(현장주소)', addr: 1 },
+      { k: 'addr2', label: '상세주소', ph: '동·층·호수 (예: A동 305~308호)' },
       { k: 'area', label: '평수', ph: '예: 100평 (대략적)' },
-      { k: 'period', label: '공사기간', period: 1, ph: '예: 2027년 1월 6일 ~ 설날 전 입주 희망' },
+      { k: 'period', label: '공사기간', range: 1, s: 'start', e: 'end', ph: ['시작일', '준공일'], bad: '준공일이 시작일보다 빨라요.' },
       { k: 'contact', label: '발주처 담당자', ph: '이름 직함 (예: 홍길동 팀장)' },
       { k: 'phone', label: '연락처', tel: 1, ph: '010-0000-0000' },
       { k: 'etc', label: '기타', multi: 1, ph: '예: 예산 미정' },
     ],
     as: [
-      { k: 'kind', label: 'A/S 기간', ph: '예: 하자보수 기간, 추가공사' },
+      { k: 'kind', label: 'A/S 형태', ph: '예: 추가공사, 하자보수' },
+      { k: 'asPeriod', label: 'A/S 기간', range: 1, s: 'asStart', e: 'asEnd', ph: ['시작일', '종료일'], bad: 'A/S 기간의 종료일이 시작일보다 빨라요.' },
       { k: 'recv', label: '접수일', date: 1 },
       { k: 'contact', label: '발주처 담당자', ph: '이름 직함 (예: 홍길동 팀장)' },
       { k: 'phone', label: '연락처', tel: 1, ph: '010-0000-0000' },
       { k: 'req', label: '요청내용', multi: 1, req: 1, ph: '예: 업무석 확장, 회의실 신설' },
-      { k: 'plan', label: '작업예정일', ph: '예: 12월 둘째 주 / 빠른 진행 요청' },
+      { k: 'plan', label: '작업예정일', date: 1 },
     ],
   };
   const mdDay = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${+m[2]}월 ${+m[3]}일` : String(s || ''); };
-  const ymdKo = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[1]}년 ${+m[2]}월 ${+m[3]}일` : ''; };
   const who = (f) => [f.contact, f.phone].filter(Boolean).join(' ');
   // 번호 줄 모양 글 만들기 (찾기·목록·홈 카드에 쓰임)
   function compose(c, f, siteName) {
     if (c === 'project') {
-      const rows = [['발주처명', f.client], ['형태', f.type], ['위치(현장주소)', f.address], ['평수', f.area], ['공사기간', f.period], ['발주처 담당자', who(f)], ['기타', f.etc]].filter((r) => r[1]);
+      const rows = [['발주처명', f.client], ['형태', f.type], ['위치(현장주소)', [f.address, f.addr2].filter(Boolean).join(' ')], ['평수', f.area], ['공사기간', f.period], ['발주처 담당자', who(f)], ['기타', f.etc]].filter((r) => r[1]);
       return rows.map((r, i) => `${i + 1}. ${r[0]} _ ${r[1]}`).join('\n');
     }
-    const rows = [['발주처명', siteName], ['A/S 기간', f.kind], ['접수일', mdDay(f.recv)], ['발주처 담당자', who(f)]].filter((r) => r[1]);
+    const rows = [['발주처명', siteName], ['A/S 형태', f.kind], ['A/S 기간', f.asPeriod], ['접수일', mdDay(f.recv)], ['발주처 담당자', who(f)]].filter((r) => r[1]);
     let t = rows.map((r, i) => `${i + 1}.${r[0]} : ${r[1]}`).join('\n');
     if (f.req) t += (t ? '\n' : '') + '요청내용 :\n' + f.req;
-    if (f.plan) t += (t ? '\n' : '') + '작업예정일 : ' + f.plan;
+    if (f.plan) t += (t ? '\n' : '') + '작업예정일 : ' + mdDay(f.plan);
     return t;
   }
   const staffLabel = (m) => [m.name, m.rank].filter(Boolean).join(' ');
+  let teams = [];
   const ownersOf = (p) => String((p.asState && p.asState.owner) || '').split(',').map((s) => s.trim()).filter(Boolean);
   function ownerChips(sel, name) {
-    const all = [...new Set([...staff.map(staffLabel), ...sel])];
-    if (!all.length) return '<div class="bd-hint">주간 스케줄 직원표에 이름이 없어요.</div>';
-    return `<div class="bd-owners">${all.map((n) => `<label><input type="checkbox" name="${name}" value="${esc(n)}" ${sel.includes(n) ? 'checked' : ''}><span>${esc(n)}</span></label>`).join('')}</div>`;
+    if (!staff.length && !sel.length) return '<div class="bd-hint">주간 스케줄 직원표에 이름이 없어요.</div>';
+    // 주간 스케줄 직원표의 팀 순서대로 묶고, 팀이 없는 사람·직원표에 없는 이름은 맨 아래
+    const groups = teams.map((t) => ({ name: t.name, list: staff.filter((m) => m.teamId === t.id).map(staffLabel) }));
+    const inTeam = new Set(groups.flatMap((g) => g.list));
+    const rest = [...new Set([...staff.map(staffLabel).filter((n) => !inTeam.has(n)), ...sel.filter((n) => !staff.some((m) => staffLabel(m) === n))])];
+    if (rest.length) groups.push({ name: groups.length ? '기타' : '직원', list: rest });
+    const chip = (n) => `<label><input type="checkbox" name="${name}" value="${esc(n)}" ${sel.includes(n) ? 'checked' : ''}><span>${esc(n)}</span></label>`;
+    return `<div class="bd-ownbox">${groups.filter((g) => g.list.length).map((g) => `<div class="bd-team"><div class="bd-teamh">${esc(g.name)} <small>${g.list.length}명</small></div><div class="bd-owners">${g.list.map(chip).join('')}</div></div>`).join('')}</div>
+      <div class="bd-ownsel">${sel.length ? '고른 사람: ' + sel.map(esc).join(', ') : '아직 고르지 않았어요.'}</div>`;
   }
 
   const siteOptions = (cur, direct) => {
@@ -222,14 +230,17 @@
     return `<option value="">현장 고르기 (선택)</option>${list.map(([id, v]) => `<option value="${esc(id)}" ${id === cur ? 'selected' : ''}>${esc(v.siteName)}</option>`).join('')}${direct ? `<option value="__direct" ${cur === '__direct' ? 'selected' : ''}>✏️ 직접 입력</option>` : ''}`;
   };
   const useForm = (c) => !!FORMS[c] && (!editing || !!editing.form || editing.cat !== c);
-  const field = (d, val) => {
+  // 날짜 칸: 누르면 달력(일요일·공휴일 빨강, 토요일 파랑). 값은 숨은 칸에 YYYY-MM-DD 로.
+  const yy = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[1].slice(2)}년 ${m[2]}월 ${m[3]}일` : ''; };
+  const dateBtn = (nm, val, ph) => `<button type="button" class="bd-date ${val ? '' : 'empty'}" data-cal="${nm}" data-ph="${esc(ph)}">${val ? yy(val) : esc(ph)}</button><input type="hidden" name="${nm}" value="${esc(val || '')}">`;
+  const field = (d, val, f = {}) => {
     const v = esc(val || ''), nm = 'f_' + d.k, req = d.req ? ' <b>*</b>' : '';
     if (d.multi) return `<label class="bd-f"><span>${d.label}${req}</span><textarea name="${nm}" rows="3" maxlength="2000" placeholder="${esc(d.ph || '')}">${v}</textarea></label>`;
-    if (d.date) return `<label class="bd-f"><span>${d.label}</span><input type="date" name="${nm}" value="${v}"></label>`;
-    if (d.period) return `<label class="bd-f"><span>${d.label}</span><div class="bd-frow"><input name="${nm}" maxlength="200" placeholder="${esc(d.ph || '')}" value="${v}"><input type="date" name="f_periodStart" title="시작일 고르기"></div></label>`;
+    if (d.date) return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow">${dateBtn(nm, val, '날짜 고르기')}</div></div>`;
+    if (d.range) return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow bd-range">${dateBtn('f_' + d.s, f[d.s], d.ph[0])}<b>~</b>${dateBtn('f_' + d.e, f[d.e], d.ph[1])}</div>${f[d.k] && !f[d.s] && !f[d.e] ? `<small class="bd-hint">예전 입력: ${esc(f[d.k])} (날짜를 고르면 바뀌어요)</small><input type="hidden" name="f_${d.k}Old" value="${esc(f[d.k])}">` : ''}</div>`;
+    if (d.addr) return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow"><input name="${nm}" readonly placeholder="도로명주소 검색을 눌러 주세요" value="${v}"><button type="button" class="btn" data-addr>주소 검색</button></div><div class="bd-postcode hidden" id="postBox"></div></div>`;
     return `<label class="bd-f"><span>${d.label}${req}</span><input name="${nm}" ${d.tel ? 'type="tel" inputmode="tel"' : ''} maxlength="200" placeholder="${esc(d.ph || '')}" value="${v}"></label>`;
   };
-  let siteNameTouched = false;
   function writeExtras() {
     const c = (fW.querySelector('input[name=cat]:checked') || {}).value;
     const p = editing || {}, f = (editing && editing.cat === c && editing.form) || {};
@@ -237,9 +248,9 @@
     let h = '';
     if (c === 'project') {
       if (form) {
-        h += FORMS.project.slice(0, 2).map((d) => field(d, f[d.k])).join('');
-        h += `<label class="bd-f"><span>현장 이름 <b>*</b> <small>(발주처명 + 형태로 자동)</small></span><input name="siteName" maxlength="40" value="${esc(p.siteName || '')}"></label>`;
-        h += FORMS.project.slice(2).map((d) => field(d, f[d.k])).join('');
+        h += FORMS.project.slice(0, 2).map((d) => field(d, f[d.k], f)).join('');
+        h += `<label class="bd-f"><span>현장 이름 <b>*</b></span><input name="siteName" maxlength="40" placeholder="현장 방 이름 (예: ○○빌딩 3층 사무실)" value="${esc(p.siteName || '')}"></label>`;
+        h += FORMS.project.slice(2).map((d) => field(d, f[d.k], f)).join('');
       } else h += `<input name="siteName" maxlength="40" placeholder="현장 이름 (예: ○○빌딩 3층 사무실)" value="${esc(p.siteName || '')}">`;
       if (editing) h += `<label class="bd-check"><input type="checkbox" name="closed" ${p.closed ? 'checked' : ''}> 끝난 현장 (현장 고르기 목록에서 숨김)</label>`;
     } else if (c === 'photo' || c === 'as') {
@@ -255,19 +266,6 @@
     $('#wExtra').innerHTML = h;
     fW.text.classList.toggle('hidden', form);
     fW.text.placeholder = c === 'project' ? '어떤 프로젝트인지 써 주세요' : c === 'as' ? 'A/S 내용을 써 주세요' : '내용을 써 주세요';
-    // 현장 이름 자동 (발주처명 + 형태), 직접 고치면 그때부터는 자동으로 안 바꿈
-    const auto = () => [fW.f_client && fW.f_client.value.trim(), fW.f_type && fW.f_type.value.trim()].filter(Boolean).join(' ');
-    siteNameTouched = !!(editing && editing.siteName && editing.siteName !== auto());
-    if (fW.siteName && fW.f_client) {
-      fW.siteName.oninput = () => { siteNameTouched = true; };
-      const up = () => { if (!siteNameTouched) fW.siteName.value = auto().slice(0, 40); };
-      fW.f_client.oninput = up; fW.f_type.oninput = up;
-    }
-    if (fW.f_periodStart) fW.f_periodStart.onchange = () => {
-      const t = ymdKo(fW.f_periodStart.value); if (!t) return;
-      const cur = fW.f_period.value.trim();
-      fW.f_period.value = t + ' ~ ' + cur.replace(/^\d{4}년 \d+월 \d+일 ~ ?/, '');
-    };
     // A/S: 현장을 고르면 발주처 담당자·연락처를 프로젝트에서 채움 (비어 있을 때만), 직접 입력 칸 보이기
     if (c === 'as' && fW.site) fW.site.onchange = () => {
       fW.siteDirect.classList.toggle('hidden', fW.site.value !== '__direct');
@@ -292,6 +290,83 @@
     setTimeout(() => { const first = fW.querySelector('#wExtra input:not([type=hidden]):not(.hidden), #wExtra select'); (useForm((fW.querySelector('input[name=cat]:checked') || {}).value) && first ? first : fW.text).focus(); }, 30);
   }
   $('#wCats').onchange = writeExtras;
+  const ownSel = (root, name) => { const el = root.querySelector('.bd-ownsel'); if (!el) return; const v = [...root.querySelectorAll(`input[name=${name}]:checked`)].map((x) => x.value); el.textContent = v.length ? '고른 사람: ' + v.join(', ') : '아직 고르지 않았어요.'; };
+  $('#wExtra').addEventListener('change', (e) => { if (e.target.name === 'owner') ownSel($('#wExtra'), 'owner'); });
+  $('#wExtra').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cal]'); if (b) { e.preventDefault(); return openCal(b); }
+    const a = e.target.closest('[data-addr]'); if (a) { e.preventDefault(); return findAddress(); }
+    if (e.target.name === 'f_address' && !e.target.readOnly) return;
+    if (e.target.name === 'f_address') findAddress();
+  });
+
+  // ---------- 달력 (일요일·공휴일 빨강, 토요일 파랑) ----------
+  let calEl = null;
+  function closeCal() { if (calEl) { calEl.remove(); calEl = null; } }
+  function openCal(btn) {
+    if (calEl && calEl.dataset.for === btn.dataset.cal) return closeCal();
+    closeCal();
+    const input = fW[btn.dataset.cal];
+    const pad = (n) => String(n).padStart(2, '0');
+    const today = WS.ymd(new Date());
+    const pair = { f_end: 'f_start', f_asEnd: 'f_asStart' }[btn.dataset.cal];
+    let base = (input.value || (pair && fW[pair] && fW[pair].value) || today).slice(0, 7);
+    calEl = document.createElement('div');
+    calEl.className = 'bd-cal'; calEl.dataset.for = btn.dataset.cal;
+    const draw = () => {
+      const [y, m] = base.split('-').map(Number);
+      const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const H = window.SB_HOLIDAYS || {};
+      let cells = '';
+      for (let i = 0; i < first; i++) cells += '<span></span>';
+      for (let d = 1; d <= days; d++) {
+        const k = `${y}-${pad(m)}-${pad(d)}`, w = (first + d - 1) % 7, hol = H[k];
+        cells += `<button type="button" data-d="${k}" class="${w === 0 || hol ? 'red' : w === 6 ? 'blue' : ''} ${k === today ? 'today' : ''} ${k === input.value ? 'on' : ''}" ${hol ? `title="${esc(hol)}"` : ''}>${d}</button>`;
+      }
+      const hols = Object.keys(H).filter((k) => k.startsWith(base)).map((k) => `${+k.slice(8)}일 ${esc(H[k])}`);
+      calEl.innerHTML = `<div class="bd-calh"><button type="button" data-mv="-1" aria-label="이전 달">‹</button><b>${y}년 ${m}월</b><button type="button" data-mv="1" aria-label="다음 달">›</button></div>
+        <div class="bd-calg"><i class="red">일</i><i>월</i><i>화</i><i>수</i><i>목</i><i>금</i><i class="blue">토</i>${cells}</div>
+        ${hols.length ? `<div class="bd-calhol">${hols.join(' · ')}</div>` : ''}
+        <div class="bd-calf"><button type="button" data-clear>지우기</button><button type="button" data-today>오늘</button></div>`;
+    };
+    const set = (v) => { input.value = v; btn.textContent = v ? yy(v) : btn.dataset.ph; btn.classList.toggle('empty', !v); closeCal(); };
+    calEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.mv) { const [y, m] = base.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + +t.dataset.mv, 1)); base = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`; draw(); }
+      else if (t.dataset.d) set(t.dataset.d);
+      else if ('clear' in t.dataset) set('');
+      else if ('today' in t.dataset) set(today);
+    });
+    draw();
+    btn.closest('.bd-f').append(calEl);
+    calEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  dW.addEventListener('click', (e) => { if (calEl && !e.target.closest('.bd-cal') && !e.target.closest('[data-cal]')) closeCal(); });
+  dW.addEventListener('close', closeCal);
+
+  // ---------- 도로명주소 검색 (카카오 우편번호 서비스, 가입·열쇠 필요 없음) ----------
+  let postcodeLoad = null;
+  const loadPostcode = () => postcodeLoad || (postcodeLoad = window.daum && daum.Postcode ? Promise.resolve() : new Promise((ok, no) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+    sc.onload = ok; sc.onerror = () => { postcodeLoad = null; no(new Error('load')); };
+    document.head.append(sc);
+  }));
+  async function findAddress() {
+    const box = $('#postBox'), inp = fW.f_address; if (!box || !inp) return;
+    if (!box.classList.contains('hidden')) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    try { await loadPostcode(); }
+    catch { inp.readOnly = false; inp.placeholder = '주소 검색을 열지 못했어요. 직접 입력해 주세요'; inp.focus(); return; }
+    box.classList.remove('hidden'); box.innerHTML = '';
+    new daum.Postcode({
+      width: '100%', height: '100%',
+      oncomplete: (d) => {
+        inp.value = d.roadAddress || d.address || '';
+        box.classList.add('hidden'); box.innerHTML = '';
+        if (fW.f_addr2) { if (!fW.f_addr2.value && d.buildingName) fW.f_addr2.placeholder = d.buildingName + ' (동·층·호수)'; fW.f_addr2.focus(); }
+      },
+    }).embed(box);
+  }
   $('#write').onclick = () => openWrite();
   fW.onsubmit = async (e) => {
     e.preventDefault();
@@ -302,7 +377,15 @@
     let f = null;
     if (form) {
       f = {};
-      FORMS[c].forEach((d) => { const el = fW['f_' + d.k]; const val = el ? el.value.trim() : ''; if (val) f[d.k] = val; });
+      FORMS[c].forEach((d) => { if (d.range) return; const el = fW['f_' + d.k]; const val = el ? el.value.trim() : ''; if (val) f[d.k] = val; });
+      for (const d of FORMS[c].filter((x) => x.range)) {
+        const st = fW['f_' + d.s] ? fW['f_' + d.s].value : '', en = fW['f_' + d.e] ? fW['f_' + d.e].value : '';
+        if (st && en && en < st) return err(d.bad);
+        if (st) f[d.s] = st;
+        if (en) f[d.e] = en;
+        if (st || en) f[d.k] = `${yy(st)}~${yy(en)}`.replace(/^~/, '~ ');
+        else if (fW['f_' + d.k + 'Old']) f[d.k] = fW['f_' + d.k + 'Old'].value;
+      }
       const miss = FORMS[c].find((d) => d.req && !f[d.k]);
       if (miss) return err(miss.label + '을(를) 써 주세요.');
     }
@@ -363,8 +446,8 @@
   function formView(p) {
     const f = p.form || {};
     const rows = p.cat === 'project'
-      ? [['발주처명', esc(f.client)], ['형태', esc(f.type)], ['위치(현장주소)', f.address ? `<a href="https://map.naver.com/p/search/${encodeURIComponent(f.address)}" target="_blank" rel="noopener">${esc(f.address)}</a>` : ''], ['평수', esc(f.area)], ['공사기간', esc(f.period)], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['기타', esc(f.etc)]]
-      : [['발주처명', esc(p.siteName)], ['A/S 기간', esc(f.kind)], ['접수일', esc(mdDay(f.recv))], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['요청내용', esc(f.req)], ['작업예정일', esc(f.plan)]];
+      ? [['발주처명', esc(f.client)], ['형태', esc(f.type)], ['위치(현장주소)', [f.address ? `<a href="https://map.naver.com/p/search/${encodeURIComponent(f.address)}" target="_blank" rel="noopener">${esc(f.address)}</a>` : '', esc(f.addr2)].filter(Boolean).join(' ')], ['평수', esc(f.area)], ['공사기간', esc(f.period)], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['기타', esc(f.etc)]]
+      : [['발주처명', esc(p.siteName)], ['A/S 형태', esc(f.kind)], ['A/S 기간', esc(f.asPeriod)], ['접수일', esc(mdDay(f.recv))], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['요청내용', esc(f.req)], ['작업예정일', esc(mdDay(f.plan))]];
     return `<dl class="bd-form">${rows.filter((r) => r[1]).map((r) => `<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('')}</dl>`;
   }
   function drawPost(p) {
@@ -453,7 +536,10 @@
     $('#list').innerHTML = '<div class="bd-empty">불러오는 중…</div>';
     // A/S 담당자 목록 = 주간 스케줄 직원표 전 직원 (이름 + 직급)
     db.ref('spaces/' + a.spaceKey + '/data/members').once('value').then((s) => {
-      const v = s.val(); staff = (Array.isArray(v) ? v : Object.values(v || {})).filter((m) => m && m.name).map((m) => ({ name: String(m.name).trim(), rank: String(m.rank || '').trim() }));
+      const v = s.val(); staff = (Array.isArray(v) ? v : Object.values(v || {})).filter((m) => m && m.name).map((m) => ({ name: String(m.name).trim(), rank: String(m.rank || '').trim(), teamId: m.teamId || '' }));
+    }).catch(() => {});
+    db.ref('spaces/' + a.spaceKey + '/data/mteams').once('value').then((s) => {
+      const v = s.val(); teams = (Array.isArray(v) ? v : Object.values(v || {})).filter((t) => t && t.name);
     }).catch(() => {});
     listenProjects();
     listen();
