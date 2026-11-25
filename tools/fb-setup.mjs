@@ -28,7 +28,8 @@ console.log('--- 바꾸기 전 규칙 ---\n' + beforeText);
 // 우리가 모르는 자리에 대한 규칙이 있으면 멈춤 (그 자리를 못 쓰게 될 수 있으므로)
 try {
   const keys = Object.keys(JSON.parse(beforeText.replace(/^\s*\/\/.*$/gm, '')).rules || {});
-  const unknown = keys.filter((k) => !['spaces', 'ws'].includes(k));
+  const known = Object.keys(JSON.parse(readFileSync(new URL('../firebase/database.rules.json', import.meta.url), 'utf8')).rules);
+  const unknown = keys.filter((k) => !known.includes(k));
   if (unknown.length) { console.error('지금 규칙에 새 규칙 파일에 없는 자리가 있어 멈춥니다: ' + unknown.join(', ')); process.exit(1); }
 } catch (e) { console.error('지금 규칙을 해석하지 못해 멈춥니다: ' + e.message); process.exit(1); }
 
