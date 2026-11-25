@@ -108,20 +108,29 @@
     if (fbData) return location.reload(); // 이미 연결된 상태에서 이름/비밀번호를 바꾼 경우
     connectCloud();
   });
+  // 웹사이트에서 구글 로그인(auth.js)을 켜면 회원만 들어온다. 데스크톱 앱(file:)은 예전처럼 회사 비밀번호.
+  const GOOGLE = () => !!(window.SBAuth && SBAuth.enabled());
   async function connectCloud() {
-    const cred = getCred();
-    if (!cred) return showGate();
+    let cred = null, key, auth = null;
+    if (GOOGLE()) {
+      auth = await SBAuth.start();
+      key = auth.spaceKey;
+    } else {
+      cred = getCred();
+      if (!cred) return showGate();
+    }
     if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
     const fdb = firebase.database();
-    const key = await sha256hex('spacebase:' + cred.code);
+    if (!auth) key = await sha256hex('spacebase:' + cred.code);
     fbSpace = fdb.ref('spaces/' + key);
     fbData = fbSpace.child('data');
-    me = { id: 'n:' + cred.name, name: cred.name };
+    me = auth ? { id: 'u:' + auth.uid, name: auth.name } : { id: 'n:' + cred.name, name: cred.name };
     $('#me').textContent = me.name + ' 님';
-    $('#logoutLink').textContent = '이름 바꾸기';
+    $('#logoutLink').textContent = auth ? '로그아웃' : '이름 바꾸기';
     fdb.ref('.info/connected').on('value', (s) => setStatus(s.val() ? '실시간 연결됨' : '연결 끊김 · 다시 연결 중…', s.val() ? 'ok' : 'bad'));
     let snap;
     try { snap = await fbData.once('value'); } catch (e) { setStatus('연결 실패', 'bad'); showGate('저장소에 연결하지 못했어요. 인터넷 연결을 확인해 주세요. (' + e.message + ')'); return; }
+    if (!snap.exists() && auth) { setStatus('연결 실패', 'bad'); toast('주간 스케줄을 찾지 못했어요. 관리자에게 알려 주세요.'); return; }
     if (!snap.exists()) {
       // 처음 쓰는 회사 비밀번호: 이 PC에 예전(회사 PC 서버) 데이터가 있으면 그것으로, 없으면 빈 양식으로 시작
       let legacy = null;
@@ -181,6 +190,7 @@
       $('#backupLink').addEventListener('click', (e) => { e.preventDefault(); if (db) downloadBackup(); });
       $('#logoutLink').addEventListener('click', (e) => {
         e.preventDefault();
+        if (GOOGLE()) { if (confirm('이 기기에서 로그아웃할까요?')) SBAuth.signOut(); return; }
         const c = getCred(); if (!c) return;
         $('#gateCode').value = c.code;
         showGate();

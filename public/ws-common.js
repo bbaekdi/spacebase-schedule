@@ -86,7 +86,9 @@
 
   // ---------- 클라우드 방식 (Firebase) ----------
   // 주간 스케줄(app.js)과 같은 저장 위치·같은 로그인 정보(localStorage sb_cred)를 쓴다.
-  const getCred = () => { try { const c = JSON.parse(localStorage.getItem('sb_cred') || 'null'); return c && c.code && c.name ? c : null; } catch { return null; } };
+  // 구글 로그인(auth.js)을 쓰면 회사 비밀번호 대신 회원 정보로 이름을 정한다.
+  let authCred = null;
+  const getCred = () => { if (authCred) return authCred; try { const c = JSON.parse(localStorage.getItem('sb_cred') || 'null'); return c && c.code && c.name ? c : null; } catch { return null; } };
   const setCred = (c) => { try { localStorage.setItem('sb_cred', JSON.stringify(c)); } catch {} };
   async function sha256hex(s) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -254,6 +256,13 @@
   const cloudBackend = {
     mode: 'cloud',
     async start() {
+      if (window.SBAuth && SBAuth.enabled()) {
+        const a = await SBAuth.start();
+        authCred = cred = { name: a.name, code: '' };
+        space = firebase.database().ref('spaces/' + a.spaceKey);
+        gClaimPending();
+        return { id: 'u:' + a.uid, name: a.name, admin: a.admin, google: true };
+      }
       cred = getCred();
       if (!cred) cred = await askCred();
       if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
@@ -343,8 +352,10 @@
     if (be.mode === 'cloud') {
       document.getElementById('wsLogout').addEventListener('click', (e) => {
         e.preventDefault();
-        if (!confirm('이 기기에서 로그아웃할까요? 다음에 회사 비밀번호와 이름을 다시 입력해야 해요.')) return;
+        const g = window.SBAuth && SBAuth.enabled();
+        if (!confirm(g ? '이 기기에서 로그아웃할까요? 다음에 구글로 다시 로그인하면 돼요.' : '이 기기에서 로그아웃할까요? 다음에 회사 비밀번호와 이름을 다시 입력해야 해요.')) return;
         try { localStorage.removeItem(gcalKey()); localStorage.removeItem('sb_google:' + myName()); localStorage.removeItem('sb_gsel:' + myName()); localStorage.removeItem('sb_cred'); } catch {}
+        if (g) return SBAuth.signOut();
         location.reload();
       });
     }
@@ -359,6 +370,11 @@
     };
     const user = await be.start();
     if (user) document.getElementById('wsName').textContent = user.name + ' 님';
+    // 관리자에게만 "회원 관리" 링크
+    if (user && user.admin) {
+      const a = document.createElement('a'); a.href = 'members.html'; a.id = 'wsMembers'; a.textContent = '회원 관리';
+      document.getElementById('wsLogout').before(a);
+    }
     return { ...be, user };
   })();
   data.catch((e) => console.error(e));

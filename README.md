@@ -9,7 +9,9 @@ PC, 태블릿, 휴대폰에서 같은 주소로 쓰고, 여러 직원이 동시�
 - 사이트: https://bbaekdi.github.io/spacebase-schedule/ (GitHub Pages + Firebase, 켜 둘 회사 PC 필요 없음)
   - 홈 `/` (`public/portal.html`), 주간 스케줄 `schedule.html` (원본 `public/index.html`), 캘린더 `calendar.html`
   - 팀원용 안내서 `guide.html`, 확장 설치 안내 `band-extension.html`, 개인정보 처리방침 `privacy.html`
-- 로그인: **회사 비밀번호 + 이름** (localStorage `sb_cred` 에 기억). 비밀번호를 아는 사람만 볼 수 있다.
+- 로그인: 지금은 **회사 비밀번호 + 이름** (localStorage `sb_cred` 에 기억).
+  - 새 방식(시험 중): **구글 로그인 + 관리자가 받아 준 사람만** (`public/auth.js`, 회원 관리 `members.html`). 전 직원 초대 뒤 `auth.js` 의 `SB_GOOGLE_AUTH = true` 로 켠다. 시험은 주소 뒤 `?login=google` (끄기 `?login=password`), 초대 링크 `?invite=코드` 로 열면 자동으로 켜짐.
+  - 데스크톱 앱(file:)은 계속 회사 비밀번호 (나중에 안 쓸 예정).
 - 지금 직원들은 주로 **설치한 데스크톱 앱**으로 주간 스케줄을 열고, 앞으로 **웹사이트로 옮길 예정** (`Doc/Todo`).
 - 별도 프로그램: 회사 공유 폴더에 있던 데스크톱 앱 **"회사 밴드 캘린더"**(다른 사람이 만든 것, 코드는 이 저장소에 없음)를 아직 쓰고 있다. 그 기능(밴드 게시글 수집, 사진 글자 인식 등)을 웹으로 옮기는 것이 할 일에 있다.
 
@@ -36,6 +38,8 @@ public/
   default-data.js, holidays.js
   portal.html        홈
   calendar.html      회사 캘린더
+  auth.js            구글 로그인 + 회원 확인 (승인 대기, 초대 링크, 관리자 비밀번호, 카톡 안 브라우저 안내)
+  members.html       회원 관리 (관리자: 승인/거절, 초대 링크, 이름 연결, 관리자 지정, 내보내기)
   ws.css, ws-common.js  워크스페이스 공통 (상단 탭, 휴대폰 아래 메뉴, 로그인, 일정 데이터, 구글 연동, TO DO 위젯, 확장 안내 띠)
   band-config.js     SB_BAND_API(밴드 중계 주소), SB_GOOGLE_LOGIN
   mail-config.js     SB_MAIL_API (비어 있음 → 메일 카드 숨김)
@@ -44,6 +48,9 @@ desktop/             Electron (main.js, preload.js, preview.html=인쇄 미리�
 worker/              band-relay.js, google.js, naverworks-mail.js (+ band.toml, wrangler.toml)
 extension/           band-fill.js, bandform.js, site-bridge.js
 tools/sync-band.js   예비 밴드 동기화 (band-calendar.yml)
+firebase/            Firebase 규칙(database.rules.json) + 규칙 시험(rules.test.mjs). firebase-rules.yml 이 실제 Firebase 에 올림
+tools/test-rules.sh  규칙 시험 (연습용 Firebase), tools/fb-setup.mjs 규칙 올리기·회원 설정 (Actions 전용)
+tools/test/          화면 시험 (연습용 Firebase + 브라우저): emu-seed.mjs, e2e-auth.cjs
 tools/check.sh       배포 전 검토 (JS 문법, 비밀 값 의심 문자열, 버전↔릴리즈 노트)
 RELEASE-NOTES.md     바뀐 내용 기록 (최신이 위)
 build/               installer.nsi, release.sh, seticon.mjs
@@ -53,7 +60,8 @@ Doc/                 기획서·계획 일정표 (Todo / Doing / Done, 기획서
 
 ### 클라우드 모드 (실사용, Firebase)
 - 데이터 경로: `spaces/<sha256('spacebase:'+비밀번호)>/data`. 캘린더 `spaces/<해시>/calendar/items`, 밴드 일정 `spaces/<해시>/band`.
-- Firebase 규칙: `{"rules":{"spaces":{"$k":{".read":"$k.length===64",".write":"$k.length===64"}}}}`
+- Firebase 규칙: `firebase/database.rules.json` (저장소에서 관리, `firebase-rules.yml` 이 시험 통과 후 자동 반영). `spaces/$k` 는 데스크톱 앱 때문에 아직 열려 있음(전환 뒤 잠금).
+- 회원(구글 로그인): `ws/members/<uid>` {name, email, joinedAt, via}, `ws/admins/<uid>`, `ws/pending/<uid>`(가입 신청), `ws/invites/<코드>` {name, expires, usedBy}, `ws/config/space`(회원에게만 알려 주는 스케줄 자리), `ws/adminKeys`(관리자 비밀번호 해시, 아무도 못 읽음).
 - 메모는 키별로 저장(`memo/<k>`), 실제로 타이핑했을 때만(`_dirty`), 값이 그대로면 저장 안 함(`_orig`).
 - 데스크톱 앱은 `firebase-config.js` 에 apiKey 가 있으면 `public/index.html` 을 로컬(file:)로 띄우고 바로 Firebase 에 저장한다. 예전 서버 PC 데이터(db.json)는 첫 실행 때 옮겨 온다.
 - 웹사이트로 열면 `index.html` 이 홈·캘린더와 같은 상단 메뉴(`.wsnav`)를 붙인다. 데스크톱 앱(file:)에서는 안 붙임.
@@ -92,10 +100,11 @@ Doc/                 기획서·계획 일정표 (Todo / Doing / Done, 기획서
 - sbe-mail: https://sbe-mail.smbaek-1c4.workers.dev (`naverworks-mail.js`, `wrangler.toml`, `mail-worker.yml`), 콜백 `/callback`.
 
 ## 4. GitHub Secrets (이름만)
-BAND_ICAL_URL, SB_CODE, BAND_URL, BAND2_URL, BAND3_URL, CF_API_TOKEN, CF_ACCOUNT_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET. (아직 없음: NW_CLIENT_ID, NW_CLIENT_SECRET)
+BAND_ICAL_URL, SB_CODE, BAND_URL, BAND2_URL, BAND3_URL, CF_API_TOKEN, CF_ACCOUNT_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, FIREBASE_SERVICE_ACCOUNT, ADMIN_CODE. (아직 없음: NW_CLIENT_ID, NW_CLIENT_SECRET)
 
 ## 5. 배포
 - 웹사이트: main 에 푸시 → `pages.yml` 이 `public` → `_site` (index↔portal 바꿈, 확장 zip, 파일 주소 뒤 `?v=<커밋>`) 후 Pages 배포. build/deploy 두 작업으로 나눠 둘 것.
+- Firebase 규칙: `firebase/**` 가 바뀌면 `firebase-rules.yml` 이 연습용 Firebase 에서 시험 → 통과하면 실제 Firebase 에 반영 (바꾸기 전 규칙은 Actions 기록에 남김).
 - 중계: `worker/**` 가 바뀌면 `band-worker.yml` / `mail-worker.yml` 이 배포.
 - 데스크톱 앱: `package.json` 의 `version` 을 올려 main 에 푸시 → `release.yml`(Windows 러너)이 Release `vX.Y.Z` 생성(같은 버전 있으면 건너뜀) → 앱이 "지금 업데이트 / 나중에"를 묻는다.
   - 리눅스 로컬 빌드: `build/release.sh` (`electron-builder --win dir` + `build/seticon.mjs` + 리눅스 makensis, `-INPUTCHARSET UTF8`). wine 불필요.

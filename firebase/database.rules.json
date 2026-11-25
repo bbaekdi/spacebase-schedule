@@ -1,0 +1,59 @@
+{
+  "rules": {
+    "spaces": {
+      "$k": {
+        ".read": "$k.length === 64",
+        ".write": "$k.length === 64"
+      }
+    },
+    "ws": {
+      "config": {
+        ".read": "auth != null && root.child('ws/members').child(auth.uid).exists()",
+        ".write": false
+      },
+      "adminKeys": {
+        ".read": false,
+        ".write": false
+      },
+      "adminTry": {
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isString() && newData.val().length === 64"
+        }
+      },
+      "admins": {
+        ".read": "auth != null && root.child('ws/members').child(auth.uid).exists()",
+        "$uid": {
+          ".write": "auth != null && (root.child('ws/admins').child(auth.uid).val() === true || (auth.uid === $uid && newData.val() === true && newData.parent().parent().child('adminTry').child($uid).isString() && root.child('ws/adminKeys').child(newData.parent().parent().child('adminTry').child($uid).val()).exists()))",
+          ".validate": "newData.val() === true"
+        }
+      },
+      "members": {
+        ".read": "auth != null && root.child('ws/members').child(auth.uid).exists()",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (root.child('ws/admins').child(auth.uid).val() === true || (auth.uid === $uid && !data.exists() && ((newData.child('invite').isString() && root.child('ws/invites').child(newData.child('invite').val()).child('name').isString() && !root.child('ws/invites').child(newData.child('invite').val()).child('usedBy').exists() && root.child('ws/invites').child(newData.child('invite').val()).child('expires').val() > now && newData.parent().parent().child('invites').child(newData.child('invite').val()).child('usedBy').val() === auth.uid && newData.child('name').val() === root.child('ws/invites').child(newData.child('invite').val()).child('name').val()) || (newData.parent().parent().child('admins').child($uid).val() === true && newData.parent().parent().child('adminTry').child($uid).isString() && root.child('ws/adminKeys').child(newData.parent().parent().child('adminTry').child($uid).val()).exists()))))",
+          ".validate": "newData.hasChildren(['name', 'email']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 20"
+        }
+      },
+      "invites": {
+        ".read": "auth != null && root.child('ws/admins').child(auth.uid).val() === true",
+        "$code": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('ws/admins').child(auth.uid).val() === true",
+          ".validate": "$code.length >= 20 && $code.length <= 40",
+          "usedBy": {
+            ".write": "auth != null && !data.exists() && newData.val() === auth.uid && newData.parent().parent().parent().child('members').child(auth.uid).child('invite').val() === $code"
+          }
+        }
+      },
+      "pending": {
+        ".read": "auth != null && root.child('ws/admins').child(auth.uid).val() === true",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (root.child('ws/admins').child(auth.uid).val() === true || (auth.uid === $uid && !root.child('ws/members').child($uid).exists()))"
+        }
+      }
+    }
+  }
+}

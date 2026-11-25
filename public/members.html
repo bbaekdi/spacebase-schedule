@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>회원 관리 · SPACEBASE</title>
+<link rel="stylesheet" href="ws.css">
+<style>
+  .mem { max-width: 860px; }
+  .mem h1 { font-size: 20px; margin: 0 0 6px; }
+  .mem .card + .card { margin-top: 14px; }
+  .mem table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .mem th, .mem td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .mem th { font-size: 12px; color: #888; font-weight: 600; }
+  .mem td.act { text-align: right; white-space: nowrap; }
+  .mem td.act .btn { padding: 5px 10px; font-size: 13px; margin-left: 4px; }
+  .mem .badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: #f1bf52; color: #1d1d1b; margin-left: 6px; vertical-align: 1px; }
+  .mem .badge.gray { background: #e8e8e8; color: #666; }
+  .mem .sub { color: #888; font-size: 12px; }
+  .mem select, .mem input[type=text], .mem input[type=password] { border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; font-size: 14px; max-width: 100%; }
+  .mem .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .mem .link { word-break: break-all; background: var(--bg); border: 1px dashed var(--line); border-radius: 8px; padding: 10px; margin-top: 10px; font-size: 13px; }
+  .mem .msg { color: #c62828; font-size: 13px; min-height: 18px; margin-top: 8px; }
+  .mem .empty { color: #999; font-size: 14px; padding: 8px 0; }
+  @media (max-width: 640px) {
+    .mem thead { display: none; }
+    .mem tr { display: block; border-bottom: 1px solid var(--line); padding: 8px 0; }
+    .mem td { display: block; border: 0; padding: 3px 0; }
+    .mem td.act { text-align: left; padding-top: 6px; }
+    .mem td.act .btn { margin: 0 6px 0 0; }
+  }
+</style>
+</head>
+<body data-page="members">
+  <main class="wrap mem" id="root">
+    <section class="card"><h1>회원 관리</h1><p class="note">불러오는 중…</p></section>
+  </main>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-database-compat.js"></script>
+<script src="vendor/firebase-auth-compat.js"></script>
+<script src="auth.js"></script>
+<script src="firebase-config.js"></script>
+<script src="ws-common.js"></script>
+<script>
+(async function () {
+  const root = document.getElementById('root');
+  const esc = WS.esc;
+  const day = (t) => (t ? new Date(t).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }) : '');
+  if (!window.SBAuth || !SBAuth.enabled()) {
+    root.innerHTML = `<section class="card"><h1>회원 관리</h1>
+      <p class="note">회원 관리는 구글 로그인을 켰을 때 쓸 수 있어요. (지금은 시험 중)</p>
+      <p><a class="btn primary" href="members.html?login=google">구글 로그인으로 시험하기</a></p></section>`;
+    return;
+  }
+  const me = await SBAuth.start();
+  const db = firebase.database(), ws = db.ref('ws');
+
+  if (!me.admin) {
+    root.innerHTML = `<section class="card"><h1>회원 관리</h1>
+      <p class="note">관리자만 볼 수 있어요. 관리자 비밀번호가 있으면 아래에 넣어 주세요.</p>
+      <form class="row" id="beAdmin"><input type="password" name="pw" placeholder="관리자 비밀번호"><button class="btn primary">관리자 되기</button></form>
+      <div class="msg"></div></section>`;
+    const f = document.getElementById('beAdmin');
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const key = await SBAuth.sha256hex('spacebase-admin:' + f.pw.value);
+      try { await ws.update({ ['adminTry/' + me.uid]: key, ['admins/' + me.uid]: true }); location.reload(); }
+      catch { root.querySelector('.msg').textContent = '관리자 비밀번호가 맞지 않아요.'; }
+    };
+    return;
+  }
+
+  // 주간 스케줄 직원표의 이름 목록 (이름 연결용)
+  const staffSnap = await db.ref('spaces/' + me.spaceKey + '/data/members').once('value');
+  const staff = (Array.isArray(staffSnap.val()) ? staffSnap.val() : Object.values(staffSnap.val() || {})).filter((m) => m && m.name).map((m) => String(m.name).trim());
+  const nameSelect = (cur, cls) => `<select class="${cls}"><option value="">이름 고르기</option>${[...new Set([...staff, ...(cur && !staff.includes(cur) ? [cur] : [])])].map((n) => `<option ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('')}<option value="__other">직접 입력…</option></select>`;
+  const pickName = (sel) => {
+    if (sel.value !== '__other') return sel.value;
+    const v = (prompt('이름을 입력해 주세요 (20자까지)') || '').trim().slice(0, 20);
+    return v;
+  };
+
+  root.innerHTML = `
+    <section class="card"><h1>회원 관리</h1>
+      <p class="note">관리자가 받아 준 사람만 사이트에 들어올 수 있어요. 들어오는 방법은 두 가지예요:
+      <b>① 초대 링크</b>(1명용, 7일) · <b>② 가입 신청</b>(구글로 로그인하면 아래 "승인 대기"에 나타나요).</p></section>
+    <section class="card"><h2>승인 대기</h2><div id="pend"></div></section>
+    <section class="card"><h2>초대 링크 만들기</h2>
+      <p class="note">초대할 사람의 이름을 고르고 링크를 만들어 카톡 등으로 보내 주세요. 링크는 <b>한 사람만, 7일 동안</b> 쓸 수 있어요.</p>
+      <div class="row">${nameSelect('', 'invName')}<button class="btn primary" id="mkInv">초대 링크 만들기</button></div>
+      <div id="newInv"></div><div class="msg" id="invMsg"></div>
+      <h3 style="margin-top:18px;font-size:15px">만든 초대 링크</h3><div id="invs"></div></section>
+    <section class="card"><h2>회원 목록</h2><div id="mems"></div><div class="msg" id="memMsg"></div></section>`;
+
+  const fail = (el) => (e) => { document.getElementById(el).textContent = '실패했어요: ' + (e && e.message || e); };
+
+  // 승인 대기
+  ws.child('pending').on('value', (s) => {
+    const list = Object.entries(s.val() || {}).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+    const el = document.getElementById('pend');
+    if (!list.length) { el.innerHTML = '<div class="empty">기다리는 사람이 없어요.</div>'; return; }
+    el.innerHTML = `<table><thead><tr><th>구글 이름 / 메일</th><th>신청일</th><th>연결할 이름</th><th></th></tr></thead><tbody>${list.map(([uid, p]) => `
+      <tr data-uid="${esc(uid)}"><td>${esc(p.gname || '')}<div class="sub">${esc(p.email || '')}</div></td><td class="sub">${day(p.at)}</td>
+      <td>${nameSelect('', 'pName')}</td>
+      <td class="act"><button class="btn primary" data-a="ok">승인</button><button class="btn" data-a="no">거절</button></td></tr>`).join('')}</tbody></table>`;
+    el.querySelectorAll('tr[data-uid]').forEach((tr) => {
+      const uid = tr.dataset.uid, p = (s.val() || {})[uid];
+      tr.querySelector('[data-a=ok]').onclick = () => {
+        const name = pickName(tr.querySelector('.pName'));
+        if (!name) return alert('연결할 이름을 골라 주세요.');
+        ws.update({ ['members/' + uid]: { name, email: p.email || '', joinedAt: Date.now(), via: 'approve', by: me.name }, ['pending/' + uid]: null }).catch(fail('memMsg'));
+      };
+      tr.querySelector('[data-a=no]').onclick = () => { if (confirm((p.email || '') + ' 의 가입 신청을 거절할까요?')) ws.child('pending/' + uid).remove().catch(fail('memMsg')); };
+    });
+  });
+
+  // 초대 링크
+  const base = location.href.replace(/members\.html.*$/, '');
+  const linkOf = (code) => base + '?invite=' + code;
+  function newCode() {
+    const b = crypto.getRandomValues(new Uint8Array(18));
+    return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_');
+  }
+  document.getElementById('mkInv').onclick = async () => {
+    const name = pickName(root.querySelector('.invName'));
+    if (!name) { document.getElementById('invMsg').textContent = '초대할 사람의 이름을 골라 주세요.'; return; }
+    const code = newCode();
+    try {
+      await ws.child('invites/' + code).set({ name, expires: Date.now() + 7 * 864e5, by: me.name, at: Date.now() });
+      document.getElementById('invMsg').textContent = '';
+      const link = linkOf(code);
+      document.getElementById('newInv').innerHTML = `<div class="link"><b>${esc(name)}</b> 님 초대 링크 (7일)<br>${esc(link)}</div>
+        <div class="row"><button class="btn primary" id="cp">링크 복사</button>${navigator.share ? '<button class="btn" id="sh">카톡 등으로 보내기</button>' : ''}</div>`;
+      document.getElementById('cp').onclick = async () => { try { await navigator.clipboard.writeText(link); alert('복사했어요. 카톡에 붙여넣어 보내 주세요.'); } catch { prompt('이 링크를 복사해 주세요', link); } };
+      const sh = document.getElementById('sh');
+      if (sh) sh.onclick = () => navigator.share({ title: 'SPACEBASE 초대', text: name + ' 님, SPACEBASE 워크스페이스 초대 링크예요. (7일 안에 열어 주세요)', url: link }).catch(() => {});
+    } catch (e) { fail('invMsg')(e); }
+  };
+  ws.child('invites').on('value', (s) => {
+    const now = Date.now();
+    const list = Object.entries(s.val() || {}).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+    const el = document.getElementById('invs');
+    if (!list.length) { el.innerHTML = '<div class="empty">아직 없어요.</div>'; return; }
+    el.innerHTML = `<table><thead><tr><th>이름</th><th>상태</th><th>만든 사람</th><th></th></tr></thead><tbody>${list.map(([code, v]) => {
+      const st = v.usedBy ? '<span class="badge gray">사용됨</span>' : v.expires < now ? '<span class="badge gray">기한 지남</span>' : `<span class="badge">${Math.ceil((v.expires - now) / 864e5)}일 남음</span>`;
+      const live = !v.usedBy && v.expires >= now;
+      return `<tr data-code="${esc(code)}"><td>${esc(v.name)}</td><td>${st}</td><td class="sub">${esc(v.by || '')} · ${day(v.at)}</td>
+        <td class="act">${live ? '<button class="btn" data-a="cp">링크 복사</button>' : ''}<button class="btn" data-a="del">${live ? '취소' : '지우기'}</button></td></tr>`;
+    }).join('')}</tbody></table>`;
+    el.querySelectorAll('tr[data-code]').forEach((tr) => {
+      const code = tr.dataset.code;
+      const cp = tr.querySelector('[data-a=cp]');
+      if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(linkOf(code)); cp.textContent = '복사됨'; } catch { prompt('이 링크를 복사해 주세요', linkOf(code)); } };
+      tr.querySelector('[data-a=del]').onclick = () => ws.child('invites/' + code).remove().catch(fail('invMsg'));
+    });
+  });
+
+  // 회원 목록
+  let admins = {};
+  function drawMembers(members) {
+    const list = Object.entries(members || {}).sort((a, b) => String(a[1].name).localeCompare(String(b[1].name), 'ko'));
+    const el = document.getElementById('mems');
+    el.innerHTML = `<table><thead><tr><th>이름</th><th>구글 메일</th><th>가입일</th><th></th></tr></thead><tbody>${list.map(([uid, m]) => `
+      <tr data-uid="${esc(uid)}"><td>${esc(m.name)}${admins[uid] ? '<span class="badge">관리자</span>' : ''}${uid === me.uid ? '<span class="badge gray">나</span>' : ''}${staff.includes(m.name) ? '' : '<div class="sub">직원표에 없는 이름</div>'}</td>
+      <td class="sub">${esc(m.email || '')}</td><td class="sub">${day(m.joinedAt)}</td>
+      <td class="act"><button class="btn" data-a="name">이름 바꾸기</button>${uid === me.uid ? '' : `<button class="btn" data-a="adm">${admins[uid] ? '관리자 해제' : '관리자로'}</button><button class="btn" data-a="out">내보내기</button>`}</td></tr>`).join('')}</tbody></table>`;
+    el.querySelectorAll('tr[data-uid]').forEach((tr) => {
+      const uid = tr.dataset.uid, m = members[uid];
+      tr.querySelector('[data-a=name]').onclick = () => {
+        const v = (prompt('새 이름 (주간 스케줄 직원표와 같게)\n직원표: ' + staff.join(', '), m.name) || '').trim().slice(0, 20);
+        if (v && v !== m.name) ws.child('members/' + uid + '/name').set(v).catch(fail('memMsg'));
+      };
+      const adm = tr.querySelector('[data-a=adm]');
+      if (adm) adm.onclick = () => {
+        if (!confirm(m.name + ' 님을 ' + (admins[uid] ? '관리자에서 해제할까요?' : '관리자로 만들까요?'))) return;
+        (admins[uid] ? ws.child('admins/' + uid).remove() : ws.child('admins/' + uid).set(true)).catch(fail('memMsg'));
+      };
+      const out = tr.querySelector('[data-a=out]');
+      if (out) out.onclick = () => {
+        if (!confirm(m.name + ' 님을 내보낼까요?\n바로 사이트에 못 들어오게 돼요. 쓴 글은 그대로 남아요.')) return;
+        ws.update({ ['members/' + uid]: null, ['admins/' + uid]: null }).catch(fail('memMsg'));
+      };
+    });
+  }
+  let lastMembers = {};
+  ws.child('admins').on('value', (s) => { admins = s.val() || {}; drawMembers(lastMembers); });
+  ws.child('members').on('value', (s) => { lastMembers = s.val() || {}; drawMembers(lastMembers); });
+})();
+</script>
+</body>
+</html>

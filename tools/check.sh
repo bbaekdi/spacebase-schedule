@@ -11,11 +11,12 @@ done < <(git ls-files '*.js' '*.mjs' | grep -v '^public/vendor/')
 [ $fail = 0 ] && echo "  OK"
 
 echo "[2] 비밀 값 의심 문자열 (바뀐 파일만)"
-files=$( { git diff --name-only HEAD; git diff --name-only --cached; git ls-files --others --exclude-standard; } | sort -u | grep -v '^tools/check.sh$')
+# 외부에서 받은 라이브러리(public/vendor)는 검사하지 않는다
+files=$( { git diff --name-only HEAD; git diff --name-only --cached; git ls-files --others --exclude-standard; } | sort -u | grep -v '^tools/check.sh$' | grep -v '^public/vendor/')
 hits=""
 for f in $files; do
   [ -f "$f" ] || continue
-  h=$(grep -nEi 'webcal://|calendar\.google\.com/calendar/ical/.+/private|band\.us/band/[0-9]{5,}|band\.us/.*\.ics|(api[_-]?key|secret|token|password)["'"'"' ]*[:=]["'"'"' ]*[A-Za-z0-9_\-]{16,}' "$f" | grep -v 'firebase-config.js' || true)
+  h=$(grep -nEi 'webcal://|calendar\.google\.com/calendar/ical/.+/private|band\.us/band/[0-9]{5,}|band\.us/.*\.ics|(api[_-]?key|secret|token|password)["'"'"' ]*[:=]["'"'"' ]*[A-Za-z0-9_\-]{16,}' "$f" | grep -v 'firebase-config.js' | cut -c1-200 || true)
   [ -n "$h" ] && hits="$hits\n  $f: $h"
 done
 if [ -n "$hits" ]; then echo -e "  ⚠ 확인 필요:$hits"; fail=1; else echo "  OK"; fi

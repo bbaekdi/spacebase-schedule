@@ -1,0 +1,49 @@
+# Firebase 규칙(누가 무엇을 읽고 쓸 수 있는지)을 올리고, 회원 설정을 넣는다.
+# 필요한 저장소 Secrets: FIREBASE_SERVICE_ACCOUNT, SB_CODE, ADMIN_CODE
+# 순서: 연습용 Firebase 에서 규칙 시험 → 통과하면 실제 Firebase 에 반영
+name: firebase-rules
+on:
+  push:
+    branches: [main]
+    paths: ['firebase/**', 'tools/fb-setup.mjs', 'tools/test-rules.sh', '.github/workflows/firebase-rules.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: firebase-rules
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: 규칙 시험 (연습용 Firebase)
+        run: |
+          bash tools/test-rules.sh | tee result.txt
+          grep -q "Script exited successfully" result.txt
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 실제 Firebase 에 반영
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SB_CODE: ${{ secrets.SB_CODE }}
+          ADMIN_CODE: ${{ secrets.ADMIN_CODE }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/fb" && cp tools/fb-setup.mjs "$RUNNER_TEMP/fb/" && mkdir -p "$RUNNER_TEMP/firebase" && cp firebase/database.rules.json "$RUNNER_TEMP/firebase/"
+          cd "$RUNNER_TEMP/fb" && npm init -y >/dev/null && npm i --silent firebase-admin@12
+          node fb-setup.mjs
