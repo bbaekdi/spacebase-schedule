@@ -39,6 +39,7 @@ public/
   portal.html        홈
   calendar.html      회사 캘린더
   auth.js            구글 로그인 + 회원 확인 (승인 대기, 초대 링크, 관리자 비밀번호, 카톡 안 브라우저 안내)
+  band.html, band.js, band.css  Band 회사 게시판 (구글 로그인 회원만): 게시판 4개, 글·댓글·찾기. Firebase board/posts, board/comments
   members.html       회원 관리 (관리자: 승인/거절, 초대 링크, 이름 연결, 관리자 지정, 내보내기)
   ws.css, ws-common.js  워크스페이스 공통 (상단 탭, 휴대폰 아래 메뉴, 로그인, 일정 데이터, 구글 연동, TO DO 위젯, 확장 안내 띠)
   band-config.js     SB_BAND_API(밴드 중계 주소), SB_GOOGLE_LOGIN
@@ -50,7 +51,7 @@ extension/           band-fill.js, bandform.js, site-bridge.js
 tools/sync-band.js   예비 밴드 동기화 (band-calendar.yml)
 firebase/            Firebase 규칙(database.rules.json) + 규칙 시험(rules.test.mjs). firebase-rules.yml 이 실제 Firebase 에 올림
 tools/test-rules.sh  규칙 시험 (연습용 Firebase), tools/fb-setup.mjs 규칙 올리기·회원 설정 (Actions 전용)
-tools/test/          화면 시험 (연습용 Firebase + 브라우저): emu-seed.mjs, e2e-auth.cjs
+tools/test/          화면 시험 (연습용 Firebase + 브라우저): emu-seed.mjs, e2e-auth.cjs(로그인), e2e-band.cjs(Band)
 tools/check.sh       배포 전 검토 (JS 문법, 비밀 값 의심 문자열, 버전↔릴리즈 노트)
 RELEASE-NOTES.md     바뀐 내용 기록 (최신이 위)
 build/               installer.nsi, release.sh, seticon.mjs

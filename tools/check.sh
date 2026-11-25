@@ -21,6 +21,10 @@ for f in $files; do
 done
 if [ -n "$hits" ]; then echo -e "  ⚠ 확인 필요:$hits"; fail=1; else echo "  OK"; fi
 
+# 시험 도구가 남긴 기록 파일(.log)은 올리지 않는다
+logs=$(git ls-files --cached --others --exclude-standard | grep -E '\.log$' || true)
+if [ -n "$logs" ]; then echo "  ⚠ 기록 파일(.log)이 섞여 있음: $logs"; fail=1; fi
+
 echo "[3] 버전 / 릴리즈 노트"
 v=$(node -p "require('./package.json').version")
 if grep -q "^## $v" RELEASE-NOTES.md; then echo "  OK ($v)"; else echo "  ✗ RELEASE-NOTES.md 에 '## $v' 항목이 없음"; fail=1; fi

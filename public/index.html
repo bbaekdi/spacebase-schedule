@@ -113,7 +113,8 @@
     const nav = document.createElement('header');
     nav.className = 'wsnav';
     nav.innerHTML = '<a class="wslogo" href="./" title="SPACEBASE 홈"><img src="logo.svg" alt="SPACEBASE"></a>'
-      + '<nav><a href="./">Home</a><a href="schedule.html" class="on">Weekly Schedule</a><a href="calendar.html">Calendar</a></nav>';
+      + '<nav><a href="./">Home</a><a href="schedule.html" class="on">Weekly Schedule</a><a href="calendar.html">Calendar</a>'
+      + (window.SBAuth && SBAuth.enabled() ? '<a href="band.html">Band</a>' : '') + '</nav>';
     document.body.prepend(nav);
   }
   </script>

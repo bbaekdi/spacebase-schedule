@@ -54,6 +54,34 @@
           ".write": "auth != null && (root.child('ws/admins').child(auth.uid).val() === true || (auth.uid === $uid && !root.child('ws/members').child($uid).exists()))"
         }
       }
+    },
+    "board": {
+      ".read": "auth != null && root.child('ws/members').child(auth.uid).exists()",
+      "posts": {
+        ".indexOn": [
+          "at"
+        ],
+        "$pid": {
+          ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && ((!data.exists() && newData.child('uid').val() === auth.uid && newData.child('name').val() === root.child('ws/members').child(auth.uid).child('name').val()) || (data.exists() && newData.exists() && (data.child('uid').val() === auth.uid || root.child('ws/admins').child(auth.uid).val() === true) && newData.child('uid').val() === data.child('uid').val() && newData.child('name').val() === data.child('name').val() && newData.child('at').val() === data.child('at').val()))",
+          ".validate": "newData.hasChildren(['cat', 'text', 'uid', 'name', 'at']) && newData.child('cat').isString() && newData.child('cat').val().matches(/^(photo|as|project|notice)$/) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 5000 && newData.child('at').isNumber()",
+          "commentCount": {
+            ".write": "auth != null && root.child('ws/members').child(auth.uid).exists()",
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "lastAt": {
+            ".write": "auth != null && root.child('ws/members').child(auth.uid).exists()",
+            ".validate": "newData.isNumber()"
+          }
+        }
+      },
+      "comments": {
+        "$pid": {
+          "$cid": {
+            ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && ((!data.exists() && newData.child('uid').val() === auth.uid && newData.child('name').val() === root.child('ws/members').child(auth.uid).child('name').val() && root.child('board/posts').child($pid).exists()) || (data.exists() && !newData.exists() && (data.child('uid').val() === auth.uid || root.child('ws/admins').child(auth.uid).val() === true)))",
+            ".validate": "newData.hasChildren(['uid', 'name', 'text', 'at']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 2000 && newData.child('at').isNumber()"
+          }
+        }
+      }
     }
   }
 }

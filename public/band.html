@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Band · SPACEBASE</title>
+<link rel="stylesheet" href="ws.css">
+<link rel="stylesheet" href="band.css">
+</head>
+<body data-page="band">
+  <main class="wrap bd" id="root">
+    <div class="bd-head">
+      <nav class="bd-cats" id="cats" aria-label="게시판"></nav>
+      <div class="bd-search"><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input id="q" type="search" placeholder="글 내용·이름으로 찾기" autocomplete="off"></div>
+    </div>
+    <div id="msg" class="bd-msg"></div>
+    <div id="list" class="bd-list"></div>
+    <div class="bd-more"><button class="btn hidden" id="more" type="button">이전 글 더 보기</button></div>
+    <button class="btn primary bd-write" id="write" type="button" aria-label="글쓰기"><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>글쓰기</span></button>
+  </main>
+
+  <dialog id="dlgWrite" class="bd-dlg">
+    <form method="dialog" id="fWrite">
+      <div class="dlg-head"><h3 id="wTitle">글쓰기</h3><button class="x" type="button" data-close>✕</button></div>
+      <div class="dlg-body">
+        <div class="bd-pick" id="wCats"></div>
+        <textarea name="text" rows="8" maxlength="5000" placeholder="내용을 써 주세요"></textarea>
+        <div class="dlg-err" id="wErr"></div>
+      </div>
+      <div class="dlg-foot"><span class="spacer"></span><button class="btn" type="button" data-close>취소</button><button class="btn primary" id="wSave">올리기</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlgPost" class="bd-dlg">
+    <div class="dlg-head"><h3 id="pCat"></h3><button class="x" type="button" data-close>✕</button></div>
+    <div class="dlg-body" id="pBody"></div>
+    <form class="bd-cform" id="fCmt"><input name="text" maxlength="2000" placeholder="댓글 달기" autocomplete="off"><button class="btn primary">등록</button></form>
+  </dialog>
+
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-database-compat.js"></script>
+<script src="vendor/firebase-auth-compat.js"></script>
+<script src="auth.js"></script>
+<script src="firebase-config.js"></script>
+<script src="ws-common.js"></script>
+<script src="band.js"></script>
+</body>
+</html>
