@@ -184,6 +184,46 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await b.goto(B + 'band.html#post=' + (await b.evaluate(async () => { const s = await firebase.database().ref('board/posts').orderByChild('cat').equalTo('project').once('value'); return Object.keys(s.val())[0]; })));
   await b.waitForSelector('#dlgPost[open] .bd-ptitle');
   log(true, 'band.html#post=… 주소로 글 바로 열기');
+
+  // ---------- 4단계: 읽음 확인 + 휴지통 ----------
+  await put('ws/members/fakeP', { name: '박연습', email: 'p@test.com', joinedAt: 1 });
+  await a.goto(B + 'band.html'); await b.goto(B + 'band.html'); await a.waitForSelector('.bd-post'); await b.waitForSelector('.bd-post');
+  await a.click('#write'); await a.click('#wCats label:has-text("공지·자유글")'); await a.fill('#fWrite textarea', '읽음 시험 공지'); await a.click('#wSave');
+  await b.waitForSelector('.bd-post:has-text("읽음 시험 공지") .bd-new');
+  log((await a.locator('.bd-post:has-text("읽음 시험 공지") .bd-new').count()) === 0, '"새 글" 표시: 다른 사람에게만 (내 글엔 없음)');
+  await b.click('.bd-post:has-text("읽음 시험 공지")'); await b.waitForSelector('#dlgPost[open]'); await b.click('#dlgPost [data-close]');
+  await b.waitForFunction(() => !document.querySelector('.bd-post .bd-new') || ![...document.querySelectorAll('.bd-post')].find((x) => /읽음 시험 공지/.test(x.innerText))?.querySelector('.bd-new'));
+  log(true, '글을 열어 보면 "새 글" 표시가 사라짐');
+  await a.click('.bd-post:has-text("읽음 시험 공지")'); await a.waitForSelector('#pBody .bd-reads');
+  await a.waitForFunction(() => /읽음 1명 · 안 읽음 \d+명/.test(document.querySelector('#pBody .bd-reads').innerText));
+  await a.click('#pBody [data-a=reads]');
+  const rl = await a.locator('#pBody .bd-readlist').innerText();
+  log(/읽은 사람\s*이시험/.test(rl) && /안 읽은 사람[\s\S]*박연습/.test(rl) && !/김테스트/.test(rl), '읽은 사람(이시험) / 안 읽은 사람(박연습), 글쓴이는 빠짐');
+  await a.screenshot({ path: SH + '/b12-reads.png' });
+  // 휴지통
+  await a.click('#pBody [data-a=del]'); await a.waitForFunction(() => !/읽음 시험 공지/.test(document.getElementById('list').innerText));
+  await a.click('.bd-trashlink'); await a.waitForSelector('.bd-trashed');
+  const tr = await a.locator('#list').innerText();
+  log(/읽음 시험 공지/.test(tr) && /실리콘/.test(tr) && /30일 뒤 완전 삭제/.test(tr), '휴지통: 삭제한 글 + "30일 뒤 완전 삭제"');
+  log((await a.locator('.bd-trashed:has-text("읽음 시험 공지") [data-tr=purge]').count()) === 1, '관리자에게는 완전 삭제 버튼');
+  await a.screenshot({ path: SH + '/b13-trash.png' });
+  await b.goto(B + 'band.html#trash'); await b.waitForSelector('.bd-empty, .bd-trashed');
+  log(!/읽음 시험 공지/.test(await b.locator('#list').innerText()), '일반 직원 휴지통에는 남의 글 안 보임');
+  await a.click('.bd-trashed:has-text("읽음 시험 공지") [data-tr=restore]');
+  await a.waitForFunction(() => !/읽음 시험 공지/.test(document.getElementById('list').innerText));
+  await a.click('.bd-back'); await a.waitForSelector('.bd-post:has-text("읽음 시험 공지")');
+  log(true, '되돌리기 → 목록에 다시 나옴');
+  await a.click('.bd-trashlink'); await a.waitForSelector('.bd-trashed:has-text("실리콘")');
+  await a.click('.bd-trashed:has-text("실리콘") [data-tr=purge]');
+  await a.waitForFunction(() => !/실리콘/.test(document.getElementById('list').innerText));
+  const gone = await a.evaluate(async () => { const s = await firebase.database().ref('board/posts').once('value'); return !Object.values(s.val()).some((v) => /실리콘/.test(v.text)); });
+  log(gone, '완전 삭제 → 정말 없어짐');
+  // 30일 지난 글 자동 정리
+  await put('board/posts/oldpost', { cat: 'notice', text: '아주 오래된 글', uid: 'x', name: '누군가', at: 1, deleted: { by: 'x', name: '누군가', at: Date.now() - 31 * 864e5 } });
+  await a.goto(B + 'band.html'); await a.waitForSelector('.bd-post'); await a.click('.bd-trashlink'); await a.waitForTimeout(1500);
+  const oldGone = await (await fetch(DB + 'board/posts/oldpost.json' + NS, { headers: { Authorization: 'Bearer owner' } })).json();
+  log(oldGone === null && !/아주 오래된 글/.test(await a.locator('#list').innerText()), '30일 지난 글은 관리자가 휴지통을 열 때 자동 정리');
+  await a.click('.bd-back');
   // 휴대폰
   const m = await user('m@test.com', '박연습', false, { ...devices['iPhone 13'] });
   await m.waitForSelector('.bd-post'); await m.waitForTimeout(500);

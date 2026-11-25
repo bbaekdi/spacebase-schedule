@@ -18,6 +18,10 @@
   const PAGE = 50;
 
   let me = null, db = null, posts = [], limit = PAGE, cat = '', query = '', openId = null, cmtRef = null;
+  // 읽음 확인 · 휴지통
+  let myReads = {}, members = {}, readers = {}, readRef = null, readsOpen = false, trash = false, trashPosts = [], trashRef = null;
+  const KEEP_DAYS = 30, NEW_DAYS = 14;
+  const isNew = (p) => !!me && !myReads[p.id] && p.uid !== me.uid && Date.now() - p.at < NEW_DAYS * 864e5;
   let projects = {}, staff = [], site = null, sitePosts = [], siteRef = null, asOpenOnly = false;
   try { cat = sessionStorage.getItem('bd_cat') || ''; asOpenOnly = sessionStorage.getItem('bd_asopen') === '1'; } catch {}
 
@@ -71,7 +75,7 @@
     const n = pj ? sitePostCount(p.id) : null;
     return `
       <article class="bd-post" data-id="${esc(p.id)}" tabindex="0">
-        <div class="bd-meta"><span class="bd-chip ${esc(p.cat)}">${catLabel(p.cat)}</span>${asBadge(p)}<b>${mark(p.name)}</b><span>${ago(p.at)}${p.editedAt ? ' · 수정됨' : ''}</span></div>
+        <div class="bd-meta">${isNew(p) ? '<span class="bd-new">새 글</span>' : ''}<span class="bd-chip ${esc(p.cat)}">${catLabel(p.cat)}</span>${asBadge(p)}<b>${mark(p.name)}</b><span>${ago(p.at)}${p.editedAt ? ' · 수정됨' : ''}</span></div>
         ${pj ? `<div class="bd-ptitle">${mark(p.siteName)}${p.closed ? ' <span class="bd-as done">끝난 현장</span>' : ''}</div>` : siteChip(p) ? `<div class="bd-sitebar">${siteChip(p)}</div>` : ''}
         <div class="bd-text">${mark(p.text)}</div>
         <div class="bd-foot"><span>${ICON_CMT}댓글 ${p.commentCount || 0}</span>${pj ? `<a class="bd-room" href="#site=${encodeURIComponent(p.id)}">현장 방 열기${n ? ` (글 ${n})` : ''} ›</a>` : ''}</div>
@@ -81,6 +85,7 @@
   const sitePostCount = (id) => posts.filter((x) => x.site === id && !x.deleted).length;
 
   function drawList() {
+    if (trash) return drawTrash();
     const q = query.toLowerCase();
     const base = site ? sitePosts : posts;
     const shown = base.filter((p) => !p.deleted && (!cat || p.cat === cat) && !(cat === 'as' && asOpenOnly && asStatus(p) === 'done')
@@ -95,6 +100,8 @@
     $('#list').innerHTML = shown.map(card).join('');
   }
   $('#list').onclick = (e) => {
+    const tb = e.target.closest('[data-tr]'); if (tb) return trashAct(tb.dataset.tr, tb.closest('.bd-post').dataset.id);
+    if (trash) return;
     if (e.target.closest('a')) return; // 현장 칩·현장 방 링크
     const a = e.target.closest('.bd-post'); if (a) openPost(a.dataset.id);
   };
@@ -161,6 +168,11 @@
         window.scrollTo(0, 0);
       } else drawList();
     }
+    const t = h.has('trash');
+    if (t !== trash) {
+      trash = t; document.body.classList.toggle('bd-intrash', t);
+      if (t) openTrash(); else closeTrash();
+    }
     if (p) {
       history.replaceState(null, '', location.pathname + location.search + (site ? '#site=' + encodeURIComponent(site) : ''));
       const show = () => { if (findPost(p)) openPost(p); };
@@ -169,6 +181,53 @@
     }
   }
   window.addEventListener('hashchange', route);
+
+  // ---------- 휴지통 (삭제한 글 30일 보관) ----------
+  const daysLeft = (p) => Math.max(0, Math.ceil(KEEP_DAYS - (Date.now() - p.deleted.at) / 864e5));
+  function openTrash() {
+    $('#siteHead').innerHTML = `<a class="bd-back" href="#">‹ Band</a>
+      <div class="bd-sitecard bd-trashhead"><h1>휴지통</h1><div class="bd-text">삭제한 글은 ${KEEP_DAYS}일 동안 보관된 뒤 완전히 삭제돼요. ${me.admin ? '관리자는 모든 사람의 글을 볼 수 있어요.' : '내가 쓴 글만 보여요.'}</div></div>`;
+    $('#list').innerHTML = '<div class="bd-empty">불러오는 중…</div>';
+    trashRef = db.ref('board/posts').orderByChild('deleted/at').startAt(1);
+    trashRef.on('value', (snap) => {
+      const out = [], old = [];
+      snap.forEach((c) => { const v = { id: c.key, ...c.val() }; if (!v.deleted) return; if (daysLeft(v) <= 0) old.push(v.id); else if (me.admin || v.uid === me.uid) out.push(v); });
+      trashPosts = out.sort((a, b) => b.deleted.at - a.deleted.at);
+      drawTrash();
+      // 30일 지난 글은 관리자가 휴지통을 열 때 정리 (글·댓글·읽음 기록)
+      if (me.admin && old.length) {
+        const up = {}; old.forEach((id) => { up['posts/' + id] = null; up['comments/' + id] = null; up['reads/' + id] = null; });
+        db.ref('board').update(up).catch(() => {});
+      }
+    });
+    window.scrollTo(0, 0);
+  }
+  function closeTrash() {
+    if (trashRef) { trashRef.off(); trashRef = null; }
+    trashPosts = [];
+    if (!site) { $('#siteHead').innerHTML = ''; drawList(); }
+  }
+  function drawTrash() {
+    if (!trashPosts.length) { $('#list').innerHTML = '<div class="bd-empty">휴지통이 비어 있어요.</div>'; return; }
+    $('#list').innerHTML = trashPosts.map((p) => `
+      <article class="bd-post bd-trashed" data-id="${esc(p.id)}">
+        <div class="bd-meta"><span class="bd-chip ${esc(p.cat)}">${catLabel(p.cat)}</span><b>${esc(p.name)}</b><span>${ago(p.at)}</span></div>
+        ${p.cat === 'project' ? `<div class="bd-ptitle">${esc(p.siteName)}</div>` : ''}
+        <div class="bd-text">${esc(p.text)}</div>
+        <div class="bd-foot"><span>${esc(p.deleted.name || '')} 님이 ${ago(p.deleted.at)} 삭제 · <b>${daysLeft(p)}일 뒤 완전 삭제</b></span></div>
+        <div class="bd-acts">${canEdit(p) ? '<button class="btn" type="button" data-tr="restore">되돌리기</button>' : ''}${me.admin ? '<button class="btn danger" type="button" data-tr="purge">완전 삭제</button>' : ''}</div>
+      </article>`).join('');
+  }
+  async function trashAct(act, id) {
+    const p = trashPosts.find((x) => x.id === id); if (!p) return;
+    try {
+      if (act === 'restore') await db.ref('board/posts/' + id + '/deleted').remove();
+      if (act === 'purge') {
+        if (!confirm('이 글을 완전히 삭제할까요?\n댓글까지 모두 없어지고 되돌릴 수 없어요.')) return;
+        await db.ref('board').update({ ['posts/' + id]: null, ['comments/' + id]: null, ['reads/' + id]: null });
+      }
+    } catch (e) { alert((act === 'restore' ? '되돌리지' : '삭제하지') + ' 못했어요: ' + e.message); }
+  }
 
   // ---------- 글쓰기 / 고치기 ----------
   const dW = $('#dlgWrite'), fW = $('#fWrite');
@@ -497,12 +556,22 @@
       ${p.form ? formView(p) : `<div class="bd-text">${linkPhones(p.text)}</div>`}
       ${p.cat === 'project' && site !== p.id ? `<a class="btn" style="margin-top:12px" href="#site=${encodeURIComponent(p.id)}">현장 방 열기 ›</a>` : ''}
       ${asBox(p)}
+      ${readBox(p)}
       ${canEdit(p) ? '<div class="bd-acts"><button class="btn" type="button" data-a="edit">수정</button><button class="btn danger" type="button" data-a="del">삭제</button></div>' : ''}
       <ul class="bd-cmts">${cmts.length ? cmts.map((c) => `<li data-cid="${esc(c.id)}"><div class="who"><b>${esc(c.name)}</b><span>${ago(c.at)}</span>${me && (c.uid === me.uid || me.admin) ? '<button type="button" data-a="cdel">삭제</button>' : ''}</div><div class="t">${esc(c.text)}</div></li>`).join('') : '<li class="none">첫 댓글을 달아 보세요.</li>'}</ul>`;
     $('#pBody').querySelectorAll('input[name=asOwner]').forEach((x) => (x.onchange = () => {
       const o = [...$('#pBody').querySelectorAll('input[name=asOwner]:checked')].map((y) => y.value).join(', ');
       setAs(p, asStatus(p), o);
     }));
+  }
+  // 읽은 사람 / 안 읽은 사람 (회원 명단 기준, 글쓴이 빼고)
+  function readBox(p) {
+    const nm = (u) => (members[u] && members[u].name) || '(나간 사람)';
+    const rd = Object.entries(readers).filter(([u]) => u !== p.uid).sort((a, b) => a[1] - b[1]);
+    const unread = Object.entries(members).filter(([u]) => !readers[u] && u !== p.uid).map(([, m]) => m.name).sort((a, b) => a.localeCompare(b, 'ko'));
+    return `<div class="bd-reads"><button type="button" class="bd-link" data-a="reads">읽음 ${rd.length}명 · 안 읽음 ${unread.length}명 ${readsOpen ? '▴' : '▾'}</button>
+      ${readsOpen ? `<div class="bd-readlist"><div><b>읽은 사람</b>${rd.length ? rd.map(([u, t]) => `<span>${esc(nm(u))} <small>${ago(t)}</small></span>`).join('') : '<span class="none">아직 없어요</span>'}</div>
+      <div><b>안 읽은 사람</b>${unread.length ? unread.map((n) => `<span>${esc(n)}</span>`).join('') : '<span class="none">모두 읽었어요</span>'}</div></div>` : ''}</div>`;
   }
   function setAs(p, status, owner) {
     const v = { status, by: me.name, at: Date.now() };
@@ -511,8 +580,13 @@
   }
   function openPost(id) {
     const p = findPost(id); if (!p) return;
-    openId = id; cmts = [];
+    openId = id; cmts = []; readers = {}; readsOpen = false;
     drawPost(p);
+    // 읽음 기록 (처음 열 때 한 번)
+    if (!myReads[id]) { const now = Date.now(); myReads[id] = now; db.ref('board').update({ ['reads/' + id + '/' + me.uid]: now, ['myreads/' + me.uid + '/' + id]: now }).catch(() => {}); }
+    if (readRef) readRef.off();
+    readRef = db.ref('board/reads/' + id);
+    readRef.on('value', (s) => { readers = s.val() || {}; refreshOpen(); });
     fC.text.value = '';
     if (cmtRef) cmtRef.off();
     cmtRef = db.ref('board/comments/' + id).orderByChild('at');
@@ -523,15 +597,16 @@
     });
     if (!dP.open) dP.showModal();
   }
-  dP.addEventListener('close', () => { openId = null; if (cmtRef) { cmtRef.off(); cmtRef = null; } });
+  dP.addEventListener('close', () => { openId = null; if (cmtRef) { cmtRef.off(); cmtRef = null; } if (readRef) { readRef.off(); readRef = null; } if (!site && !trash) drawList(); });
   $('#pBody').onclick = async (e) => {
     if (e.target.closest('a[href^="#site="]')) { dP.close(); return; }
     const b = e.target.closest('button[data-a], button[data-as]'); if (!b) return;
     const p = findPost(openId); if (!p) return;
     if (b.dataset.as) return setAs(p, b.dataset.as, ownersOf(p).join(', '));
+    if (b.dataset.a === 'reads') { readsOpen = !readsOpen; return drawPost(p); }
     if (b.dataset.a === 'edit') { dP.close(); openWrite(p); }
     if (b.dataset.a === 'del') {
-      if (!confirm(p.cat === 'project' ? '이 현장(프로젝트) 글을 삭제할까요?\n현장에 올라온 사진·A/S 글은 삭제되지 않아요.' : '이 글을 삭제할까요?')) return;
+      if (!confirm(p.cat === 'project' ? '이 현장(프로젝트) 글을 삭제할까요?\n현장에 올라온 사진·A/S 글은 삭제되지 않아요.\n삭제한 글은 휴지통에 30일 동안 보관돼요.' : '이 글을 삭제할까요?\n삭제한 글은 휴지통에 30일 동안 보관돼요.')) return;
       try { await db.ref('board/posts/' + p.id + '/deleted').set({ by: me.uid, name: me.name, at: Date.now() }); dP.close(); if (site === p.id) location.hash = ''; }
       catch (err) { alert('삭제하지 못했어요: ' + err.message); }
     }
@@ -573,6 +648,8 @@
   SBAuth.start().then((a) => {
     me = a; db = firebase.database();
     $('#list').innerHTML = '<div class="bd-empty">불러오는 중…</div>';
+    db.ref('board/myreads/' + a.uid).on('value', (s) => { myReads = s.val() || {}; if (!site && !trash && !openId) drawList(); });
+    db.ref('ws/members').on('value', (s) => { members = s.val() || {}; refreshOpen(); });
     // A/S 담당자 목록 = 주간 스케줄 직원표 전 직원 (이름 + 직급)
     db.ref('spaces/' + a.spaceKey + '/data/members').once('value').then((s) => {
       const v = s.val(); staff = (Array.isArray(v) ? v : Object.values(v || {})).filter((m) => m && m.name).map((m) => ({ name: String(m.name).trim(), rank: String(m.rank || '').trim(), teamId: m.teamId || '' }));

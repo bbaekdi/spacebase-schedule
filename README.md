@@ -43,6 +43,7 @@ public/
                      Firebase board/posts (프로젝트 글 siteName = 현장, 다른 글 site/siteName, A/S asState), board/comments. 홈(portal.html)에 "Band 새 글" 카드
                      자동 양식: 프로젝트·A/S 는 항목별 칸(form) → 지금 밴드 글 모양의 번호 줄 글(text)로 저장. 날짜는 자체 달력(일요일·공휴일 빨강, 토요일 파랑, holidays.js),
                      위치는 카카오 우편번호 검색(외부 스크립트 t1.kakaocdn.net, 누를 때만 불러옴). A/S 현장 직접 입력, A/S 예정일, A/S 담당자 = 주간 스케줄 직원표(팀별, 여러 명)
+                     읽음 확인: board/reads/<글>/<uid>, board/myreads/<uid>/<글> (안 읽은 최근 14일 글 "새 글"). 휴지통(#trash): 삭제 표시 글 30일 보관, 관리자가 열 때 30일 지난 글 정리
   members.html       회원 관리 (관리자: 승인/거절, 초대 링크, 이름 연결, 관리자 지정, 내보내기)
   ws.css, ws-common.js  워크스페이스 공통 (상단 탭, 휴대폰 아래 메뉴, 로그인, 일정 데이터, 구글 연동, TO DO 위젯, 확장 안내 띠)
   band-config.js     SB_BAND_API(밴드 중계 주소), SB_GOOGLE_LOGIN

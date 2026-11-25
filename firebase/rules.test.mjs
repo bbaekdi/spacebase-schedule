@@ -93,6 +93,21 @@ await ok('현장 직접 입력 A/S (현장 방 없이 이름만)', B.ref('board/
 await no('현장 이름 너무 김', B.ref('board/posts/as4').set({ cat: 'as', siteName: 'x'.repeat(41), text: '요청', uid: 'b', name: '비', at: 21 }));
 await no('양식 칸이 글자가 아님', B.ref('board/posts/proj4').set({ cat: 'project', siteName: 'x', text: 'x', form: { client: 5 }, uid: 'b', name: '비', at: 20 }));
 await no('양식 칸 너무 김', B.ref('board/posts/proj5').set({ cat: 'project', siteName: 'x', text: 'x', form: { etc: 'x'.repeat(2001) }, uid: 'b', name: '비', at: 20 }));
+
+// ---------- 읽음 확인 + 휴지통 ----------
+await ok('글 읽음 기록 (나)', B.ref('board').update({ 'reads/proj1/b': 30, 'myreads/b/proj1': 30 }));
+await no('남 대신 읽음 기록', B.ref('board/reads/proj1/a').set(30));
+await no('남의 내 기록 쓰기', B.ref('board/myreads/a/proj1').set(30));
+await no('비회원 읽음 기록', X.ref('board/reads/proj1/x').set(30));
+await ok('회원은 읽은 사람 목록 봄', A.ref('board/reads/proj1').once('value'));
+await ok('휴지통으로 (삭제 표시)', B.ref('board/posts/proj3/deleted').set({ by: 'b', name: '비', at: 40 }));
+await ok('쓴 사람이 되돌리기', B.ref('board/posts/proj3/deleted').remove());
+await ok('다시 휴지통으로', B.ref('board/posts/proj3/deleted').set({ by: 'b', name: '비', at: 41 }));
+await no('일반 회원 완전 삭제', B.ref('board/posts/proj3').remove());
+await no('관리자도 휴지통에 없는 글은 완전 삭제 못 함', A.ref('board/posts/proj1').remove());
+await ok('관리자 완전 삭제 (글·댓글·읽음 기록 함께)', A.ref('board').update({ 'posts/proj3': null, 'comments/proj3': null, 'reads/proj3': null }));
+await ok('A/S 글에 댓글', A.ref('board/comments/as1/c9').set({ uid: 'a', name: '관리', text: '확인', at: 50 }));
+await no('휴지통에 없는 글의 댓글 통째 삭제', A.ref('board/comments/as1').remove());
 // 내보내기
 await ok('관리자가 내보내기', A.ref('ws/members/c').remove());
 await no('내보낸 사람 config 읽기', C.ref('ws/config').once('value'));

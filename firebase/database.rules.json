@@ -61,10 +61,11 @@
         ".indexOn": [
           "at",
           "site",
-          "cat"
+          "cat",
+          "deleted/at"
         ],
         "$pid": {
-          ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && ((!data.exists() && newData.child('uid').val() === auth.uid && newData.child('name').val() === root.child('ws/members').child(auth.uid).child('name').val()) || (data.exists() && newData.exists() && (data.child('uid').val() === auth.uid || root.child('ws/admins').child(auth.uid).val() === true) && newData.child('uid').val() === data.child('uid').val() && newData.child('name').val() === data.child('name').val() && newData.child('at').val() === data.child('at').val()))",
+          ".write": "(auth != null && root.child('ws/members').child(auth.uid).exists() && ((!data.exists() && newData.child('uid').val() === auth.uid && newData.child('name').val() === root.child('ws/members').child(auth.uid).child('name').val()) || (data.exists() && newData.exists() && (data.child('uid').val() === auth.uid || root.child('ws/admins').child(auth.uid).val() === true) && newData.child('uid').val() === data.child('uid').val() && newData.child('name').val() === data.child('name').val() && newData.child('at').val() === data.child('at').val()))) || (auth != null && root.child('ws/members').child(auth.uid).exists() && data.exists() && !newData.exists() && data.child('deleted').exists() && root.child('ws/admins').child(auth.uid).val() === true)",
           ".validate": "newData.hasChildren(['cat', 'text', 'uid', 'name', 'at']) && newData.child('cat').isString() && newData.child('cat').val().matches(/^(photo|as|project|notice)$/) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 5000 && newData.child('at').isNumber() && (newData.child('cat').val() !== 'project' || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40)) && (!newData.child('site').exists() || (newData.child('site').isString() && newData.child('siteName').isString())) && (!newData.child('siteName').exists() || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40))",
           "commentCount": {
             ".write": "auth != null && root.child('ws/members').child(auth.uid).exists()",
@@ -90,6 +91,24 @@
           "$cid": {
             ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && ((!data.exists() && newData.child('uid').val() === auth.uid && newData.child('name').val() === root.child('ws/members').child(auth.uid).child('name').val() && root.child('board/posts').child($pid).exists()) || (data.exists() && !newData.exists() && (data.child('uid').val() === auth.uid || root.child('ws/admins').child(auth.uid).val() === true)))",
             ".validate": "newData.hasChildren(['uid', 'name', 'text', 'at']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 2000 && newData.child('at').isNumber()"
+          },
+          ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && !newData.exists() && root.child('ws/admins').child(auth.uid).val() === true && root.child('board/posts').child($pid).child('deleted').exists()"
+        }
+      },
+      "reads": {
+        "$pid": {
+          ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && !newData.exists() && root.child('ws/admins').child(auth.uid).val() === true && root.child('board/posts').child($pid).child('deleted').exists()",
+          "$uid": {
+            ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && auth.uid === $uid",
+            ".validate": "newData.isNumber()"
+          }
+        }
+      },
+      "myreads": {
+        "$uid": {
+          ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && auth.uid === $uid",
+          "$pid": {
+            ".validate": "newData.isNumber()"
           }
         }
       }
