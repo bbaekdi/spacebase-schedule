@@ -65,7 +65,6 @@
   .bdnew .empty { color: var(--sub); padding: 8px 0; }
   .bd-chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-text); }
   .bd-chip.photo { background: #e6f1fb; color: #1f5f9e; } .bd-chip.as { background: #fde8e8; color: #b42318; } .bd-chip.project { background: #e7f6ec; color: #1e7a3c; }
-  .bd-asnote { display: inline-block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #fff; background: #e5484d; border-radius: 99px; padding: 3px 10px; text-decoration: none; }
   @media (max-width: 720px) { .apps, .apps.three, .grid { grid-template-columns: minmax(0, 1fr); } .app { padding: 16px; } }
 </style>
 </head>
@@ -127,7 +126,6 @@
         </section>
         <section class="card hidden" id="bandCard">
           <h2>Band 새 글 <a class="more" href="band.html">전체 ›</a></h2>
-          <a class="bd-asnote hidden" id="bandAs" href="band.html#cat=as&amp;open=1"></a>
           <ul class="bdnew" id="bandNew"><li class="empty">불러오는 중…</li></ul>
         </section>
         <section class="card mail hidden" id="mailCard">
@@ -171,12 +169,6 @@
       const first = String(p.cat === 'project' ? p.siteName : p.text).split('\n')[0].slice(0, 60);
       return `<li><a href="band.html#post=${encodeURIComponent(p.id)}"><span class="bd-chip ${esc(p.cat)}">${CAT[p.cat] || ''}</span><span class="t">${p.siteName && p.cat !== 'project' ? `<b>${esc(p.siteName)}</b> · ` : ''}${esc(first)}</span><small>${esc(p.name)} · ${ago(p.at)}${p.commentCount ? ` · 댓글 ${p.commentCount}` : ''}</small></a></li>`;
     }).join('') : '<li class="empty">아직 글이 없어요.</li>';
-  });
-  // 안 끝난 A/S 수
-  db.ref('board/posts').orderByChild('cat').equalTo('as').on('value', (s) => {
-    let n = 0; s.forEach((c) => { const v = c.val(); if (!v.deleted && (!v.asState || v.asState.status !== 'done')) n++; });
-    const el = document.getElementById('bandAs');
-    el.textContent = `안 끝난 A/S ${n}건 ›`; el.classList.toggle('hidden', !n);
   });
 })();
 

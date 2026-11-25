@@ -175,11 +175,10 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   // 홈 카드
   await b.click('#write'); await b.click('#wCats label:has-text("A/S")'); await b.fill('[name=f_req]', '새 A/S 하나'); await b.click('#wSave');
   await b.goto(B + 'portal.html'); await b.waitForSelector('#bandNew li a');
-  await b.waitForFunction(() => /안 끝난 A\/S 2건/.test(document.getElementById('bandAs').innerText));
-  log((await b.locator('#bandNew li').count()) === 5, '홈 "Band 새 글" 5개 + "안 끝난 A/S 2건"');
+  log((await b.locator('#bandNew li').count()) === 5 && (await b.locator('#bandAs').count()) === 0, '홈 "Band 새 글" 5개 ("안 끝난 A/S" 빨간 표시는 없음)');
   await b.waitForTimeout(1500); await b.screenshot({ path: SH + '/b8-home.png' });
-  await b.click('#bandAs'); await b.waitForSelector('#asOpen:checked'); await b.waitForSelector('.bd-post');
-  log((await b.locator('.bd-post').count()) === 2, '홈에서 누르면 안 끝난 A/S 목록으로');
+  await b.goto(B + 'band.html#cat=as&open=1'); await b.waitForSelector('#asOpen:checked'); await b.waitForSelector('.bd-post');
+  log((await b.locator('.bd-post').count()) === 2, 'band.html#cat=as&open=1 → 안 끝난 A/S 목록');
   await b.click('.bd-post'); await b.waitForSelector('#dlgPost[open]'); await b.click('#dlgPost [data-close]');
   await b.goto(B + 'band.html#post=' + (await b.evaluate(async () => { const s = await firebase.database().ref('board/posts').orderByChild('cat').equalTo('project').once('value'); return Object.keys(s.val())[0]; })));
   await b.waitForSelector('#dlgPost[open] .bd-ptitle');
