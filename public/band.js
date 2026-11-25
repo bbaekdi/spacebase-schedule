@@ -129,7 +129,7 @@
   function drawSiteHead() {
     const p = projects[site];
     const el = $('#siteHead');
-    if (!p) { el.innerHTML = '<a class="bd-back" href="#">‹ Band</a><div class="bd-empty">없는 현장이거나 지워진 현장이에요.</div>'; return; }
+    if (!p) { el.innerHTML = '<a class="bd-back" href="#">‹ Band</a><div class="bd-empty">없는 현장이거나 삭제된 현장이에요.</div>'; return; }
     const as = sitePosts.filter((x) => x.cat === 'as' && !x.deleted);
     const open = as.filter((x) => asStatus(x) !== 'done').length;
     el.innerHTML = `<a class="bd-back" href="#">‹ Band</a>
@@ -296,7 +296,7 @@
   }
   function openWrite(p) {
     editing = p || null;
-    $('#wTitle').textContent = p ? '글 고치기' : '글쓰기';
+    $('#wTitle').textContent = p ? '글 수정' : '글쓰기';
     $('#wSave').textContent = p ? '저장' : '올리기';
     const sel = p ? p.cat : cat || (site ? 'photo' : 'notice');
     const keys = site && !p ? ['photo', 'as'] : CATS.filter((c) => c.key).map((c) => c.key);
@@ -361,7 +361,7 @@
       calEl.innerHTML = `<div class="bd-calh"><button type="button" data-mv="-1" aria-label="이전 달">‹</button><b>${y}년 ${m}월</b><button type="button" data-mv="1" aria-label="다음 달">›</button></div>
         <div class="bd-calg"><i class="red">일</i><i>월</i><i>화</i><i>수</i><i>목</i><i>금</i><i class="blue">토</i>${cells}</div>
         ${hols.length ? `<div class="bd-calhol">${hols.join(' · ')}</div>` : ''}
-        <div class="bd-calf"><button type="button" data-clear>지우기</button><button type="button" data-today>오늘</button></div>`;
+        <div class="bd-calf"><button type="button" data-clear>삭제</button><button type="button" data-today>오늘</button></div>`;
     };
     const set = (v) => { input.value = v; btn.textContent = v ? yy(v) : btn.dataset.ph; btn.classList.toggle('empty', !v); closeCal(); };
     calEl.addEventListener('click', (e) => {
@@ -499,8 +499,8 @@
       ${p.form ? formView(p) : `<div class="bd-text">${linkPhones(p.text)}</div>`}
       ${p.cat === 'project' && site !== p.id ? `<a class="btn" style="margin-top:12px" href="#site=${encodeURIComponent(p.id)}">현장 방 열기 ›</a>` : ''}
       ${asBox(p)}
-      ${canEdit(p) ? '<div class="bd-acts"><button class="btn" type="button" data-a="edit">고치기</button><button class="btn danger" type="button" data-a="del">지우기</button></div>' : ''}
-      <ul class="bd-cmts">${cmts.length ? cmts.map((c) => `<li data-cid="${esc(c.id)}"><div class="who"><b>${esc(c.name)}</b><span>${ago(c.at)}</span>${me && (c.uid === me.uid || me.admin) ? '<button type="button" data-a="cdel">지우기</button>' : ''}</div><div class="t">${esc(c.text)}</div></li>`).join('') : '<li class="none">첫 댓글을 달아 보세요.</li>'}</ul>`;
+      ${canEdit(p) ? '<div class="bd-acts"><button class="btn" type="button" data-a="edit">수정</button><button class="btn danger" type="button" data-a="del">삭제</button></div>' : ''}
+      <ul class="bd-cmts">${cmts.length ? cmts.map((c) => `<li data-cid="${esc(c.id)}"><div class="who"><b>${esc(c.name)}</b><span>${ago(c.at)}</span>${me && (c.uid === me.uid || me.admin) ? '<button type="button" data-a="cdel">삭제</button>' : ''}</div><div class="t">${esc(c.text)}</div></li>`).join('') : '<li class="none">첫 댓글을 달아 보세요.</li>'}</ul>`;
     $('#pBody').querySelectorAll('input[name=asOwner]').forEach((x) => (x.onchange = () => {
       const o = [...$('#pBody').querySelectorAll('input[name=asOwner]:checked')].map((y) => y.value).join(', ');
       setAs(p, asStatus(p), o);
@@ -533,17 +533,17 @@
     if (b.dataset.as) return setAs(p, b.dataset.as, ownersOf(p).join(', '));
     if (b.dataset.a === 'edit') { dP.close(); openWrite(p); }
     if (b.dataset.a === 'del') {
-      if (!confirm(p.cat === 'project' ? '이 현장(프로젝트) 글을 지울까요?\n현장에 올라온 사진·A/S 글은 지워지지 않아요.' : '이 글을 지울까요?')) return;
+      if (!confirm(p.cat === 'project' ? '이 현장(프로젝트) 글을 삭제할까요?\n현장에 올라온 사진·A/S 글은 삭제되지 않아요.' : '이 글을 삭제할까요?')) return;
       try { await db.ref('board/posts/' + p.id + '/deleted').set({ by: me.uid, name: me.name, at: Date.now() }); dP.close(); if (site === p.id) location.hash = ''; }
-      catch (err) { alert('지우지 못했어요: ' + err.message); }
+      catch (err) { alert('삭제하지 못했어요: ' + err.message); }
     }
     if (b.dataset.a === 'cdel') {
       const cid = b.closest('li').dataset.cid;
-      if (!confirm('이 댓글을 지울까요?')) return;
+      if (!confirm('이 댓글을 삭제할까요?')) return;
       try {
         await db.ref('board/comments/' + p.id + '/' + cid).remove();
         db.ref('board/posts/' + p.id + '/commentCount').transaction((n) => Math.max(0, (n || 1) - 1));
-      } catch (err) { alert('지우지 못했어요: ' + err.message); }
+      } catch (err) { alert('삭제하지 못했어요: ' + err.message); }
     }
   };
   fC.onsubmit = async (e) => {

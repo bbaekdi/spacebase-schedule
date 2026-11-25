@@ -145,7 +145,7 @@
       const st = v.usedBy ? '<span class="badge gray">사용됨</span>' : v.expires < now ? '<span class="badge gray">기한 지남</span>' : `<span class="badge">${Math.ceil((v.expires - now) / 864e5)}일 남음</span>`;
       const live = !v.usedBy && v.expires >= now;
       return `<tr data-code="${esc(code)}"><td>${esc(v.name)}</td><td>${st}</td><td class="sub">${esc(v.by || '')} · ${day(v.at)}</td>
-        <td class="act">${live ? '<button class="btn" data-a="cp">링크 복사</button>' : ''}<button class="btn" data-a="del">${live ? '취소' : '지우기'}</button></td></tr>`;
+        <td class="act">${live ? '<button class="btn" data-a="cp">링크 복사</button>' : ''}<button class="btn" data-a="del">${live ? '취소' : '삭제'}</button></td></tr>`;
     }).join('')}</tbody></table>`;
     el.querySelectorAll('tr[data-code]').forEach((tr) => {
       const code = tr.dataset.code;

@@ -1034,7 +1034,7 @@
         ['구분 위로 이동', () => { send({ k: 'moveGroup', id: groupId, dir: -1 }); renderSheet(); }],
         ['구분 아래로 이동', () => { send({ k: 'moveGroup', id: groupId, dir: 1 }); renderSheet(); }], '-',
         ['새 구분 추가', addGroup],
-        has ? ['구분 삭제 (먼저 행을 모두 지우세요)', () => toast('구분 안의 행을 먼저 모두 삭제해 주세요.'), 'danger']
+        has ? ['구분 삭제 (먼저 행을 모두 삭제하세요)', () => toast('구분 안의 행을 먼저 모두 삭제해 주세요.'), 'danger']
           : ['구분 삭제', () => { send({ k: 'delGroup', id: groupId }); renderSheet(); }, 'danger']];
     }
     ctx.innerHTML = items.map((it, i) => (it === '-' ? '<hr>' : `<button data-i="${i}" class="${it[2] || ''}">${esc(it[0])}</button>`)).join('');

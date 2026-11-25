@@ -32,7 +32,7 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await b.waitForFunction(() => document.querySelectorAll('.bd-post').length === 2);
   log(true, '다른 직원 화면에 바로 보임');
   await b.click('.bd-post:has-text("회식")'); await b.waitForSelector('#dlgPost[open]');
-  log((await b.locator('#pBody [data-a=edit]').count()) === 0, '남의 글에는 고치기/지우기 버튼 없음');
+  log((await b.locator('#pBody [data-a=edit]').count()) === 0, '남의 글에는 수정/삭제 버튼 없음');
   await b.fill('#fCmt input', '참석합니다!'); await b.click('#fCmt button');
   await b.waitForSelector('.bd-cmts li[data-cid]');
   await b.screenshot({ path: SH + '/b2-post.png' });
@@ -47,18 +47,21 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   log((await b.locator('.bd-post').count()) === 1 && (await b.locator('.bd-post mark').count()) >= 1, '"실리콘" 찾기 → 1개 + 노란 표시');
   await b.screenshot({ path: SH + '/b3-search.png' });
   await b.fill('#q', ''); await b.waitForTimeout(300);
-  // 글 고치기 (쓴 사람)
-  await a.click('.bd-post:has-text("회식")'); await a.click('#pBody [data-a=edit]');
+  // 글 수정 (쓴 사람)
+  await a.click('.bd-post:has-text("회식")');
+  log((await a.locator('#pBody [data-a=edit]').innerText()) === '수정' && (await a.locator('#pBody [data-a=del]').innerText()) === '삭제', '버튼 이름: 수정 / 삭제');
+  await a.click('#pBody [data-a=edit]');
+  log((await a.locator('#wTitle').innerText()) === '글 수정', '창 제목: 글 수정');
   await a.fill('#fWrite textarea', '12월 회식 안내 (장소 추가)\n금요일 저녁 7시, 회사 앞 식당입니다.'); await a.click('#wSave');
   await b.waitForFunction(() => /장소 추가/.test(document.body.innerText) && /수정됨/.test(document.body.innerText));
-  log(true, '글 고치기 → 다른 직원 화면에도 반영, "수정됨" 표시');
-  // 관리자가 아닌 사람이 남의 글을 강제로 고치기 → 막힘
+  log(true, '글 수정 → 다른 직원 화면에도 반영, "수정됨" 표시');
+  // 관리자가 아닌 사람이 남의 글을 강제로 수정 → 막힘
   const blocked = await b.evaluate(async () => { const s = await firebase.database().ref('board/posts').once('value'); const id = Object.keys(s.val()).find((k) => s.val()[k].name === '김테스트'); try { await firebase.database().ref('board/posts/' + id + '/text').set('해킹'); return false; } catch { return true; } });
-  log(blocked, '일반 직원이 남의 글을 몰래 고치기 → 막힘');
-  // 지우기
+  log(blocked, '일반 직원이 남의 글을 몰래 수정 → 막힘');
+  // 삭제
   await a.click('.bd-post:has-text("실리콘")'); await a.click('#pBody [data-a=del]');
   await b.waitForFunction(() => document.querySelectorAll('.bd-post').length === 1);
-  log(true, '글 지우기 → 목록에서 사라짐');
+  log(true, '글 삭제 → 목록에서 사라짐');
   await a.screenshot({ path: SH + '/b1-list.png' });
   // 비회원
   const x = await user('x@test.com', null, false);
