@@ -110,7 +110,30 @@
     }
     return best;
   }
-  const DEFAULT_TASKS = ['철거', '설비', '전기', '목공', '타일', '도장', '도배', '가구', '조명', '청소', '검수'];
+  // 표준 공정표 (회사 인테리어 공정표 양식): [공종, 공종 상세, 하는 날(착공 1일째부터, [시작, 끝] 여러 개)]
+  // "표준 공정표 넣기"를 누르면 착공일 기준으로 날짜가 들어간다.
+  const STD_TASKS = [
+    ['보양,철거공사', '보양작업', [[1, 1]]], ['보양,철거공사', '천정 및 양개도어 철거', [[1, 1]]], ['보양,철거공사', '기계,조명,소방설비철거', [[1, 2]]],
+    ['목공사', '먹메김', [[3, 3]]], ['목공사', '벽체 합판 보강 및 목재틀 작업', [[8, 11]]], ['목공사', '벽체 MDF 마감판넬 작업', [[10, 14]]], ['목공사', '천정 MDF보드 작업', [[15, 16]]],
+    ['경량공사', '벽체 경량철골틀 설치작업', [[4, 6]]], ['경량공사', '벽체 석고보드 취부작업', [[6, 10]]], ['경량공사', '천장 경량철골틀 설치작업', [[11, 11]]], ['경량공사', '천장 석고보드 취부작업', [[11, 15]]], ['경량공사', '천정 등기구 외 타공 및 점검구 설치', [[15, 17]]],
+    ['금속공사', '프레임 설치 작업', [[10, 14]]], ['금속공사', '천정 등박스 외 구조틀 설치 작업', [[7, 11]]], ['금속공사', '벽체 금속보강구조틀 설치 작업', [[10, 16]]], ['금속공사', '몰딩 외 마감 설치작업', [[11, 15]]],
+    ['도장공사', '벽,천정 퍼티 및 샌딩작업', [[18, 26]]], ['도장공사', '벽, 천정 도장 마감작업', [[25, 28]]],
+    ['유리공사', '강화유리 설치', [[29, 30]]], ['유리공사', '백페인트글라스 설치', [[29, 30]]], ['유리공사', '마감코킹 작업', [[31, 31]]],
+    ['창호공사', '강화도어 힌지 설치작업', [[17, 19]]], ['창호공사', '강화도어 설치작업', [[29, 31]]], ['창호공사', '목문 설치 작업', [[22, 23]]],
+    ['수장공사', '인테리어필름, 타일 마감', [[28, 31]]], ['수장공사', '바닥 마감 공사', [[28, 30]]], ['수장공사', '블라인드,커튼 설치', [[31, 32]]],
+    ['사인공사', '사인물 설치', [[32, 32]]],
+    ['설비공사', '위생 설비 공사', [[8, 14], [31, 32]]], ['설비공사', '소방 설비 공사', [[12, 17], [31, 31]]],
+    ['전기공사', '전열,전등라인 배선 배관', [[2, 20]]], ['전기공사', '등기구 설치', [[25, 29]]], ['전기공사', '콘센트 외 기구 설치', [[28, 30]]],
+    ['가구집기셋팅', '제작가구 셋팅작업', [[31, 32]]], ['가구집기셋팅', '이동가구 셋팅작업', [[32, 33]]],
+    ['기타공사', '잔손보기', [[33, 35]]], ['준공청소', '준공 청소', [[34, 35]]],
+  ];
+  // 표준 공정 하나를 착공일 기준 날짜로 → {start, end, plus}
+  function stdDates(ranges, st) {
+    const day = (n) => addDays(st, n - 1);
+    const [a, b] = ranges[0], plus = {};
+    ranges.slice(1).forEach(([x, y]) => { for (let n = x; n <= y; n++) plus[day(n)] = true; });
+    return { start: day(a), end: day(b), plus: Object.keys(plus).length ? plus : null };
+  }
 
   // 새 글 알림 보내기 (Band 중계 worker/push.js)
   async function notify(postId) {
@@ -135,5 +158,5 @@
   }
   const hmOf = (t) => new Date(t).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
 
-  window.SBSite = { today, addDays, diffDays, parse, ymdOf, yy, md, periodRange, sites, managers, isManager, canAttend, activeOn, daysOf, taskList, progress, todayTasks, nextTask, DEFAULT_TASKS, attend, notify, hmOf, list, norm };
+  window.SBSite = { today, addDays, diffDays, parse, ymdOf, yy, md, periodRange, sites, managers, isManager, canAttend, activeOn, daysOf, taskList, progress, todayTasks, nextTask, STD_TASKS, stdDates, attend, notify, hmOf, list, norm };
 })();
