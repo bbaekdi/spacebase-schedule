@@ -69,7 +69,12 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   // ---------- 3단계: 현장 방 + A/S 처리 상태 + 홈 카드 ----------
   await a.click('#write'); await a.click('#wCats label:has-text("프로젝트")');
   log(await a.locator('#fWrite textarea[name=text]').isHidden(), '프로젝트: 자유 글 상자 대신 항목별 칸');
-  await a.fill('[name=f_client]', '테스트건설'); await a.fill('[name=f_type]', '오피스');
+  await a.fill('[name=f_client]', '테스트건설');
+  log((await a.locator('.bd-choice label').allInnerTexts()).join(',') === '오피스,카페,병원,직접 입력', '형태: 오피스/카페/병원/직접 입력 고르기');
+  await a.click('.bd-choice label:has-text("직접 입력")');
+  log(await a.locator('[name=f_type]').isVisible(), '형태 "직접 입력" → 글자 칸 나옴');
+  await a.click('.bd-choice label:has-text("오피스")');
+  log((await a.inputValue('[name=f_type]')) === '오피스' && await a.locator('[name=f_type]').isHidden(), '형태 "오피스" 고르기');
   log((await a.inputValue('[name=siteName]')) === '', '현장 이름은 자동으로 안 채움 (직접 입력)');
   await a.fill('[name=siteName]', '테스트빌딩 3층 사무실');
   // 도로명주소 검색 (시험에서는 카카오 대신 가짜 검색창)
@@ -83,6 +88,7 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   const cls = async (d) => a.getAttribute(`.bd-cal [data-d="${d}"]`, 'class');
   log(/red/.test(await cls('2027-01-01')) && /red/.test(await cls('2027-01-03')) && /blue/.test(await cls('2027-01-02')) && !/red|blue/.test(await cls('2027-01-04')), '달력: 공휴일·일요일 빨강, 토요일 파랑, 평일 검정');
   await a.screenshot({ path: SH + '/b11-calendar.png' });
+  log(await a.evaluate(() => { const d = document.getElementById('dlgWrite'); return d.scrollLeft === 0 && d.querySelector('.dlg-body').scrollLeft === 0 && ![...d.querySelectorAll('*')].some((x) => x.getBoundingClientRect().right > d.getBoundingClientRect().right + 1); }), '글쓰기 창이 옆으로 밀리지 않음');
   await a.click('.bd-cal [data-d="2027-01-06"]');
   await a.click('[data-cal=f_end]');
   log((await a.locator('.bd-cal b').innerText()) === '2027년 1월', '준공일 달력은 시작일 달부터');
@@ -96,7 +102,7 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await a.screenshot({ path: SH + '/b9-form-project.png' });
   await a.click('#wSave');
   await a.waitForSelector('.bd-post:has-text("테스트빌딩")');
-  log(/1\. 발주처명 _ 테스트건설[\s\S]*3\. 위치\(현장주소\) _ 테스트시 테스트구 연습로 1 A동 305호\n4\. 평수 _ 100\.0 PY\n5\. 공사기간 _ 27년 01월 06일~27년 02월 10일[\s\S]*6\. 발주처 담당자 _ 홍길동 팀장 010-1234-5678[\s\S]*7\. 기타 _ 예산 미정/.test(await a.locator('.bd-post:has(.bd-chip.project) .bd-text').innerText()), '올라간 글은 지금 밴드처럼 1~7번 모양');
+  log(/1\. 발주처명 _ 테스트건설\n2\. 형태 _ 오피스\n3\. 위치\(현장주소\) _ 테스트시 테스트구 연습로 1 A동 305호\n4\. 평수 _ 100\.0 PY\n5\. 공사기간 _ 27년 01월 06일~27년 02월 10일[\s\S]*6\. 발주처 담당자 _ 홍길동 팀장 010-1234-5678[\s\S]*7\. 기타 _ 예산 미정/.test(await a.locator('.bd-post:has(.bd-chip.project) .bd-text').innerText()), '올라간 글은 지금 밴드처럼 1~7번 모양');
   await a.click('.bd-post:has(.bd-chip.project) .bd-text');
   log((await a.locator('#pBody a[href="tel:01012345678"]').count()) === 1 && (await a.locator('#pBody a[href*="map.naver.com"]').count()) === 1, '글 보기: 연락처 누르면 전화, 주소 누르면 지도');
   await a.click('#dlgPost [data-close]');

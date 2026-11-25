@@ -148,3 +148,8 @@
 .bd-unit input { padding-right: 46px !important; }
 .bd-unit b { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--sub); font-size: 13px; pointer-events: none; }
 .bd-tel select { flex: 0 0 84px; width: 84px !important; }
+
+/* 숨은 고르기 칸이 창 밖으로 나가 창이 옆으로 밀리지 않게 */
+.bd-pick label, .bd-owners label { position: relative; }
+.bd-pick input, .bd-owners input { left: 0; top: 0; width: 1px; height: 1px; }
+.bd-dlg, .bd-dlg .dlg-body { overflow-x: hidden; }

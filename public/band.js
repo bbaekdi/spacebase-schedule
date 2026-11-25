@@ -177,7 +177,7 @@
   const FORMS = {
     project: [
       { k: 'client', label: '발주처명', req: 1 },
-      { k: 'type', label: '형태', ph: '예: 오피스, 카페, 병원' },
+      { k: 'type', label: '형태', choices: ['오피스', '카페', '병원'], ph: '형태 직접 입력' },
       { k: 'address', label: '위치(현장주소)', addr: 1 },
       { k: 'addr2', label: '상세주소', ph: '동·층·호수 (예: A동 305~308호)' },
       { k: 'area', label: '평수', unit: 'PY', ph: '예: 100' },
@@ -247,6 +247,11 @@
     if (d.multi) return `<label class="bd-f"><span>${d.label}${req}</span><textarea name="${nm}" rows="3" maxlength="2000" placeholder="${esc(d.ph || '')}">${v}</textarea></label>`;
     if (d.date) return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow">${dateBtn(nm, val, '날짜 고르기')}</div></div>`;
     if (d.range) return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow bd-range">${dateBtn('f_' + d.s, f[d.s], d.ph[0])}<b>~</b>${dateBtn('f_' + d.e, f[d.e], d.ph[1])}</div>${f[d.k] && !f[d.s] && !f[d.e] ? `<small class="bd-hint">예전 입력: ${esc(f[d.k])} (날짜를 고르면 바뀌어요)</small><input type="hidden" name="f_${d.k}Old" value="${esc(f[d.k])}">` : ''}</div>`;
+    if (d.choices) {
+      const other = !!val && !d.choices.includes(val);
+      return `<div class="bd-f"><span>${d.label}</span><div class="bd-pick bd-choice">${d.choices.map((x) => `<label><input type="radio" name="${nm}Sel" value="${esc(x)}" ${x === val ? 'checked' : ''}><span>${esc(x)}</span></label>`).join('')}<label><input type="radio" name="${nm}Sel" value="__other" ${other ? 'checked' : ''}><span>직접 입력</span></label></div>
+        <input name="${nm}" maxlength="40" placeholder="${esc(d.ph || '')}" value="${other || d.choices.includes(val) ? v : ''}" class="${other ? '' : 'hidden'}"></div>`;
+    }
     if (d.unit) { const n = String(val || '').replace(/\s*PY$/i, ''); return `<div class="bd-f"><span>${d.label}</span><div class="bd-unit"><input name="${nm}" inputmode="decimal" maxlength="12" placeholder="${esc(d.ph || '')}" value="${esc(n)}"><b>${d.unit}</b></div></div>`; }
     if (d.tel) {
       const [pre, rest] = splitPhone(val);
@@ -307,6 +312,14 @@
   const ownSel = (root, name) => { const el = root.querySelector('.bd-ownsel'); if (!el) return; const v = [...root.querySelectorAll(`input[name=${name}]:checked`)].map((x) => x.value); el.textContent = v.length ? '고른 사람: ' + v.join(', ') : '아직 고르지 않았어요.'; };
   $('#wExtra').addEventListener('change', (e) => {
     if (e.target.name === 'owner') ownSel($('#wExtra'), 'owner');
+    // 형태 고르기: 오피스/카페/병원은 그 글자를, "직접 입력"은 글자 칸을 보여 줌
+    if (/Sel$/.test(e.target.name) && e.target.type === 'radio') {
+      const inp = fW[e.target.name.slice(0, -3)]; if (!inp) return;
+      const other = e.target.value === '__other';
+      inp.classList.toggle('hidden', !other);
+      inp.value = other ? '' : e.target.value;
+      if (other) inp.focus();
+    }
     if (e.target.name === 'f_phonePre') { fW.f_phone.placeholder = e.target.value === '기타' ? '전화번호 전체' : '1234-5678'; fW.f_phone.focus(); }
   });
   $('#wExtra').addEventListener('input', (e) => {
