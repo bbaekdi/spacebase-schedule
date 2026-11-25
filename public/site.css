@@ -37,43 +37,44 @@
 .st-bar { height: 6px; background: var(--bg); border-radius: 99px; margin-top: 8px; overflow: hidden; }
 .st-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 
-/* 이번 주 칸 */
-.st-week .card-h, .st-gantt .card-h, .st-tasks .card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-.st-week .card-h h2, .st-gantt .card-h h2, .st-tasks .card-h h2 { margin: 0; font-size: 15px; }
-.st-range { font-size: 12px; font-weight: 700; color: var(--accent-text); background: var(--accent-soft); border-radius: 99px; padding: 3px 10px; }
+.st-calcard .card-h, .st-tasks .card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.st-calcard .card-h h2, .st-tasks .card-h h2 { margin: 0; font-size: 16px; }
 .st-nav { margin-left: auto; display: flex; gap: 4px; }
 .st-nav button { border: 1px solid var(--line); background: #fff; border-radius: 8px; min-width: 32px; height: 30px; cursor: pointer; font-weight: 700; color: var(--sub); padding: 0 8px; }
 .st-nav button:hover { background: var(--bg); }
 .st-scroll { overflow-x: auto; }
-.st-grid { display: grid; grid-template-columns: 88px repeat(7, minmax(52px, 1fr)); gap: 4px; min-width: 520px; align-items: center; }
-.st-grid .h { font-size: 12px; color: var(--sub); text-align: center; font-weight: 700; padding: 2px 0 4px; line-height: 1.3; }
-.st-grid .h small { display: block; font-weight: 400; }
-.st-grid .h.red { color: #e03b3b; }
-.st-grid .h.blue { color: #2f6fd8; }
-.st-grid .h.today { background: var(--accent-soft); border-radius: 8px; }
-.st-grid .rl { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.st-grid .rl.done { color: var(--sub); text-decoration: line-through; }
-.st-grid .c { height: 30px; border-radius: 7px; background: #f1efe9; border: 0; padding: 0; }
-.st-grid .c.on { background: var(--accent); }
-.st-grid .c.on.done { background: #c9c5b6; }
-.st-grid .c.rest { background: #faf8f3; }
-.st-grid button.c { cursor: pointer; }
-.st-grid button.c:hover { outline: 2px solid var(--accent-ink); outline-offset: -2px; }
-.st-grid .att { font-size: 11px; text-align: center; color: #1e7a3c; font-weight: 700; min-height: 18px; }
-.st-grid .rl.att-l { color: #1e7a3c; }
 .st-hint { font-size: 12px; color: var(--sub); margin-top: 10px; }
 
-/* 전체 기간 막대 */
-.st-g { position: relative; min-width: 520px; }
-.st-g-row { display: grid; grid-template-columns: 88px 1fr; align-items: center; gap: 8px; height: 26px; }
-.st-g-row .rl { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.st-g-track { position: relative; height: 14px; background: #f6f4ef; border-radius: 99px; }
-.st-g-track i { position: absolute; top: 0; height: 100%; background: var(--accent); border-radius: 99px; min-width: 3px; }
-.st-g-track i.done { background: #c9c5b6; }
-.st-g-months { display: grid; grid-template-columns: 88px 1fr; gap: 8px; margin-bottom: 4px; }
-.st-g-months .m { position: relative; height: 16px; font-size: 11px; color: var(--sub); }
-.st-g-months .m span { position: absolute; top: 0; white-space: nowrap; border-left: 1px solid var(--line); padding-left: 3px; }
-.st-g-today { position: absolute; top: 20px; bottom: 0; width: 2px; background: #e03b3b; opacity: .7; }
+/* 한 달 공정 캘린더 */
+.st-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.st-lg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--sub); border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; background: #fff; }
+.st-lg i { width: 9px; height: 9px; border-radius: 50%; }
+.st-lg.now { color: var(--ink); }
+.st-lg.done { text-decoration: line-through; opacity: .7; }
+.st-month { min-width: 640px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.st-wh { display: grid; grid-template-columns: repeat(7, 1fr); background: #faf9f6; border-bottom: 1px solid var(--line); }
+.st-wh span { text-align: center; font-size: 12px; font-weight: 700; color: var(--sub); padding: 8px 0; }
+.st-wh .red { color: #e03b3b; } .st-wh .blue { color: #2f6fd8; }
+.st-wk { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--line); }
+.st-wk:last-child { border-bottom: 0; }
+.st-wk.now { background: #fffbf1; }
+.st-day { display: flex; justify-content: space-between; align-items: flex-start; border: 0; border-right: 1px solid var(--line); background: none; padding: 6px 7px; text-align: left; font: inherit; color: inherit; min-height: 100%; }
+.st-day:last-child { border-right: 0; }
+button.st-day { cursor: pointer; }
+button.st-day:hover { background: rgba(241, 191, 82, .12); }
+.st-day .n { font-size: 13px; font-weight: 700; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; }
+.st-day .n.red { color: #e03b3b; } .st-day .n.blue { color: #2f6fd8; }
+.st-day.today .n { background: var(--accent-ink); color: #fff; }
+.st-day.out .n { opacity: .35; }
+.st-day .att { font-size: 10px; font-weight: 700; color: #1e7a3c; background: #e7f6ec; border-radius: 99px; padding: 1px 6px; white-space: nowrap; }
+.st-seg { position: absolute; height: 20px; line-height: 20px; border-radius: 6px; background: #d9d5cb; color: #5e5b54; font-size: 11px; font-weight: 700; padding: 0 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; text-align: center; }
+.st-seg.now { color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.st-daypop b { display: block; font-size: 14px; margin-bottom: 8px; }
+.st-dpl { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
+.st-dpl label { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+.st-dpl label:hover { background: var(--bg); }
+.st-dpl input { width: 17px; height: 17px; accent-color: var(--accent-ink); }
+.st-dpl i { width: 9px; height: 9px; border-radius: 50%; }
 
 /* 공정 목록 (수정) */
 .st-trow { display: grid; grid-template-columns: 26px minmax(0, 1fr) 128px 14px 128px auto; grid-template-areas: "c n d1 t d2 a"; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }

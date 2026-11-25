@@ -5,7 +5,7 @@
 
 const PROJECT = 'spacebase-schedule';
 const DB = 'https://spacebase-schedule-default-rtdb.asia-southeast1.firebasedatabase.app';
-const CAT = { photo: '현장 사진', as: 'A/S', project: '프로젝트', notice: '공지·자유글' };
+const CAT = { photo: '현장 사진', as: 'A/S', project: '프로젝트', notice: '공지·자유글', attend: '출근' };
 const enc = new TextEncoder();
 const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = (s) => { s = s.replace(/-/g, '+').replace(/_/g, '/'); const r = atob(s + '='.repeat((4 - (s.length % 4)) % 4)); return Uint8Array.from(r, (c) => c.charCodeAt(0)); };
@@ -109,7 +109,6 @@ export async function push(req, env, url, reply) {
   const [member, post, sent] = await Promise.all([db(env, 'ws/members/' + uid), db(env, 'board/posts/' + postId), db(env, 'push/sent/' + postId)]);
   if (!member) return reply('회원이 아닙니다.', 403);
   if (!post || post.uid !== uid || post.deleted) return reply('보낼 수 없는 글입니다.', 403);
-  if (post.cat === 'attend') return reply(JSON.stringify({ sent: 0, attend: true }), 200, 'application/json'); // 출근 글은 알림 안 보냄
   if (Date.now() - post.at > 10 * 60e3) return reply('오래된 글입니다.', 409);
   if (sent) return reply(JSON.stringify({ sent: 0, already: true }), 200, 'application/json');
   await db(env, 'push/sent/' + postId, 'PUT', Date.now());

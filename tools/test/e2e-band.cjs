@@ -12,7 +12,7 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
     const p = await c.newPage(); p.on('pageerror', (e) => errs.push(e.message)); p.on('dialog', (d) => d.accept());
     await p.goto(B + 'band.html'); await p.waitForSelector('#sbG');
     const uid = await p.evaluate((email) => firebase.auth().signInWithCredential(firebase.auth.GoogleAuthProvider.credential(JSON.stringify({ sub: email, email, email_verified: true }))).then((r) => r.user.uid), email);
-    if (name) { await put('ws/members/' + uid, { name, email, joinedAt: 1 }); if (admin) await put('ws/admins/' + uid, true); await p.reload(); }
+    if (name) { await put('ws/members/' + uid, { name, email, joinedAt: 1 }); if (admin) await put('ws/admins/' + uid, true); await p.reload().catch(() => {}); await p.waitForLoadState(); }
     return p;
   }
   const a = await user('a@test.com', '김테스트', true);

@@ -81,7 +81,24 @@
     return !!(t.start && day >= t.start && (!t.end ? day === t.start : day <= t.end));
   }
   const taskList = (tasks) => Object.entries(tasks || {}).map(([id, t]) => ({ id, ...t })).sort((a, b) => (a.order || 0) - (b.order || 0));
-  const progress = (tasks) => { const l = taskList(tasks); return l.length ? Math.round((l.filter((t) => t.done).length / l.length) * 100) : 0; };
+  // 공정이 하는 날들 (기간 안 + 더한 날 - 뺀 날)
+  function daysOf(t) {
+    const out = new Set();
+    if (t.start) { const end = t.end && t.end >= t.start ? t.end : t.start; for (let d = t.start, i = 0; d <= end && i < 1000; d = addDays(d, 1), i++) if (!(t.minus && t.minus[d])) out.add(d); }
+    Object.keys(t.plus || {}).forEach((d) => out.add(d));
+    return [...out].sort();
+  }
+  // 진행률: 공정 일정이 지난 날만큼 (완료 체크한 공정은 다 끝난 것으로). 날짜 없는 공정은 1칸으로 세고 완료 체크로만.
+  function progress(tasks, day = today()) {
+    let tot = 0, got = 0;
+    for (const t of taskList(tasks)) {
+      const ds = daysOf(t);
+      const w = ds.length || 1;
+      tot += w;
+      got += t.done ? w : ds.filter((d) => d < day).length;
+    }
+    return tot ? Math.round((got / tot) * 100) : 0;
+  }
   const todayTasks = (tasks, day = today()) => taskList(tasks).filter((t) => activeOn(t, day));
   // 다음에 시작하는 공정 (오늘 이후 첫 날)
   function nextTask(tasks, day = today()) {
@@ -95,17 +112,28 @@
   }
   const DEFAULT_TASKS = ['철거', '설비', '전기', '목공', '타일', '도장', '도배', '가구', '조명', '청소', '검수'];
 
-  // 출근: site/<id>/attend/<날짜>/<uid> + Band "출근" 게시판 글 (하루 한 번)
+  // 새 글 알림 보내기 (Band 중계 worker/push.js)
+  async function notify(postId) {
+    try {
+      const api = String(window.SB_BAND_API || '').replace(/\/$/, ''); if (!api || !postId) return;
+      const t = await firebase.auth().currentUser.getIdToken();
+      fetch(api + '/push/notify', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ post: postId }) }).catch(() => {});
+    } catch {}
+  }
+  // 출근할 수 있는 사람: 그 현장 소장님 + 관리자
+  const canAttend = (site, members, me) => !!me && (me.admin || isManager(site, members, me.name));
+  // 출근: site/<id>/attend/<날짜>/<uid> + Band "출근" 게시판 글 + 새 글 알림 (하루 한 번)
   async function attend(db, me, site) {
     const day = today(), ref = db.ref('site/' + site.id + '/attend/' + day + '/' + me.uid);
     if ((await ref.once('value')).exists()) return { already: true };
     const now = Date.now();
     await ref.set({ name: me.name, at: now });
     const hm = new Date(now).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
-    await db.ref('board/posts').push({ cat: 'attend', text: `${me.name} 출근 · ${hm}`, siteName: site.name.slice(0, 40), uid: me.uid, name: me.name, at: now, commentCount: 0 }).catch(() => {});
+    const post = db.ref('board/posts').push();
+    await post.set({ cat: 'attend', text: `${me.name} 출근 · ${hm}`, siteName: site.name.slice(0, 40), uid: me.uid, name: me.name, at: now, commentCount: 0 }).then(() => notify(post.key)).catch(() => {});
     return { at: now, hm };
   }
   const hmOf = (t) => new Date(t).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
 
-  window.SBSite = { today, addDays, diffDays, parse, ymdOf, yy, md, periodRange, sites, managers, isManager, activeOn, taskList, progress, todayTasks, nextTask, DEFAULT_TASKS, attend, hmOf, list, norm };
+  window.SBSite = { today, addDays, diffDays, parse, ymdOf, yy, md, periodRange, sites, managers, isManager, canAttend, activeOn, daysOf, taskList, progress, todayTasks, nextTask, DEFAULT_TASKS, attend, notify, hmOf, list, norm };
 })();

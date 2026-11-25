@@ -174,13 +174,14 @@
   const sched = {}; let siteData = {};
   const draw = () => {
     if (!sched.projects || !sched.groups || !sched.members) return;
-    const mine = S.sites(sched).active.filter((s) => S.isManager(s, sched.members, me.name));
+    // 소장님은 내 현장, 관리자는 모든 진행 현장
+    const mine = S.sites(sched).active.filter((s) => S.canAttend(s, sched.members, me));
     document.getElementById('mySiteCard').classList.toggle('hidden', !mine.length);
     const day = S.today();
     document.getElementById('mySites').innerHTML = mine.map((s) => {
       const d = siteData[s.id] || {}, now = S.todayTasks(d.tasks, day), att = ((d.attend || {})[day] || {})[me.uid];
       return `<div class="mysite" data-id="${esc(s.id)}"><a href="site.html#s=${encodeURIComponent(s.id)}"><b>${esc(s.name)}</b><small>${now.length ? '오늘: ' + now.map((t) => esc(t.name)).join(', ') : '오늘은 공정이 없어요'} · 진행률 ${S.progress(d.tasks)}%</small></a>
-        ${att ? `<span class="mysite-ok">✓ 출근 ${S.hmOf(att.at)}</span>` : '<button class="btn primary" type="button" data-att>출근</button>'}</div>`;
+        ${att ? '<span class="mysite-ok">✓ 출근함</span>' : '<button class="btn primary" type="button" data-att>출근</button>'}</div>`;
     }).join('');
   };
   ['projects', 'groups', 'members'].forEach((k) => base.child(k).on('value', (s) => { sched[k] = S.list(s.val()); draw(); }));

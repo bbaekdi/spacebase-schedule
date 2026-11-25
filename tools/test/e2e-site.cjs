@@ -28,7 +28,7 @@ const dot = (s) => s.replace(/-/g, '.');
     await p.goto(B + 'site.html'); await p.waitForSelector('#sbG');
     const uid = await p.evaluate((email) => firebase.auth().signInWithCredential(firebase.auth.GoogleAuthProvider.credential(JSON.stringify({ sub: email, email, email_verified: true }))).then((r) => r.user.uid), email);
     await put('ws/members/' + uid, { name, email, joinedAt: 1 }); if (admin) await put('ws/admins/' + uid, true);
-    await p.reload(); return { p, uid };
+    await p.reload().catch(() => {}); await p.waitForLoadState(); return { p, uid };
   }
   const { p: a, uid: aUid } = await user('a@test.com', '김테스트', false);
   await a.waitForSelector('.st-head h1');
@@ -46,19 +46,35 @@ const dot = (s) => s.replace(/-/g, '.');
   await a.click(`${row('목공')} [data-cal=end]`);
   if (plus(4).slice(0, 7) !== TODAY.slice(0, 7)) await a.click('.st-cal [data-m="1"]');
   await a.click(`.st-cal [data-d="${plus(4)}"]`);
-  await a.waitForFunction(() => document.querySelectorAll('.st-week button.c.on').length >= 1);
-  const cell = `.st-week button.c[data-d="${TODAY}"][data-t]`;
+  await a.waitForSelector('.st-wk.now .st-seg.now:has-text("목공")');
+  log(true, '캘린더: 이번 주 목공 막대가 색으로');
   const mokId = await a.getAttribute(row('목공'), 'data-t');
-  const mok = `.st-week button.c[data-t="${mokId}"][data-d="${TODAY}"]`;
-  log(/on/.test(await a.getAttribute(mok, 'class')), '이번 주 칸: 목공 오늘 칸 색칠');
   log(/오늘: 목공/.test(await a.locator('.st-head').innerText()), '머리: "오늘: 목공"');
-  await a.click(mok); await a.waitForFunction((s) => !/\bon\b/.test(document.querySelector(s).className), mok);
-  log(true, '칸 누르면 그날 쉬는 날로');
-  await a.click(mok); await a.waitForFunction((s) => /\bon\b/.test(document.querySelector(s).className), mok);
-  log(true, '다시 누르면 하는 날로');
-  // 완료 체크 → 진행률
-  await a.check(`${row('철거')} input.chk`); await a.waitForFunction(() => /진행률 9%/.test(document.querySelector('.st-head').innerText));
-  log(true, '완료 체크 1/11 → 진행률 9%');
+  // 날짜 눌러 그날 하는 공정 고치기
+  await a.click(`button.st-day[data-day="${TODAY}"]`); await a.waitForSelector('.st-daypop');
+  log(await a.isChecked(`.st-daypop input[data-t="${mokId}"]`), '날짜를 누르면 그날 하는 공정 목록 (목공 켜짐)');
+  await a.uncheck(`.st-daypop input[data-t="${mokId}"]`);
+  await a.waitForFunction(async ([u]) => true, [0]);
+  await new Promise((r) => setTimeout(r, 600));
+  log((await get(`site/p1/tasks/${mokId}/minus/${TODAY}`)) === true, '끄면 그날만 쉬는 날');
+  await a.check(`.st-daypop input[data-t="${mokId}"]`); await new Promise((r) => setTimeout(r, 600));
+  log((await get(`site/p1/tasks/${mokId}/minus/${TODAY}`)) === null, '다시 켜면 하는 날');
+  await a.click('.st-daypop [data-close]');
+  // 이번 주가 아닌 주의 막대는 회색 (타일: 8~9일 뒤)
+  const taId = await a.getAttribute(row('타일'), 'data-t');
+  await put(`site/p1/tasks/${taId}/start`, plus(8)); await put(`site/p1/tasks/${taId}/end`, plus(9));
+  if (plus(8).slice(0, 7) !== TODAY.slice(0, 7)) await a.click('[data-mo="1"]');
+  await a.waitForSelector('.st-seg:has-text("타일")');
+  log((await a.locator('.st-seg.now:has-text("타일")').count()) === 0, '이번 주가 아닌 공정 막대는 회색');
+  await a.click('[data-mo="0"]');
+  // 진행률: 일정이 지난 날만큼 (철거 3일 지남 / 철거3 + 목공5 + 타일2 + 날짜 없는 8)
+  const chId = await a.getAttribute(row('철거'), 'data-t');
+  await put(`site/p1/tasks/${chId}/start`, plus(-3)); await put(`site/p1/tasks/${chId}/end`, plus(-1));
+  await a.waitForFunction(() => /진행률 17%/.test(document.querySelector('.st-head').innerText));
+  log(true, '공정을 등록하면 진행률이 바뀜 (지난 날만큼, 17%)');
+  // 완료 체크 → 그 공정은 다 끝난 것으로
+  await a.check(`${row('목공')} input.chk`); await a.waitForFunction(() => /진행률 44%/.test(document.querySelector('.st-head').innerText));
+  log(true, '완료 체크 → 진행률 올라감 (44%)');
   // 이름 고치기 + 순서
   await a.fill(`${row('청소')} input.nmc`, '준공 청소'); await a.locator(`${row('청소')} input.nmc`).press('Tab');
   await a.waitForSelector(row('준공 청소'));
@@ -66,19 +82,25 @@ const dot = (s) => s.replace(/-/g, '.');
   const before = await a.locator('.st-trow input.nmc').evaluateAll((l) => l.map((x) => x.value).slice(0, 2).join(','));
   await a.click(`${row('설비')} [data-mv="-1"]`); await a.waitForFunction(() => document.querySelector('.st-trow input.nmc').value === '설비');
   log(before === '철거,설비', '공정 순서 바꾸기 (설비 ↑)');
-  log((await a.locator('.st-gantt .st-g-row').count()) === 11 && (await a.locator('.st-gantt .st-g-track i').count()) >= 1, '전체 공정 막대');
+  log((await a.locator('.st-gantt, .st-week').count()) === 0, '이번 주 칸·전체 막대는 캘린더 하나로 합침');
   await a.screenshot({ path: SH + '/s1-site.png', fullPage: true });
-  // 출근
+  // 출근 (+ 새 글 알림 요청)
+  let notifyReq = null;
+  await a.route('**/push/notify', (r) => { notifyReq = r.request().postDataJSON(); r.fulfill({ status: 200, body: '{}' }); });
   await a.click('#attBtn'); await a.waitForSelector('.st-attend .done');
-  log(/✓ 출근 \d\d:\d\d/.test(await a.locator('.st-attend .done').innerText()), '출근 → "✓ 출근 08:12" 모양');
-  log(/✓ \d\d:\d\d/.test(await a.locator('.st-week .att').allInnerTexts().then((x) => x.join(' '))), '이번 주 칸에 출근 표시');
+  log((await a.locator('.st-attend .done').innerText()) === '✓ 출근함', '출근 → "✓ 출근함" (시간 없음)');
+  log(/✓ 출근/.test(await a.locator(`.st-day[data-day="${TODAY}"]`).innerText()), '캘린더 오늘 칸에 출근 표시');
   const posts = Object.values((await get('board/posts')) || {});
   log(posts.some((x) => x.cat === 'attend' && /김테스트 출근 · \d\d:\d\d/.test(x.text) && x.siteName === '테스트 오피스'), 'Band "출근" 게시판에 자동 글');
+  await new Promise((r) => setTimeout(r, 800));
+  log(!!notifyReq && !!notifyReq.post, '출근하면 새 글 알림 보내기 요청');
+  await a.locator('.st-head').screenshot({ path: SH + '/s0-head.png' });
+  await a.locator('.st-calcard').screenshot({ path: SH + '/s4-calendar.png' });
   // 다른 직원 (소장 아님)
   const { p: b } = await user('b@test.com', '이시험', false);
   await b.waitForSelector('.st-head h1');
-  log((await b.locator('#attBtn').count()) === 0 && (await b.locator('#addTask').count()) === 0 && (await b.locator('.st-week button.c').count()) === 0, '소장 아닌 직원: 출근·수정 버튼 없음 (보기만)');
-  log(/출근[\s\S]*✓ \d\d:\d\d/.test(await b.locator('.st-week').innerText()), '다른 직원도 출근한 날을 봄');
+  log((await b.locator('#attBtn').count()) === 0 && (await b.locator('#addTask').count()) === 0 && (await b.locator('button.st-day').count()) === 0, '소장 아닌 직원: 출근·수정 버튼 없음 (보기만)');
+  log(/✓ 출근/.test(await b.locator('.st-calcard').innerText()), '다른 직원도 출근한 날을 봄');
   await b.goto(B + 'band.html'); await b.waitForTimeout(1500);
   log(!/출근 ·/.test(await b.locator('#list').innerText()), 'Band "전체"에는 출근 글이 안 섞임');
   await b.click('#cats button:has-text("출근")'); await b.waitForTimeout(300);
@@ -88,10 +110,16 @@ const dot = (s) => s.replace(/-/g, '.');
   await b.click('#dlgWrite [data-close]');
   // 홈 카드
   await a.goto(B + 'portal.html'); await a.waitForSelector('#mySiteCard:not(.hidden) .mysite');
-  log(/테스트 오피스[\s\S]*오늘: 목공[\s\S]*✓ 출근/.test(await a.locator('#mySiteCard').innerText()), '홈 "오늘 내 현장": 오늘 공정 + 출근함');
+  log(/테스트 오피스[\s\S]*오늘: 목공[\s\S]*✓ 출근함/.test(await a.locator('#mySiteCard').innerText()), '홈 "오늘 내 현장": 오늘 공정 + 출근함');
   await a.waitForTimeout(800); await a.screenshot({ path: SH + '/s2-home.png' });
   await b.goto(B + 'portal.html'); await b.waitForTimeout(2000);
   log(await b.locator('#mySiteCard').isHidden(), '소장 아닌 직원은 "오늘 내 현장" 카드 없음');
+  // 관리자 (소장 아님): 출근 버튼·오늘 내 현장 카드 보임
+  const { p: c } = await user('c@test.com', '박관리', true);
+  await c.waitForSelector('.st-head h1');
+  log((await c.locator('#attBtn').count()) === 1 && (await c.locator('#addTask').count()) === 1, '관리자: 출근 버튼 + 수정 가능');
+  await c.goto(B + 'portal.html'); await c.waitForSelector('#mySiteCard:not(.hidden) .mysite');
+  log(/테스트 오피스/.test(await c.locator('#mySiteCard').innerText()) && (await c.locator('#mySiteCard [data-att]').count()) === 1, '관리자: 홈 "오늘 내 현장" 카드 + 출근 버튼');
   // 휴대폰
   const { p: m } = await user('a@test.com', '김테스트', false, { ...devices['iPhone 13'] });
   await m.waitForSelector('.st-head h1'); await m.waitForTimeout(500);

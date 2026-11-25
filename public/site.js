@@ -5,9 +5,8 @@
   const $ = (s) => document.querySelector(s);
   const WD = ['일', '월', '화', '수', '목', '금', '토'];
   const H = () => window.SB_HOLIDAYS || {};
-  let me = null, db = null, sched = { projects: [], groups: [], members: [] }, siteData = {}, cur = null, weekStart = null;
+  let me = null, db = null, sched = { projects: [], groups: [], members: [] }, siteData = {}, cur = null, monthBase = S.today().slice(0, 7);
 
-  const mondayOf = (day) => { const w = S.parse(day).getDay(); return S.addDays(day, -((w + 6) % 7)); };
   const canEdit = (site) => !!me && (me.admin || S.isManager(site, sched.members, me.name));
   const tasksOf = (id) => (siteData[id] && siteData[id].tasks) || {};
   const attendOf = (id) => (siteData[id] && siteData[id].attend) || {};
@@ -41,8 +40,8 @@
     const pc = S.progress(tasks), nowT = S.todayTasks(tasks, day), nx = S.nextTask(tasks, day);
     const state = s.en && s.en < day ? ['end', '끝남'] : s.st && s.st > day ? ['soon', '준비 중'] : ['', '진행 중'];
     const att = (attendOf(s.id)[day] || {})[me.uid];
-    const isMg = S.isManager(s, sched.members, me.name);
-    const weekDays = [...Array(7)].map((_, i) => S.addDays(weekStart, i));
+    const canAtt = S.canAttend(s, sched.members, me);
+    const wk0 = S.addDays(day, -S.parse(day).getDay()), weekDays = [...Array(7)].map((_, i) => S.addDays(wk0, i));
     const weekCount = tl.filter((t) => weekDays.some((d) => S.activeOn(t, d))).length;
     const periodText = s.st || s.en ? `${S.yy(s.st) || '?'} ~ ${S.yy(s.en) || '준공일 미정'}` : `공사기간: ${esc(s.period || '미정')}`;
     $('#main').innerHTML = `${pickHtml()}
@@ -51,61 +50,86 @@
           <div class="sub">${periodText} · 진행률 ${pc}%${nowT.length ? ` · 오늘: <b>${nowT.map((t) => esc(t.name)).join(', ')}</b>` : ''}${nx ? ` · 다음: ${esc(nx.t.name)} (D-${S.diffDays(day, nx.day)})` : ''}</div>
           <div class="sub">소장: ${mg.length ? mg.map((m) => esc((m.name + ' ' + m.rank).trim())).join(', ') : '주간 스케줄 "시공 담당"이 비어 있어요'}</div></div>
         <div class="st-attend"><span class="st-badge ${state[0]}">${state[1]}</span>
-          ${isMg && state[0] !== 'end' ? (att ? `<span class="done">✓ 출근 ${S.hmOf(att.at)}</span>` : '<button class="btn primary" type="button" id="attBtn">출근</button>') : ''}</div>
+          ${canAtt && state[0] !== 'end' ? (att ? '<span class="done">✓ 출근함</span>' : '<button class="btn primary" type="button" id="attBtn">출근</button>') : ''}</div>
       </div>
       <div class="st-stats">
         <div class="st-stat"><div class="k">진행 현장</div><div class="v">${L.active.length}</div><div class="s">공사기간 안 (착공 7일 전부터)</div></div>
         <div class="st-stat"><div class="k">오늘 공정</div><div class="v">${nowT.length}<small> 개</small></div><div class="s">${nowT.length ? nowT.map((t) => esc(t.name)).join(', ') : '오늘은 공정이 없어요'}</div></div>
         <div class="st-stat"><div class="k">이번 주 공정</div><div class="v">${weekCount}<small> / ${tl.length}</small></div><div class="s">${S.md(weekDays[0])} ~ ${S.md(weekDays[6])}</div></div>
-        <div class="st-stat"><div class="k">진행률</div><div class="v">${pc}<small>%</small></div><div class="st-bar"><i style="width:${pc}%"></i></div><div class="s">완료 ${tl.filter((t) => t.done).length} / ${tl.length} 공정</div></div>
+        <div class="st-stat"><div class="k">진행률</div><div class="v">${pc}<small>%</small></div><div class="st-bar"><i style="width:${pc}%"></i></div><div class="s">공정 일정이 지난 만큼 · 완료 ${tl.filter((t) => t.done).length} / ${tl.length}</div></div>
       </div>
-      ${weekCard(s, tl, weekDays, edit)}
-      ${ganttCard(s, tl)}
+      ${calCard(s, tl, edit)}
       ${tasksCard(s, tl, edit)}`;
     const pick = $('#pick'); if (pick) pick.onchange = () => { location.hash = 's=' + encodeURIComponent(pick.value); };
     const ab = $('#attBtn'); if (ab) ab.onclick = doAttend;
   }
 
-  function weekCard(s, tl, days, edit) {
+  // ---------- 한 달 공정 캘린더 (이번 주 막대만 색, 나머지 주는 회색) ----------
+  const COLORS = ['#e5484d', '#0f8a6a', '#2f6fd8', '#a33b6b', '#1d1d1b', '#c26a12', '#3f7f2a', '#d4572a', '#7c6be0', '#1e9e7a', '#b8860b', '#5a6b8c'];
+  const colorOf = (tl, t) => COLORS[Math.max(0, tl.findIndex((x) => x.id === t.id)) % COLORS.length];
+  function calCard(s, tl, edit) {
     const day = S.today(), att = attendOf(s.id);
-    const head = days.map((d) => `<div class="h ${dayCls(d)} ${d === day ? 'today' : ''}">${WD[S.parse(d).getDay()]}<small>${S.md(d)}</small></div>`).join('');
-    const attRow = `<div class="rl att-l">출근</div>` + days.map((d) => { const a = Object.values(att[d] || {}); return `<div class="att">${a.length ? '✓ ' + esc(S.hmOf(Math.min(...a.map((x) => x.at)))) : ''}</div>`; }).join('');
-    const rows = tl.map((t) => `<div class="rl ${t.done ? 'done' : ''}" title="${esc(t.name)}">${esc(t.name)}</div>` + days.map((d) => {
-      const on = S.activeOn(t, d), cls = `c ${on ? 'on' : dayCls(d) === 'red' ? 'rest' : ''} ${t.done ? 'done' : ''}`;
-      return edit ? `<button type="button" class="${cls}" data-t="${esc(t.id)}" data-d="${d}" aria-label="${esc(t.name)} ${S.md(d)} ${on ? '하는 날' : '안 하는 날'}"></button>` : `<div class="${cls}"></div>`;
-    }).join('')).join('');
-    return `<div class="card st-week"><div class="card-h"><h2>이번 주 공정</h2><span class="st-range">${S.md(days[0])} — ${S.md(days[6])}</span>
-      <div class="st-nav"><button type="button" data-w="-7" aria-label="지난주">‹</button><button type="button" data-w="0">이번 주</button><button type="button" data-w="7" aria-label="다음 주">›</button></div></div>
-      ${tl.length ? `<div class="st-scroll"><div class="st-grid"><div class="h">공정</div>${head}${attRow}${rows}</div></div>
-      ${edit ? '<div class="st-hint">칸을 누르면 그날 하는 날 ↔ 안 하는 날로 바뀌어요 (쉬는 날, 하루 더 하는 날).</div>' : ''}`
-      : `<div class="st-empty" style="padding:24px">아직 공정이 없어요.${edit ? ' 아래 "공정 목록"에서 넣어 주세요.' : ''}</div>`}</div>`;
+    const [y, m] = monthBase.split('-').map(Number);
+    const first = `${monthBase}-01`, startCell = S.addDays(first, -S.parse(first).getDay());
+    const lastDay = `${monthBase}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+    const weeks = []; for (let d = startCell; d <= lastDay; d = S.addDays(d, 7)) weeks.push([...Array(7)].map((_, i) => S.addDays(d, i)));
+    const thisWeek = S.addDays(day, -S.parse(day).getDay());
+    const legend = tl.map((t) => {
+      const now = S.daysOf(t).some((d) => d >= thisWeek && d <= S.addDays(thisWeek, 6));
+      return `<span class="st-lg ${now ? 'now' : ''} ${t.done ? 'done' : ''}"><i style="background:${now && !t.done ? colorOf(tl, t) : '#c9c5b6'}"></i>${esc(t.name)}</span>`;
+    }).join('');
+    const rows = weeks.map((w) => {
+      const isNow = w[0] === thisWeek;
+      // 한 주 안에서 공정마다 이어진 날을 막대로, 겹치지 않게 줄을 나눔
+      const segs = [];
+      tl.forEach((t) => {
+        let st = -1;
+        for (let i = 0; i <= 7; i++) {
+          const on = i < 7 && S.activeOn(t, w[i]);
+          if (on && st < 0) st = i;
+          if (!on && st >= 0) { segs.push({ t, a: st, b: i }); st = -1; }
+        }
+      });
+      const lanes = [];
+      segs.forEach((g) => { let l = lanes.findIndex((end) => end <= g.a); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = g.b; g.l = l; });
+      const cells = w.map((d) => {
+        const a = Object.values(att[d] || {}), out = d.slice(0, 7) !== monthBase;
+        return `<${edit ? 'button type="button"' : 'div'} class="st-day ${out ? 'out' : ''} ${d === day ? 'today' : ''}" data-day="${d}"><span class="n ${dayCls(d)}">${+d.slice(8)}</span>${a.length ? '<span class="att">✓ 출근</span>' : ''}</${edit ? 'button' : 'div'}>`;
+      }).join('');
+      const bars = segs.map((g) => {
+        const color = isNow && !g.t.done ? colorOf(tl, g.t) : '';
+        const len = g.b - g.a;
+        return `<span class="st-seg ${color ? 'now' : ''}" style="left:calc(${(g.a / 7) * 100}% + 3px);width:calc(${(len / 7) * 100}% - 6px);top:${30 + g.l * 24}px;${color ? 'background:' + color : ''}" title="${esc(g.t.name)}">${esc(g.t.name)}${len > 1 ? ` ${S.daysOf(g.t).length}일` : ''}</span>`;
+      }).join('');
+      return `<div class="st-wk ${isNow ? 'now' : ''}" style="min-height:${Math.max(84, 36 + lanes.length * 24)}px">${cells}${bars}</div>`;
+    }).join('');
+    return `<div class="card st-calcard"><div class="card-h"><div class="st-nav" style="margin-left:0"><button type="button" data-mo="-1" aria-label="지난달">‹</button></div><h2>${y}년 ${m}월 공정 일정</h2><div class="st-nav" style="margin-left:0"><button type="button" data-mo="1" aria-label="다음 달">›</button><button type="button" data-mo="0">이번 달</button></div>
+      <span class="st-ro" style="margin-left:auto">이번 주 공정만 색으로 보여요${edit ? ' · 날짜를 누르면 그날 하는 공정을 고칠 수 있어요' : ''}</span></div>
+      ${tl.length ? `<div class="st-legend">${legend}</div>` : ''}
+      <div class="st-scroll"><div class="st-month"><div class="st-wh">${WD.map((d, i) => `<span class="${i === 0 ? 'red' : i === 6 ? 'blue' : ''}">${d}</span>`).join('')}</div>${rows}</div></div>
+      ${tl.length ? '' : `<div class="st-empty" style="padding:18px">아직 공정이 없어요.${edit ? ' 아래 "공정 목록"에서 넣어 주세요.' : ''}</div>`}</div>`;
   }
-
-  function ganttCard(s, tl) {
-    const days = [];
-    tl.forEach((t) => { if (t.start) days.push(t.start); if (t.end) days.push(t.end); Object.keys(t.plus || {}).forEach((d) => days.push(d)); });
-    let a = s.st || days.slice().sort()[0], b = s.en || days.slice().sort().pop();
-    if (days.length) { const sd = days.slice().sort(); if (sd[0] < a) a = sd[0]; if (sd[sd.length - 1] > b) b = sd[sd.length - 1]; }
-    if (!a || !b || b < a || !tl.length) return `<div class="card st-gantt"><div class="card-h"><h2>전체 공정</h2></div><div class="st-empty" style="padding:24px">공정에 기간을 넣으면 착공부터 준공까지 막대로 보여요.</div></div>`;
-    const span = Math.min(S.diffDays(a, b) + 1, 500), pos = (d) => (S.diffDays(a, d) / span) * 100;
-    // 그 공정이 하는 날들을 이어 붙여 막대로
-    const segs = (t) => {
-      const out = []; let st = null;
-      for (let i = 0; i <= span; i++) {
-        const d = S.addDays(a, i), on = i < span && S.activeOn(t, d);
-        if (on && st === null) st = i;
-        if (!on && st !== null) { out.push([st, i]); st = null; }
-      }
-      return out.map(([x, y]) => `<i class="${t.done ? 'done' : ''}" style="left:${(x / span) * 100}%;width:${((y - x) / span) * 100}%" title="${esc(t.name)} ${S.md(S.addDays(a, x))}~${S.md(S.addDays(a, y - 1))}"></i>`).join('');
-    };
-    const months = []; for (let d = a; d <= b; d = S.addDays(d, 1)) if (d === a || d.endsWith('-01')) months.push(d);
-    const today = S.today(), tp = today >= a && today <= b ? pos(today) : null;
-    return `<div class="card st-gantt"><div class="card-h"><h2>전체 공정</h2><span class="st-range">${S.md(a)} — ${S.md(b)}</span></div>
-      <div class="st-scroll"><div class="st-g">
-        <div class="st-g-months"><div></div><div class="m">${months.map((d) => `<span style="left:${pos(d)}%">${+d.slice(5, 7)}월</span>`).join('')}</div></div>
-        ${tl.map((t) => `<div class="st-g-row"><div class="rl" title="${esc(t.name)}">${esc(t.name)}</div><div class="st-g-track">${segs(t)}</div></div>`).join('')}
-        ${tp !== null ? `<div class="st-g-today" style="left:calc(96px + (100% - 96px) * ${tp / 100})" title="오늘"></div>` : ''}
-      </div></div></div>`;
+  // 날짜를 누르면: 그날 하는 공정 고르기 (켜고 끄면 그날만 더하기/빼기)
+  let dayPop = null;
+  const closeDayPop = () => { if (dayPop) { dayPop.remove(); dayPop = null; } };
+  function openDayPop(cell) {
+    closeDayPop(); closeCal();
+    const d = cell.dataset.day, tl = S.taskList(tasksOf(cur.id));
+    if (!tl.length) return;
+    dayPop = document.createElement('div'); dayPop.className = 'st-cal st-daypop';
+    dayPop.innerHTML = `<b>${S.yy(d)} 하는 공정</b><div class="st-dpl">${tl.map((t) => `<label><input type="checkbox" data-t="${esc(t.id)}" ${S.activeOn(t, d) ? 'checked' : ''}><i style="background:${colorOf(tl, t)}"></i>${esc(t.name)}</label>`).join('')}</div><div class="st-calf"><span></span><button type="button" data-close>닫기</button></div>`;
+    dayPop.addEventListener('click', (e) => { e.stopPropagation(); if (e.target.closest('[data-close]')) closeDayPop(); });
+    dayPop.addEventListener('change', (e) => {
+      const id = e.target.dataset.t, t = tasksOf(cur.id)[id]; if (!t) return;
+      const up = { ...stamp() };
+      if (S.activeOn(t, d)) { if (t.plus && t.plus[d]) up['plus/' + d] = null; else up['minus/' + d] = true; }
+      else { if (t.minus && t.minus[d]) up['minus/' + d] = null; else up['plus/' + d] = true; }
+      tRef(id).update(up).catch(fail);
+    });
+    document.body.append(dayPop);
+    const r = cell.getBoundingClientRect();
+    dayPop.style.top = window.scrollY + r.bottom + 4 + 'px';
+    dayPop.style.left = Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - 308)) + 'px';
   }
 
   function tasksCard(s, tl, edit) {
@@ -126,17 +150,11 @@
   const stamp = () => ({ by: me.name, at: Date.now() });
   const fail = (e) => alert('저장하지 못했어요: ' + e.message);
   $('#main').addEventListener('click', async (e) => {
-    const w = e.target.closest('[data-w]'); if (w) { weekStart = +w.dataset.w ? S.addDays(weekStart, +w.dataset.w) : mondayOf(S.today()); return drawMain(); }
+    const mo = e.target.closest('[data-mo]');
+    if (mo) { const [y, m] = monthBase.split('-').map(Number); const d = new Date(y, m - 1 + +mo.dataset.mo, 1); monthBase = +mo.dataset.mo ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : S.today().slice(0, 7); closeDayPop(); return drawMain(); }
     if (!cur || !canEdit(cur)) return;
     const tasks = tasksOf(cur.id);
-    const c = e.target.closest('button.c[data-t]');
-    if (c) {
-      const t = tasks[c.dataset.t], d = c.dataset.d; if (!t) return;
-      const up = { ...stamp() };
-      if (S.activeOn(t, d)) { if (t.plus && t.plus[d]) up['plus/' + d] = null; else up['minus/' + d] = true; }
-      else { if (t.minus && t.minus[d]) up['minus/' + d] = null; else up['plus/' + d] = true; }
-      return tRef(c.dataset.t).update(up).catch(fail);
-    }
+    const dc = e.target.closest('button.st-day[data-day]'); if (dc) { e.stopPropagation(); return openDayPop(dc); }
     const cal = e.target.closest('[data-cal]');
     if (cal) {
       const t = tasks[cal.dataset.t], k = cal.dataset.cal;
@@ -213,7 +231,7 @@
     calEl.style.top = window.scrollY + r.bottom + 6 + 'px';
     calEl.style.left = Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - 308)) + 'px';
   }
-  document.addEventListener('click', (e) => { if (calEl && !e.target.closest('.st-cal') && !e.target.closest('[data-cal]')) closeCal(); });
+  document.addEventListener('click', (e) => { if (calEl && !e.target.closest('.st-cal') && !e.target.closest('[data-cal]')) closeCal(); if (dayPop && !e.target.closest('.st-daypop') && !e.target.closest('.st-day')) closeDayPop(); });
 
   // ---------- 시작 ----------
   function route() {
@@ -222,7 +240,7 @@
     cur = L.all.find((s) => s.id === id) || (id ? null : L.active[0] || L.undated[0] || null);
     drawSide(); drawMain();
   }
-  window.addEventListener('hashchange', () => { closeCal(); route(); });
+  window.addEventListener('hashchange', () => { closeCal(); closeDayPop(); route(); });
   // 공정 이름을 고치는 중이면 다 쓸 때까지 화면을 다시 그리지 않음 (다른 사람이 고쳐도 쓰던 글자가 안 지워지게)
   let pending = false;
   function redraw(full) {
@@ -236,7 +254,6 @@
     $('#main').innerHTML = `<div class="st-empty"><b>Site 는 지금 시험 중이에요.</b><br>관리자에게 초대받은 분은 아래 버튼을 눌러<br>구글 계정으로 로그인해 주세요.<br><br><a class="btn primary" href="site.html?login=google">구글 로그인으로 들어가기</a></div>`;
     return;
   }
-  weekStart = mondayOf(S.today());
   SBAuth.start().then((a) => {
     me = a; db = firebase.database();
     const base = db.ref('spaces/' + a.spaceKey + '/data');
