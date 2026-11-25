@@ -348,7 +348,7 @@
   let postcodeLoad = null;
   const loadPostcode = () => postcodeLoad || (postcodeLoad = window.daum && daum.Postcode ? Promise.resolve() : new Promise((ok, no) => {
     const sc = document.createElement('script');
-    sc.src = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+    sc.src = 'https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
     sc.onload = ok; sc.onerror = () => { postcodeLoad = null; no(new Error('load')); };
     document.head.append(sc);
   }));
