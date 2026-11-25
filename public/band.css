@@ -142,3 +142,9 @@
 .bd-teamh { position: sticky; top: 0; z-index: 1; background: #fff; font-size: 12px; font-weight: 700; color: var(--ink); padding: 8px 0 6px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 .bd-teamh small { color: var(--sub); font-weight: 400; }
 .bd-ownsel { font-size: 12px; color: var(--sub); margin-top: 6px; }
+
+/* 평수 PY, 연락처 앞자리 */
+.bd-unit { position: relative; }
+.bd-unit input { padding-right: 46px !important; }
+.bd-unit b { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--sub); font-size: 13px; pointer-events: none; }
+.bd-tel select { flex: 0 0 84px; width: 84px !important; }

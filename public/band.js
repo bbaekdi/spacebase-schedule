@@ -180,10 +180,10 @@
       { k: 'type', label: '형태', ph: '예: 오피스, 카페, 병원' },
       { k: 'address', label: '위치(현장주소)', addr: 1 },
       { k: 'addr2', label: '상세주소', ph: '동·층·호수 (예: A동 305~308호)' },
-      { k: 'area', label: '평수', ph: '예: 100평 (대략적)' },
+      { k: 'area', label: '평수', unit: 'PY', ph: '예: 100' },
       { k: 'period', label: '공사기간', range: 1, s: 'start', e: 'end', ph: ['시작일', '준공일'], bad: '준공일이 시작일보다 빨라요.' },
       { k: 'contact', label: '발주처 담당자', ph: '이름 직함 (예: 홍길동 팀장)' },
-      { k: 'phone', label: '연락처', tel: 1, ph: '010-0000-0000' },
+      { k: 'phone', label: '연락처', tel: 1, ph: '1234-5678' },
       { k: 'etc', label: '기타', multi: 1, ph: '예: 예산 미정' },
     ],
     as: [
@@ -191,7 +191,7 @@
       { k: 'asPeriod', label: 'A/S 기간', range: 1, s: 'asStart', e: 'asEnd', ph: ['시작일', '종료일'], bad: 'A/S 기간의 종료일이 시작일보다 빨라요.' },
       { k: 'recv', label: '접수일', date: 1 },
       { k: 'contact', label: '발주처 담당자', ph: '이름 직함 (예: 홍길동 팀장)' },
-      { k: 'phone', label: '연락처', tel: 1, ph: '010-0000-0000' },
+      { k: 'phone', label: '연락처', tel: 1, ph: '1234-5678' },
       { k: 'req', label: '요청내용', multi: 1, req: 1, ph: '예: 업무석 확장, 회의실 신설' },
       { k: 'plan', label: '작업예정일', date: 1 },
     ],
@@ -233,11 +233,25 @@
   // 날짜 칸: 누르면 달력(일요일·공휴일 빨강, 토요일 파랑). 값은 숨은 칸에 YYYY-MM-DD 로.
   const yy = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[1].slice(2)}년 ${m[2]}월 ${m[3]}일` : ''; };
   const dateBtn = (nm, val, ph) => `<button type="button" class="bd-date ${val ? '' : 'empty'}" data-cal="${nm}" data-ph="${esc(ph)}">${val ? yy(val) : esc(ph)}</button><input type="hidden" name="${nm}" value="${esc(val || '')}">`;
+  // 연락처: 앞자리(기본 010)는 고르고 뒷번호만 입력, 줄표(-)는 자동
+  const PHONE_PRE = ['010', '02', '031', '032', '070', '기타'];
+  const splitPhone = (v) => {
+    v = String(v || '').trim(); if (!v) return ['010', ''];
+    const m = v.match(/^(010|02|031|032|070)[-\s.)]?(.*)$/);
+    return m ? [m[1], m[2].trim()] : ['기타', v];
+  };
+  const hyphen = (d) => (d.length > 8 ? d.slice(0, d.length - 4).replace(/^(\d{4})(\d+)$/, '$1-$2') + '-' + d.slice(-4) : d.length > 4 ? d.slice(0, d.length - 4) + '-' + d.slice(-4) : d);
+  const joinPhone = (pre, rest) => { rest = String(rest || '').trim(); if (!rest) return ''; if (pre === '기타') return rest; return pre + '-' + hyphen(rest.replace(/\D/g, '')); };
   const field = (d, val, f = {}) => {
     const v = esc(val || ''), nm = 'f_' + d.k, req = d.req ? ' <b>*</b>' : '';
     if (d.multi) return `<label class="bd-f"><span>${d.label}${req}</span><textarea name="${nm}" rows="3" maxlength="2000" placeholder="${esc(d.ph || '')}">${v}</textarea></label>`;
     if (d.date) return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow">${dateBtn(nm, val, '날짜 고르기')}</div></div>`;
     if (d.range) return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow bd-range">${dateBtn('f_' + d.s, f[d.s], d.ph[0])}<b>~</b>${dateBtn('f_' + d.e, f[d.e], d.ph[1])}</div>${f[d.k] && !f[d.s] && !f[d.e] ? `<small class="bd-hint">예전 입력: ${esc(f[d.k])} (날짜를 고르면 바뀌어요)</small><input type="hidden" name="f_${d.k}Old" value="${esc(f[d.k])}">` : ''}</div>`;
+    if (d.unit) { const n = String(val || '').replace(/\s*PY$/i, ''); return `<div class="bd-f"><span>${d.label}</span><div class="bd-unit"><input name="${nm}" inputmode="decimal" maxlength="12" placeholder="${esc(d.ph || '')}" value="${esc(n)}"><b>${d.unit}</b></div></div>`; }
+    if (d.tel) {
+      const [pre, rest] = splitPhone(val);
+      return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow bd-tel"><select name="${nm}Pre" aria-label="앞자리">${PHONE_PRE.map((x) => `<option ${x === pre ? 'selected' : ''}>${x}</option>`).join('')}</select><input name="${nm}" type="tel" inputmode="numeric" maxlength="20" placeholder="${pre === '기타' ? '전화번호 전체' : esc(d.ph || '')}" value="${esc(rest)}"></div></div>`;
+    }
     if (d.addr) return `<div class="bd-f"><span>${d.label}</span><div class="bd-frow"><input name="${nm}" readonly placeholder="도로명주소 검색을 눌러 주세요" value="${v}"><button type="button" class="btn" data-addr>주소 검색</button></div><div class="bd-postcode hidden" id="postBox"></div></div>`;
     return `<label class="bd-f"><span>${d.label}${req}</span><input name="${nm}" ${d.tel ? 'type="tel" inputmode="tel"' : ''} maxlength="200" placeholder="${esc(d.ph || '')}" value="${v}"></label>`;
   };
@@ -272,7 +286,7 @@
       if (fW.site.value === '__direct') fW.siteDirect.focus();
       const pf = (projects[fW.site.value] || {}).form || {};
       if (fW.f_contact && !fW.f_contact.value) fW.f_contact.value = pf.contact || '';
-      if (fW.f_phone && !fW.f_phone.value) fW.f_phone.value = pf.phone || '';
+      if (fW.f_phone && !fW.f_phone.value && pf.phone) { const [pre, rest] = splitPhone(pf.phone); fW.f_phonePre.value = pre; fW.f_phone.value = rest; }
     };
   }
   function openWrite(p) {
@@ -291,7 +305,15 @@
   }
   $('#wCats').onchange = writeExtras;
   const ownSel = (root, name) => { const el = root.querySelector('.bd-ownsel'); if (!el) return; const v = [...root.querySelectorAll(`input[name=${name}]:checked`)].map((x) => x.value); el.textContent = v.length ? '고른 사람: ' + v.join(', ') : '아직 고르지 않았어요.'; };
-  $('#wExtra').addEventListener('change', (e) => { if (e.target.name === 'owner') ownSel($('#wExtra'), 'owner'); });
+  $('#wExtra').addEventListener('change', (e) => {
+    if (e.target.name === 'owner') ownSel($('#wExtra'), 'owner');
+    if (e.target.name === 'f_phonePre') { fW.f_phone.placeholder = e.target.value === '기타' ? '전화번호 전체' : '1234-5678'; fW.f_phone.focus(); }
+  });
+  $('#wExtra').addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.name === 'f_phone' && fW.f_phonePre.value !== '기타') { const d = t.value.replace(/\D/g, '').slice(0, 8); t.value = hyphen(d); }
+    if (t.name === 'f_area') t.value = t.value.replace(/[^\d.]/g, '');
+  });
   $('#wExtra').addEventListener('click', (e) => {
     const b = e.target.closest('[data-cal]'); if (b) { e.preventDefault(); return openCal(b); }
     const a = e.target.closest('[data-addr]'); if (a) { e.preventDefault(); return findAddress(); }
@@ -377,7 +399,13 @@
     let f = null;
     if (form) {
       f = {};
-      FORMS[c].forEach((d) => { if (d.range) return; const el = fW['f_' + d.k]; const val = el ? el.value.trim() : ''; if (val) f[d.k] = val; });
+      FORMS[c].forEach((d) => {
+        if (d.range) return;
+        const el = fW['f_' + d.k]; let val = el ? el.value.trim() : '';
+        if (d.tel) val = joinPhone(fW['f_' + d.k + 'Pre'].value, val);
+        if (d.unit && val) { const n = parseFloat(val.replace(/[^\d.]/g, '')); val = isNaN(n) ? val + ' ' + d.unit : n.toFixed(1) + ' ' + d.unit; }
+        if (val) f[d.k] = val;
+      });
       for (const d of FORMS[c].filter((x) => x.range)) {
         const st = fW['f_' + d.s] ? fW['f_' + d.s].value : '', en = fW['f_' + d.e] ? fW['f_' + d.e].value : '';
         if (st && en && en < st) return err(d.bad);

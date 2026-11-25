@@ -76,7 +76,7 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await a.evaluate(() => { window.daum = { Postcode: function (o) { this.embed = (el) => { el.innerHTML = '<button type="button" id="fakeAddr">가짜 검색 결과</button>'; el.querySelector('button').onclick = () => o.oncomplete({ roadAddress: '테스트시 테스트구 연습로 1', buildingName: '테스트빌딩' }); }; } }; });
   await a.click('[data-addr]'); await a.click('#fakeAddr');
   log((await a.inputValue('[name=f_address]')) === '테스트시 테스트구 연습로 1', '도로명주소 검색 → 주소 칸 자동 입력');
-  await a.fill('[name=f_addr2]', 'A동 305호'); await a.fill('[name=f_area]', '100평 (대략적)');
+  await a.fill('[name=f_addr2]', 'A동 305호'); await a.fill('[name=f_area]', '100');
   // 공사기간 달력: 시작일 2027-01-06, 준공일 2027-02-10
   await a.click('[data-cal=f_start]'); await a.click('.bd-cal [data-mv="1"]'); await a.click('.bd-cal [data-mv="1"]');
   log((await a.locator('.bd-cal b').innerText()) === '2027년 1월', '달력 다음 달로 넘기기');
@@ -88,11 +88,15 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   log((await a.locator('.bd-cal b').innerText()) === '2027년 1월', '준공일 달력은 시작일 달부터');
   await a.click('.bd-cal [data-mv="1"]'); await a.click('.bd-cal [data-d="2027-02-10"]');
   log((await a.locator('[data-cal=f_start]').innerText()) === '27년 01월 06일' && (await a.locator('[data-cal=f_end]').innerText()) === '27년 02월 10일', '공사기간: 27년 01월 06일 ~ 27년 02월 10일');
-  await a.fill('[name=f_contact]', '홍길동 팀장'); await a.fill('[name=f_phone]', '010-1234-5678'); await a.fill('[name=f_etc]', '예산 미정');
+  log((await a.locator('.bd-unit b').innerText()) === 'PY', '평수 칸 옆에 PY 단위');
+  log((await a.inputValue('[name=f_phonePre]')) === '010', '연락처 앞자리 010 이 미리 골라져 있음');
+  await a.fill('[name=f_contact]', '홍길동 팀장'); await a.locator('[name=f_phone]').pressSequentially('12345678');
+  log((await a.inputValue('[name=f_phone]')) === '1234-5678', '뒷번호만 치면 줄표 자동 (1234-5678)');
+  await a.fill('[name=f_etc]', '예산 미정');
   await a.screenshot({ path: SH + '/b9-form-project.png' });
   await a.click('#wSave');
   await a.waitForSelector('.bd-post:has-text("테스트빌딩")');
-  log(/1\. 발주처명 _ 테스트건설[\s\S]*3\. 위치\(현장주소\) _ 테스트시 테스트구 연습로 1 A동 305호[\s\S]*5\. 공사기간 _ 27년 01월 06일~27년 02월 10일[\s\S]*6\. 발주처 담당자 _ 홍길동 팀장 010-1234-5678[\s\S]*7\. 기타 _ 예산 미정/.test(await a.locator('.bd-post:has(.bd-chip.project) .bd-text').innerText()), '올라간 글은 지금 밴드처럼 1~7번 모양');
+  log(/1\. 발주처명 _ 테스트건설[\s\S]*3\. 위치\(현장주소\) _ 테스트시 테스트구 연습로 1 A동 305호\n4\. 평수 _ 100\.0 PY\n5\. 공사기간 _ 27년 01월 06일~27년 02월 10일[\s\S]*6\. 발주처 담당자 _ 홍길동 팀장 010-1234-5678[\s\S]*7\. 기타 _ 예산 미정/.test(await a.locator('.bd-post:has(.bd-chip.project) .bd-text').innerText()), '올라간 글은 지금 밴드처럼 1~7번 모양');
   await a.click('.bd-post:has(.bd-chip.project) .bd-text');
   log((await a.locator('#pBody a[href="tel:01012345678"]').count()) === 1 && (await a.locator('#pBody a[href*="map.naver.com"]').count()) === 1, '글 보기: 연락처 누르면 전화, 주소 누르면 지도');
   await a.click('#dlgPost [data-close]');
@@ -100,7 +104,7 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await b.click('#write'); await b.click('#wCats label:has-text("A/S")');
   await b.waitForSelector('#wExtra select[name=site] option:has-text("테스트빌딩")', { state: 'attached' });
   await b.selectOption('#wExtra select[name=site]', { label: '테스트빌딩 3층 사무실' });
-  log((await b.inputValue('[name=f_contact]')) === '홍길동 팀장', 'A/S: 현장 고르면 발주처 담당자 자동으로 채움');
+  log((await b.inputValue('[name=f_contact]')) === '홍길동 팀장' && (await b.inputValue('[name=f_phone]')) === '1234-5678' && (await b.inputValue('[name=f_phonePre]')) === '010', 'A/S: 현장 고르면 발주처 담당자·연락처 자동으로 채움');
   log((await b.inputValue('[name=f_recv]')) !== '' && /^\d{2}년 \d{2}월 \d{2}일$/.test(await b.locator('[data-cal=f_recv]').innerText()), 'A/S: 접수일 오늘로 미리 채움 (달력 칸)');
   log((await b.locator('.bd-owners label').count()) === 3, 'A/S 담당자 = 주간 스케줄 직원표 전 직원 (3명)');
   log((await b.locator('.bd-teamh').allInnerTexts()).join('|').replace(/\s+/g, ' ') === '설계팀 2명|시공팀 1명', '담당자: 팀별로 나눠서 (설계팀 2명 / 시공팀 1명)');
