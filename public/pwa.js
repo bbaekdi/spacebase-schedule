@@ -20,10 +20,19 @@
     let d = document.getElementById('sbIosGuide');
     if (!d) {
       d = document.createElement('dialog'); d.id = 'sbIosGuide'; d.className = 'sb-guide';
+      const share = '<svg class="sb-shareic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H6v10h12V10h-1"/></svg>';
       d.innerHTML = `<h3>아이폰에 SPACEBASE 앱 설치</h3>
-        <ol><li>Safari 화면 아래(또는 위)의 <b>공유 버튼</b> <span class="sb-share" aria-hidden="true">⬆︎</span> 을 눌러요.</li>
-        <li>목록을 내려 <b>"홈 화면에 추가"</b>를 눌러요.</li>
-        <li>오른쪽 위 <b>"추가"</b>를 누르면 홈 화면에 SPACEBASE 아이콘이 생겨요.</li></ol>
+        <ol>
+          <li><b>공유 버튼</b> <span class="sb-share">${share}</span> 을 눌러요. (네모 위로 화살표 모양)
+            <ul class="sb-where">
+              <li>화면 <b>맨 아래 버튼 줄의 가운데</b> 버튼이에요. 버튼 줄이 안 보이면 화면을 손가락으로 살짝 아래로 끌어 주세요.</li>
+              <li>아래에 <b>주소창만</b> 있으면: 주소창 오른쪽 <b class="sb-dots">⋯</b> → <b>공유</b> ${share}</li>
+              <li>주소창이 <b>화면 위</b>에 있으면: 주소창 오른쪽 끝에 있어요.</li>
+            </ul></li>
+          <li>목록을 아래로 내려 <b>"홈 화면에 추가"</b>를 눌러요. <small>(안 보이면 맨 아래 "작업 편집"에서 추가)</small></li>
+          <li>오른쪽 위 <b>"추가"</b>를 누르면 홈 화면에 SPACEBASE 아이콘이 생겨요.</li>
+        </ol>
+        <p class="sb-warn">⚠️ <b>카카오톡·네이버 앱 안</b>에서 열었다면 공유 버튼이 없어요. 오른쪽 아래(또는 위) 메뉴에서 <b>"Safari로 열기"</b>를 먼저 눌러 주세요.</p>
         <p>설치한 아이콘으로 열면 새 글 알림도 받을 수 있어요. (iOS 16.4 이상)</p>
         <button class="btn primary" type="button">알겠어요</button>`;
       d.querySelector('button').onclick = () => d.close();
