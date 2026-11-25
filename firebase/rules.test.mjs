@@ -74,6 +74,18 @@ await no('남의 이름으로 댓글', A.ref('board/comments/' + P + '/c2').set(
 await no('남의 댓글 고치기', B.ref('board/comments/' + P + '/c1/text').set('바꿈'));
 await no('남의 댓글 지우기(일반 회원)', B.ref('board/comments/' + P + '/c1').remove());
 await ok('쓴 사람 댓글 지우기', A.ref('board/comments/' + P + '/c1').remove());
+
+// ---------- 현장 방 + A/S 처리 상태 ----------
+await ok('프로젝트(현장) 글쓰기', B.ref('board/posts/proj1').set({ cat: 'project', siteName: '테스트현장', text: '새 프로젝트', uid: 'b', name: '비', at: 10 }));
+await no('현장 이름 없는 프로젝트', B.ref('board/posts/proj2').set({ cat: 'project', text: 'x', uid: 'b', name: '비', at: 10 }));
+await ok('현장 고른 A/S 글', B.ref('board/posts/as1').set({ cat: 'as', site: 'proj1', siteName: '테스트현장', text: '실리콘 들뜸', uid: 'b', name: '비', at: 11, asState: { status: 'new', by: '비', at: 11 } }));
+await no('현장 이름 없이 현장만', B.ref('board/posts/as2').set({ cat: 'as', site: 'proj1', text: 'x', uid: 'b', name: '비', at: 11 }));
+await ok('다른 회원이 A/S 상태 바꾸기', A.ref('board/posts/as1/asState').set({ status: 'doing', owner: '관리', by: '관리', at: 12 }));
+await no('A/S 상태 남의 이름으로', A.ref('board/posts/as1/asState').set({ status: 'done', by: '비', at: 13 }));
+await no('없는 A/S 상태', A.ref('board/posts/as1/asState').set({ status: 'xxx', by: '관리', at: 13 }));
+await no('A/S 가 아닌 글에 상태', A.ref('board/posts/proj1/asState').set({ status: 'new', by: '관리', at: 13 }));
+await no('비회원 A/S 상태 바꾸기', X.ref('board/posts/as1/asState').set({ status: 'done', by: 'x', at: 13 }));
+await ok('쓴 사람이 현장 끝남 표시', B.ref('board/posts/proj1/closed').set(true));
 // 내보내기
 await ok('관리자가 내보내기', A.ref('ws/members/c').remove());
 await no('내보낸 사람 config 읽기', C.ref('ws/config').once('value'));

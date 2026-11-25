@@ -49,7 +49,18 @@
   .links .lk { display: inline-flex; align-items: center; gap: 9px; }
   .links .lk svg { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: var(--accent-text); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   @media (max-width: 860px) { .home { grid-template-columns: minmax(0, 1fr); } .left { display: contents; } .profile { min-height: 0; order: 0; } .right { order: 1; } .linkcard { order: 2; } }
-  @media (max-width: 720px) { .apps, .grid { grid-template-columns: minmax(0, 1fr); } .app { padding: 16px; } }
+  .apps.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bdnew { list-style: none; margin: 0; padding: 0; }
+  .bdnew li + li { border-top: 1px solid var(--line); }
+  .bdnew a { display: block; padding: 9px 0; text-decoration: none; }
+  .bdnew a:hover .t { text-decoration: underline; }
+  .bdnew .t { display: block; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bdnew small { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; }
+  .bdnew .empty { color: var(--sub); padding: 8px 0; }
+  .bd-chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-text); }
+  .bd-chip.photo { background: #e6f1fb; color: #1f5f9e; } .bd-chip.as { background: #fde8e8; color: #b42318; } .bd-chip.project { background: #e7f6ec; color: #1e7a3c; }
+  .bd-asnote { display: inline-block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #fff; background: #e5484d; border-radius: 99px; padding: 3px 10px; text-decoration: none; }
+  @media (max-width: 720px) { .apps, .apps.three, .grid { grid-template-columns: minmax(0, 1fr); } .app { padding: 16px; } }
 </style>
 </head>
 <body data-page="home">
@@ -90,6 +101,10 @@
           <div class="ico"><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="8" cy="14.5" r="1" fill="currentColor"/><circle cx="12" cy="14.5" r="1" fill="currentColor"/><circle cx="16" cy="14.5" r="1" fill="currentColor"/><circle cx="8" cy="18" r="1" fill="currentColor"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg></div>
           <div><b>Calendar</b><span>밴드 캘린더 일정과 직접 추가한 일정을 월·주·목록으로 봐요.</span></div>
         </a>
+        <a class="card app hidden" href="band.html" id="bandApp">
+          <div class="ico"><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h10M7 17h6"/></svg></div>
+          <div><b>Band</b><span>현장 사진, A/S, 프로젝트, 공지를 회사 사람끼리 나눠요.</span></div>
+        </a>
       </div>
 
       <div class="grid">
@@ -100,6 +115,11 @@
           </section>
           <section class="card todo" id="todoCard"></section>
         </div>
+        <section class="card hidden" id="bandCard">
+          <h2>Band 새 글 <a class="more" href="band.html">전체 ›</a></h2>
+          <a class="bd-asnote hidden" id="bandAs" href="band.html#cat=as&amp;open=1"></a>
+          <ul class="bdnew" id="bandNew"><li class="empty">불러오는 중…</li></ul>
+        </section>
         <section class="card">
           <h2>다가오는 일정 (7일)</h2>
           <div id="weekList"><div class="empty">불러오는 중…</div></div>
@@ -128,6 +148,31 @@
 </script>
 <script src="ws-common.js"></script>
 <script>
+// Band 새 글 (구글 로그인 회원만)
+(async function () {
+  if (!window.SBAuth || !SBAuth.enabled()) return;
+  await SBAuth.start();
+  const db = firebase.database(), esc = WS.esc;
+  const CAT = { photo: '현장 사진', as: 'A/S', project: '프로젝트', notice: '공지·자유글' };
+  ['bandCard', 'bandApp'].forEach((id) => document.getElementById(id).classList.remove('hidden'));
+  document.querySelector('.apps').classList.add('three');
+  const ago = (t) => { const s = (Date.now() - t) / 1000; return s < 60 ? '방금' : s < 3600 ? Math.floor(s / 60) + '분 전' : s < 86400 ? Math.floor(s / 3600) + '시간 전' : new Date(t).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' }); };
+  db.ref('board/posts').orderByChild('at').limitToLast(20).on('value', (s) => {
+    const list = []; s.forEach((c) => { const v = c.val(); if (!v.deleted) list.push({ id: c.key, ...v }); });
+    const top = list.reverse().slice(0, 5);
+    document.getElementById('bandNew').innerHTML = top.length ? top.map((p) => {
+      const first = String(p.cat === 'project' ? p.siteName : p.text).split('\n')[0].slice(0, 60);
+      return `<li><a href="band.html#post=${encodeURIComponent(p.id)}"><span class="bd-chip ${esc(p.cat)}">${CAT[p.cat] || ''}</span><span class="t">${p.siteName && p.cat !== 'project' ? `<b>${esc(p.siteName)}</b> · ` : ''}${esc(first)}</span><small>${esc(p.name)} · ${ago(p.at)}${p.commentCount ? ` · 댓글 ${p.commentCount}` : ''}</small></a></li>`;
+    }).join('') : '<li class="empty">아직 글이 없어요.</li>';
+  });
+  // 안 끝난 A/S 수
+  db.ref('board/posts').orderByChild('cat').equalTo('as').on('value', (s) => {
+    let n = 0; s.forEach((c) => { const v = c.val(); if (!v.deleted && (!v.asState || v.asState.status !== 'done')) n++; });
+    const el = document.getElementById('bandAs');
+    el.textContent = `안 끝난 A/S ${n}건 ›`; el.classList.toggle('hidden', !n);
+  });
+})();
+
 // 네이버웍스 메일 (중계 서버: worker/naverworks-mail.js)
 (function () {
   const API = (window.SB_MAIL_API || '').replace(/\/$/, '');

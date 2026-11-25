@@ -39,7 +39,8 @@ public/
   portal.html        홈
   calendar.html      회사 캘린더
   auth.js            구글 로그인 + 회원 확인 (승인 대기, 초대 링크, 관리자 비밀번호, 카톡 안 브라우저 안내)
-  band.html, band.js, band.css  Band 회사 게시판 (구글 로그인 회원만): 게시판 4개, 글·댓글·찾기. Firebase board/posts, board/comments
+  band.html, band.js, band.css  Band 회사 게시판 (구글 로그인 회원만): 게시판 4개, 글·댓글·찾기, 현장 방(#site=), A/S 처리 상태.
+                     Firebase board/posts (프로젝트 글 siteName = 현장, 다른 글 site/siteName, A/S asState), board/comments. 홈(portal.html)에 "Band 새 글" 카드
   members.html       회원 관리 (관리자: 승인/거절, 초대 링크, 이름 연결, 관리자 지정, 내보내기)
   ws.css, ws-common.js  워크스페이스 공통 (상단 탭, 휴대폰 아래 메뉴, 로그인, 일정 데이터, 구글 연동, TO DO 위젯, 확장 안내 띠)
   band-config.js     SB_BAND_API(밴드 중계 주소), SB_GOOGLE_LOGIN

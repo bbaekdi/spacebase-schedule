@@ -57,3 +57,35 @@
 .bd-cmts .none { color: var(--sub); font-size: 13px; }
 .bd-cform { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
 .bd-cform input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 99px; padding: 9px 14px; }
+
+/* 현장 방 · A/S 처리 상태 */
+.bd-site { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: #1e7a3c; text-decoration: none; background: #e7f6ec; border-radius: 6px; padding: 2px 8px 2px 5px; }
+.bd-site:hover { text-decoration: underline; }
+.bd-site .si { width: 14px; height: 14px; }
+.bd-sitebar { margin-top: 8px; }
+.bd-ptitle { font-size: 16px; font-weight: 700; margin-top: 8px; }
+.bd-as { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+.bd-as.new { background: #e5484d; color: #fff; }
+.bd-as.doing { background: #f1bf52; color: #1d1d1b; }
+.bd-as.done { background: #e4e2dc; color: #6b6b66; }
+.bd-room, .bd-link { margin-left: auto; color: var(--accent-text); font-weight: 700; text-decoration: none; background: none; border: 0; cursor: pointer; font-size: 12px; padding: 0; }
+.bd-room:hover, .bd-link:hover { text-decoration: underline; }
+.bd-toggle { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--sub); white-space: nowrap; padding: 0 6px; cursor: pointer; }
+.bd-back { display: inline-block; color: var(--sub); text-decoration: none; font-weight: 700; margin: 0 0 8px; }
+.bd-back:hover { color: var(--ink); }
+.bd-sitecard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid #1e7a3c; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+.bd-sitecard h1 { font-size: 20px; margin: 6px 0 0; }
+.bd-sitecard .bd-text { color: var(--sub); }
+.bd-extra { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.bd-extra:empty { display: none; }
+.bd-extra input[type=text], .bd-extra input:not([type]), .bd-extra select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fff; }
+.bd-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--sub); }
+.bd-hint { font-size: 12px; color: var(--sub); }
+.bd-asbox { margin-top: 14px; padding: 12px; background: var(--bg); border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.bd-asrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.bd-asrow select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: #fff; margin-left: 4px; }
+.bd-asbtn { flex: 1; min-width: 80px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 9px 6px; font-weight: 700; cursor: pointer; color: var(--sub); }
+.bd-asbtn.on.new { background: #e5484d; border-color: #e5484d; color: #fff; }
+.bd-asbtn.on.doing { background: #f1bf52; border-color: #f1bf52; color: #1d1d1b; }
+.bd-asbtn.on.done { background: #6b6b66; border-color: #6b6b66; color: #fff; }
+.bd-sub { color: var(--sub); font-size: 12px; margin-left: auto; }

@@ -65,6 +65,65 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await x.waitForFunction(() => /승인을 기다리고/.test(document.body.innerText));
   const xr = await x.evaluate(async () => { try { await firebase.database().ref('board').once('value'); return 'read'; } catch { return 'blocked'; } });
   log(xr === 'blocked', '비회원은 Band 글을 못 읽음');
+
+  // ---------- 3단계: 현장 방 + A/S 처리 상태 + 홈 카드 ----------
+  await a.click('#write'); await a.click('#wCats label:has-text("프로젝트")');
+  await a.fill('#wExtra input[name=siteName]', '테스트빌딩 3층 사무실');
+  await a.fill('#fWrite textarea', '발주처: 테스트 / 기간: 12월~1월'); await a.click('#wSave');
+  await a.waitForSelector('.bd-post:has-text("테스트빌딩")');
+  log(true, '프로젝트(현장) 등록');
+  await b.click('#write'); await b.click('#wCats label:has-text("A/S")');
+  await b.waitForSelector('#wExtra select[name=site] option:has-text("테스트빌딩")', { state: 'attached' });
+  await b.selectOption('#wExtra select[name=site]', { label: '테스트빌딩 3층 사무실' });
+  await b.selectOption('#wExtra select[name=owner]', '김테스트');
+  await b.fill('#fWrite textarea', '화장실 문 손잡이 고장'); await b.click('#wSave');
+  await b.waitForSelector('.bd-post:has-text("손잡이") .bd-site');
+  log((await b.locator('.bd-post:has-text("손잡이") .bd-as').innerText()).includes('접수'), 'A/S 글: 현장 표시 + "접수 · 김테스트"');
+  await b.click('#write'); await b.click('#wCats label:has-text("현장 사진")');
+  await b.selectOption('#wExtra select[name=site]', { label: '테스트빌딩 3층 사무실' });
+  await b.fill('#fWrite textarea', '오늘 천장 작업 진행'); await b.click('#wSave');
+  await b.waitForSelector('.bd-post:has-text("천장")');
+  // 현장 방
+  await b.click('.bd-post:has-text("천장") .bd-site');
+  await b.waitForSelector('.bd-sitecard h1:has-text("테스트빌딩")');
+  await b.waitForFunction(() => document.querySelectorAll('#list .bd-post').length === 2);
+  log(/현장 사진 1/.test(await b.locator('.bd-sitecard').innerText()) && /안 끝남 1/.test(await b.locator('.bd-sitecard').innerText()), '현장 방: 사진 1 · A/S 1 (안 끝남 1)');
+  await b.click('#write');
+  log((await b.locator('#wCats label').count()) === 2 && (await b.inputValue('#wExtra select[name=site]')) !== '', '현장 방에서 글쓰기 → 현장이 미리 골라져 있음');
+  await b.click('#dlgWrite [data-close]');
+  await b.screenshot({ path: SH + '/b6-site.png' });
+  // A/S 상태 바꾸기 (다른 직원)
+  await a.click('.bd-post:has-text("손잡이")'); await a.waitForSelector('.bd-asbox');
+  await a.click('.bd-asbtn.doing');
+  await b.waitForFunction(() => /처리 중/.test(document.querySelector('.bd-post .bd-as')?.innerText || ''));
+  log(true, 'A/S "처리 중" → 다른 직원 화면에도 바로 반영');
+  await a.screenshot({ path: SH + '/b7-as.png' });
+  await a.click('.bd-asbtn.done');
+  await a.click('#dlgPost [data-close]');
+  await b.click('.bd-back');
+  await b.click('#cats button:has-text("A/S")'); await b.check('#asOpen');
+  await b.waitForFunction(() => /안 끝난 A\/S 가 없어요/.test(document.body.innerText));
+  log(true, 'A/S 완료 → "안 끝난 A/S만" 보기에서 빠짐');
+  await b.uncheck('#asOpen'); await b.click('#cats button:has-text("전체")');
+  // 끝난 현장 → 고르기 목록에서 숨김
+  await a.click('.bd-post:has(.bd-chip.project) .bd-text'); await a.click('#pBody [data-a=edit]');
+  await a.check('#wExtra input[name=closed]'); await a.click('#wSave');
+  await a.waitForSelector('.bd-post:has-text("끝난 현장")');
+  await b.click('#write'); await b.click('#wCats label:has-text("현장 사진")');
+  log((await b.locator('#wExtra select[name=site] option:has-text("테스트빌딩")').count()) === 0, '끝난 현장은 현장 고르기 목록에서 숨김');
+  await b.click('#dlgWrite [data-close]');
+  // 홈 카드
+  await b.click('#write'); await b.click('#wCats label:has-text("A/S")'); await b.fill('#fWrite textarea', '새 A/S 하나'); await b.click('#wSave');
+  await b.goto(B + 'portal.html'); await b.waitForSelector('#bandNew li a');
+  await b.waitForFunction(() => /안 끝난 A\/S 1건/.test(document.getElementById('bandAs').innerText));
+  log((await b.locator('#bandNew li').count()) === 5, '홈 "Band 새 글" 5개 + "안 끝난 A/S 1건"');
+  await b.waitForTimeout(1500); await b.screenshot({ path: SH + '/b8-home.png' });
+  await b.click('#bandAs'); await b.waitForSelector('#asOpen:checked'); await b.waitForSelector('.bd-post');
+  log((await b.locator('.bd-post').count()) === 1, '홈에서 누르면 안 끝난 A/S 목록으로');
+  await b.click('.bd-post'); await b.waitForSelector('#dlgPost[open]'); await b.click('#dlgPost [data-close]');
+  await b.goto(B + 'band.html#post=' + (await b.evaluate(async () => { const s = await firebase.database().ref('board/posts').orderByChild('cat').equalTo('project').once('value'); return Object.keys(s.val())[0]; })));
+  await b.waitForSelector('#dlgPost[open] .bd-ptitle');
+  log(true, 'band.html#post=… 주소로 글 바로 열기');
   // 휴대폰
   const m = await user('m@test.com', '박연습', false, { ...devices['iPhone 13'] });
   await m.waitForSelector('.bd-post'); await m.waitForTimeout(500);

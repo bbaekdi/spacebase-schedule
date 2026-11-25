@@ -9,6 +9,7 @@
 </head>
 <body data-page="band">
   <main class="wrap bd" id="root">
+    <div id="siteHead"></div>
     <div class="bd-head">
       <nav class="bd-cats" id="cats" aria-label="게시판"></nav>
       <div class="bd-search"><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input id="q" type="search" placeholder="글 내용·이름으로 찾기" autocomplete="off"></div>
@@ -24,6 +25,7 @@
       <div class="dlg-head"><h3 id="wTitle">글쓰기</h3><button class="x" type="button" data-close>✕</button></div>
       <div class="dlg-body">
         <div class="bd-pick" id="wCats"></div>
+        <div class="bd-extra" id="wExtra"></div>
         <textarea name="text" rows="8" maxlength="5000" placeholder="내용을 써 주세요"></textarea>
         <div class="dlg-err" id="wErr"></div>
       </div>
