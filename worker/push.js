@@ -109,6 +109,7 @@ export async function push(req, env, url, reply) {
   const [member, post, sent] = await Promise.all([db(env, 'ws/members/' + uid), db(env, 'board/posts/' + postId), db(env, 'push/sent/' + postId)]);
   if (!member) return reply('회원이 아닙니다.', 403);
   if (!post || post.uid !== uid || post.deleted) return reply('보낼 수 없는 글입니다.', 403);
+  if (post.cat === 'attend') return reply(JSON.stringify({ sent: 0, attend: true }), 200, 'application/json'); // 출근 글은 알림 안 보냄
   if (Date.now() - post.at > 10 * 60e3) return reply('오래된 글입니다.', 409);
   if (sent) return reply(JSON.stringify({ sent: 0, already: true }), 200, 'application/json');
   await db(env, 'push/sent/' + postId, 'PUT', Date.now());

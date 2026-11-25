@@ -168,3 +168,4 @@ body.bd-intrash .bd-head, body.bd-intrash #write, body.bd-intrash .bd-more, body
 .bd-tools { justify-content: space-between; align-items: center; }
 .bd-bell { border: 1px solid var(--line); background: #fff; border-radius: 99px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: var(--sub); cursor: pointer; }
 .bd-bell[data-on="on"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-text); }
+.bd-chip.attend { background: #e7f6ec; color: #1e7a3c; }

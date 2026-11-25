@@ -56,6 +56,13 @@
   .links .lk svg { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: var(--accent-text); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   @media (max-width: 860px) { .home { grid-template-columns: minmax(0, 1fr); } .left { display: contents; } .profile { min-height: 0; order: 0; } .right { order: 1; } .linkcard { order: 2; } }
   .apps.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mysite { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .mysite:first-child { border-top: 0; padding-top: 2px; }
+  .mysite a { flex: 1; min-width: 0; text-decoration: none; }
+  .mysite a b { display: block; font-size: 15px; }
+  .mysite a small { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; }
+  .mysite .btn { padding: 8px 14px; }
+  .mysite-ok { font-size: 12px; font-weight: 700; color: #1e7a3c; background: #e7f6ec; border-radius: 99px; padding: 6px 10px; white-space: nowrap; }
   .bdnew { list-style: none; margin: 0; padding: 0; }
   .bdnew li + li { border-top: 1px solid var(--line); }
   .bdnew a { display: block; padding: 9px 0; text-decoration: none; }
@@ -114,6 +121,10 @@
 
       <div class="grid">
         <div class="col">
+          <section class="card hidden" id="mySiteCard">
+            <h2>오늘 내 현장 <a class="more" href="site.html">Site ›</a></h2>
+            <div id="mySites"></div>
+          </section>
           <section class="card">
             <h2>오늘 일정 <a class="more hidden" id="bandAdd" target="_blank" rel="noopener">＋ 일정 추가</a><a class="more" href="calendar.html" id="calOpen">전체 ›</a></h2>
             <ul class="events" id="todayList"><li class="empty">불러오는 중…</li></ul>
@@ -152,7 +163,37 @@
 </script>
 <script src="ws-common.js"></script>
 <script src="pwa.js"></script>
+<script src="site-core.js"></script>
 <script>
+// 오늘 내 현장 (내가 시공 담당인 진행 현장: 오늘 공정 + 출근 버튼)
+(async function () {
+  if (!window.SBAuth || !SBAuth.enabled()) return;
+  const me = await SBAuth.start();
+  const db = firebase.database(), esc = WS.esc, S = SBSite;
+  const base = db.ref('spaces/' + me.spaceKey + '/data');
+  const sched = {}; let siteData = {};
+  const draw = () => {
+    if (!sched.projects || !sched.groups || !sched.members) return;
+    const mine = S.sites(sched).active.filter((s) => S.isManager(s, sched.members, me.name));
+    document.getElementById('mySiteCard').classList.toggle('hidden', !mine.length);
+    const day = S.today();
+    document.getElementById('mySites').innerHTML = mine.map((s) => {
+      const d = siteData[s.id] || {}, now = S.todayTasks(d.tasks, day), att = ((d.attend || {})[day] || {})[me.uid];
+      return `<div class="mysite" data-id="${esc(s.id)}"><a href="site.html#s=${encodeURIComponent(s.id)}"><b>${esc(s.name)}</b><small>${now.length ? '오늘: ' + now.map((t) => esc(t.name)).join(', ') : '오늘은 공정이 없어요'} · 진행률 ${S.progress(d.tasks)}%</small></a>
+        ${att ? `<span class="mysite-ok">✓ 출근 ${S.hmOf(att.at)}</span>` : '<button class="btn primary" type="button" data-att>출근</button>'}</div>`;
+    }).join('');
+  };
+  ['projects', 'groups', 'members'].forEach((k) => base.child(k).on('value', (s) => { sched[k] = S.list(s.val()); draw(); }));
+  db.ref('site').on('value', (s) => { siteData = s.val() || {}; draw(); });
+  document.getElementById('mySites').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-att]'); if (!b) return;
+    const s = S.sites(sched).all.find((x) => x.id === b.closest('.mysite').dataset.id); if (!s) return;
+    b.disabled = true;
+    try { const r = await S.attend(db, me, s); if (r.already) alert('오늘은 이미 출근 등록을 했어요.'); }
+    catch (er) { alert('출근 등록을 하지 못했어요: ' + er.message); b.disabled = false; }
+  });
+})();
+
 // Band 새 글 (구글 로그인 회원만)
 (async function () {
   if (!window.SBAuth || !SBAuth.enabled()) return;
@@ -163,7 +204,7 @@
   document.querySelector('.apps').classList.add('three');
   const ago = (t) => { const s = (Date.now() - t) / 1000; return s < 60 ? '방금' : s < 3600 ? Math.floor(s / 60) + '분 전' : s < 86400 ? Math.floor(s / 3600) + '시간 전' : new Date(t).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' }); };
   db.ref('board/posts').orderByChild('at').limitToLast(20).on('value', (s) => {
-    const list = []; s.forEach((c) => { const v = c.val(); if (!v.deleted) list.push({ id: c.key, ...v }); });
+    const list = []; s.forEach((c) => { const v = c.val(); if (!v.deleted && v.cat !== 'attend') list.push({ id: c.key, ...v }); });
     const top = list.reverse().slice(0, 5);
     document.getElementById('bandNew').innerHTML = top.length ? top.map((p) => {
       const first = String(p.cat === 'project' ? p.siteName : p.text).split('\n')[0].slice(0, 60);

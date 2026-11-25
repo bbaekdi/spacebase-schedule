@@ -118,6 +118,26 @@ await no('남의 알림 구독 보기', A.ref('push/subs/b').once('value'));
 await no('전체 구독 목록 보기', A.ref('push/subs').once('value'));
 await no('알림 보낸 기록 쓰기', A.ref('push/sent/x').set(1));
 await ok('내 기기 알림 끄기', B.ref('push/subs/b/dev1').remove());
+
+// ---------- Site: 공정표 + 출근 ----------
+await no('비회원 공정표 읽기', X.ref('site').once('value'));
+await ok('회원 공정표 읽기', B.ref('site').once('value'));
+await ok('공정 추가', B.ref('site/p1/tasks/t1').set({ name: '목공', order: 1, start: '2026-12-01', end: '2026-12-05', by: '비', at: 1 }));
+await ok('칸 눌러 하루 빼기·더하기', B.ref('site/p1/tasks/t1').update({ 'minus/2026-12-03': true, 'plus/2026-12-07': true }));
+await ok('완료 체크', B.ref('site/p1/tasks/t1/done').set(true));
+await no('공정 이름 없음', B.ref('site/p1/tasks/t2').set({ order: 2 }));
+await no('날짜 형식 틀림', B.ref('site/p1/tasks/t2').set({ name: '전기', order: 2, start: '12/01' }));
+await no('남의 이름으로 기록', B.ref('site/p1/tasks/t1/by').set('관리'));
+await no('모르는 칸', B.ref('site/p1/tasks/t1/hack').set('x'));
+await no('비회원 공정 추가', X.ref('site/p1/tasks/t3').set({ name: 'x', order: 1 }));
+await ok('공정 삭제', B.ref('site/p1/tasks/t1').remove());
+await ok('출근 (나, 하루 한 번)', B.ref('site/p1/attend/2026-12-01/b').set({ name: '비', at: 1 }));
+await no('같은 날 출근 다시', B.ref('site/p1/attend/2026-12-01/b').set({ name: '비', at: 2 }));
+await no('남 대신 출근', B.ref('site/p1/attend/2026-12-01/a').set({ name: '관리', at: 1 }));
+await no('남의 이름으로 출근', B.ref('site/p1/attend/2026-12-02/b').set({ name: '관리', at: 1 }));
+await no('일반 회원 출근 기록 지우기', B.ref('site/p1/attend/2026-12-01/b').remove());
+await ok('관리자는 출근 기록 지우기', A.ref('site/p1/attend/2026-12-01/b').remove());
+await ok('Band 출근 게시판 글', B.ref('board/posts/att1').set({ cat: 'attend', text: '비 출근 · 08:12', siteName: '테스트현장', uid: 'b', name: '비', at: 60 }));
 // 내보내기
 await ok('관리자가 내보내기', A.ref('ws/members/c').remove());
 await no('내보낸 사람 config 읽기', C.ref('ws/config').once('value'));

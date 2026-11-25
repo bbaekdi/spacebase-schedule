@@ -66,7 +66,7 @@
         ],
         "$pid": {
           ".write": "(auth != null && root.child('ws/members').child(auth.uid).exists() && ((!data.exists() && newData.child('uid').val() === auth.uid && newData.child('name').val() === root.child('ws/members').child(auth.uid).child('name').val()) || (data.exists() && newData.exists() && (data.child('uid').val() === auth.uid || root.child('ws/admins').child(auth.uid).val() === true) && newData.child('uid').val() === data.child('uid').val() && newData.child('name').val() === data.child('name').val() && newData.child('at').val() === data.child('at').val()))) || (auth != null && root.child('ws/members').child(auth.uid).exists() && data.exists() && !newData.exists() && data.child('deleted').exists() && root.child('ws/admins').child(auth.uid).val() === true)",
-          ".validate": "newData.hasChildren(['cat', 'text', 'uid', 'name', 'at']) && newData.child('cat').isString() && newData.child('cat').val().matches(/^(photo|as|project|notice)$/) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 5000 && newData.child('at').isNumber() && (newData.child('cat').val() !== 'project' || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40)) && (!newData.child('site').exists() || (newData.child('site').isString() && newData.child('siteName').isString())) && (!newData.child('siteName').exists() || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40))",
+          ".validate": "newData.hasChildren(['cat', 'text', 'uid', 'name', 'at']) && newData.child('cat').isString() && newData.child('cat').val().matches(/^(photo|as|project|notice|attend)$/) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 5000 && newData.child('at').isNumber() && (newData.child('cat').val() !== 'project' || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40)) && (!newData.child('site').exists() || (newData.child('site').isString() && newData.child('siteName').isString())) && (!newData.child('siteName').exists() || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40))",
           "commentCount": {
             ".write": "auth != null && root.child('ws/members').child(auth.uid).exists()",
             ".validate": "newData.isNumber() && newData.val() >= 0"
@@ -120,6 +120,46 @@
           ".write": "auth != null && auth.uid === $uid",
           "$sid": {
             ".validate": "$sid.length <= 40 && newData.hasChildren(['endpoint', 'p256dh', 'auth']) && newData.child('endpoint').isString() && newData.child('endpoint').val().beginsWith('https://') && newData.child('endpoint').val().length <= 1000 && newData.child('p256dh').isString() && newData.child('p256dh').val().length <= 200 && newData.child('auth').isString() && newData.child('auth').val().length <= 100"
+          }
+        }
+      }
+    },
+    "site": {
+      ".read": "auth != null && root.child('ws/members').child(auth.uid).exists()",
+      "$pid": {
+        ".validate": "$pid.length <= 40",
+        "tasks": {
+          "$tid": {
+            ".write": "auth != null && root.child('ws/members').child(auth.uid).exists()",
+            ".validate": "newData.hasChildren(['name', 'order']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 30 && newData.child('order').isNumber() && (!newData.child('start').exists() || newData.child('start').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)) && (!newData.child('end').exists() || newData.child('end').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)) && (!newData.child('done').exists() || newData.child('done').isBoolean())",
+            "plus": {
+              "$d": {
+                ".validate": "$d.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.val() === true"
+              }
+            },
+            "minus": {
+              "$d": {
+                ".validate": "$d.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.val() === true"
+              }
+            },
+            "by": {
+              ".validate": "newData.val() === root.child('ws/members').child(auth.uid).child('name').val()"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": "$other === 'name' || $other === 'order' || $other === 'start' || $other === 'end' || $other === 'done'"
+            }
+          }
+        },
+        "attend": {
+          "$day": {
+            ".validate": "$day.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)",
+            "$uid": {
+              ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && ((auth.uid === $uid && !data.exists()) || (root.child('ws/admins').child(auth.uid).val() === true && !newData.exists()))",
+              ".validate": "newData.hasChildren(['name', 'at']) && newData.child('name').val() === root.child('ws/members').child($uid).child('name').val() && newData.child('at').isNumber()"
+            }
           }
         }
       }

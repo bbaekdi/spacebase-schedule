@@ -13,7 +13,11 @@
   ];
   // Band(회사 게시판): 메뉴는 항상 보이고, 구글 로그인이 꺼진 기기에서는 Band 화면이 "구글 로그인으로 들어가기" 버튼을 보여 준다
   // (아이폰은 설치한 앱이 Safari 와 저장 공간을 따로 써서, 앱 안에서 켤 수 있어야 함)
-  if (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && location.protocol !== 'file:') TABS.push({ href: 'band.html', key: 'band', label: 'Band', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>' });
+  if (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && location.protocol !== 'file:') {
+    TABS.push({ href: 'band.html', key: 'band', label: 'Band', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>' });
+    // Site(현장 공정·출근)도 Band 처럼 구글 로그인 회원만 (꺼진 기기에서는 안내)
+    TABS.push({ href: 'site.html', key: 'site', label: 'Site', ic: '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>' });
+  }
   const page = document.body.dataset.page || 'home';
   const tab = (t) => `<a href="${t.href}" class="${t.key === page ? 'on' : ''}">`;
 
@@ -372,7 +376,7 @@
       return r;
     };
     // Band 화면인데 구글 로그인이 꺼져 있으면 회사 비밀번호 창을 띄우지 않는다 (Band 화면이 안내함)
-    if (be.mode === 'cloud' && page === 'band' && !(window.SBAuth && SBAuth.enabled())) return { ...be, user: null };
+    if (be.mode === 'cloud' && (page === 'band' || page === 'site') && !(window.SBAuth && SBAuth.enabled())) return { ...be, user: null };
     const user = await be.start();
     if (user) document.getElementById('wsName').textContent = user.name + ' 님';
     // 관리자에게만 "회원 관리" 링크

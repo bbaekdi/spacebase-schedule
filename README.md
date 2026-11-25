@@ -46,6 +46,9 @@ public/
                      읽음 확인: board/reads/<글>/<uid>, board/myreads/<uid>/<글> (안 읽은 최근 14일 글 "새 글"). 휴지통(#trash): 삭제 표시 글 30일 보관, 관리자가 열 때 30일 지난 글 정리
   manifest.webmanifest, icons/, sw.js, pwa.js  휴대폰에 앱처럼 설치(홈 화면 아이콘) + 새 글 알림 받기·켜고 끄기.
                      안드로이드는 "설치하기", 아이폰은 공유 → 홈 화면에 추가 안내(아이폰은 설치한 앱에서만 알림). 구독은 Firebase push/subs/<uid>/<id>
+  site.html, site.js, site.css, site-core.js  Site: 현장 공정 스케줄표 + 출근 (구글 로그인 회원만). 현장 목록 = 주간 스케줄 PROJECT 현장(읽기만),
+                     진행 = 공사기간 안(착공 7일 전부터), 소장 = 시공 담당 약칭 → 직원표 이름. Firebase site/<현장id>/tasks/<공정id> {name, order, start, end, plus, minus, done, by, at},
+                     site/<현장id>/attend/<날짜>/<uid> {name, at}. 출근하면 Band cat "attend"(출근 게시판) 글. 홈 "오늘 내 현장" 카드
   members.html       회원 관리 (관리자: 승인/거절, 초대 링크, 이름 연결, 관리자 지정, 내보내기)
   ws.css, ws-common.js  워크스페이스 공통 (상단 탭, 휴대폰 아래 메뉴, 로그인, 일정 데이터, 구글 연동, TO DO 위젯, 확장 안내 띠)
   band-config.js     SB_BAND_API(밴드 중계 주소), SB_GOOGLE_LOGIN
@@ -58,7 +61,7 @@ tools/sync-band.js   예비 밴드 동기화 (band-calendar.yml)
 firebase/            Firebase 규칙(database.rules.json) + 규칙 시험(rules.test.mjs). firebase-rules.yml 이 실제 Firebase 에 올림
 tools/vapid.mjs      알림 열쇠(VAPID)를 Secret FIREBASE_SERVICE_ACCOUNT 에서 만듦 (band-worker.yml 은 비밀 열쇠, pages.yml 은 공개 열쇠 SB_VAPID_PUBLIC)
 tools/test-rules.sh  규칙 시험 (연습용 Firebase), tools/fb-setup.mjs 규칙 올리기·회원 설정 (Actions 전용)
-tools/test/          시험 (연습용 Firebase): emu-seed.mjs, e2e-auth.cjs(로그인 화면), e2e-band.cjs(Band 화면), push.test.mjs(알림 보내기)
+tools/test/          시험 (연습용 Firebase): emu-seed.mjs, e2e-auth.cjs(로그인 화면), e2e-band.cjs(Band 화면), e2e-site.cjs(Site 화면), push.test.mjs(알림 보내기)
 tools/check.sh       배포 전 검토 (JS 문법, 비밀 값 의심 문자열, 버전↔릴리즈 노트)
 RELEASE-NOTES.md     바뀐 내용 기록 (최신이 위)
 build/               installer.nsi, release.sh, seticon.mjs

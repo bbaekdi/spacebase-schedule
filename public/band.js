@@ -10,6 +10,7 @@
     { key: 'as', label: 'A/S' },
     { key: 'project', label: '프로젝트' },
     { key: 'notice', label: '공지·자유글' },
+    { key: 'attend', label: '출근' }, // Site 출근 버튼이 자동으로 쓰는 글 (직접 쓰기 없음)
   ];
   const AS = { new: '접수', doing: '처리 중', done: '완료' };
   const catLabel = (k) => (CATS.find((c) => c.key === k) || {}).label || '';
@@ -88,7 +89,7 @@
     if (trash) return drawTrash();
     const q = query.toLowerCase();
     const base = site ? sitePosts : posts;
-    const shown = base.filter((p) => !p.deleted && (!cat || p.cat === cat) && !(cat === 'as' && asOpenOnly && asStatus(p) === 'done')
+    const shown = base.filter((p) => !p.deleted && (cat ? p.cat === cat : p.cat !== 'attend') && !(cat === 'as' && asOpenOnly && asStatus(p) === 'done')
       && (!q || (p.text + ' ' + p.name + ' ' + (p.siteName || '') + ' ' + ((p.asState && p.asState.owner) || '')).toLowerCase().includes(q)));
     $('#msg').textContent = query ? `"${query}" 찾은 글 ${shown.length}개` + (!site && posts.length >= limit ? ' (최근 글에서 찾았어요. 아래 "이전 글 더 보기"를 누르면 더 찾아요)' : '') : '';
     $('#more').classList.toggle('hidden', !!site || posts.length < limit);
@@ -356,7 +357,7 @@
     $('#wTitle').textContent = p ? '글 수정' : '글쓰기';
     $('#wSave').textContent = p ? '저장' : '올리기';
     const sel = p ? p.cat : cat || (site ? 'photo' : 'notice');
-    const keys = site && !p ? ['photo', 'as'] : CATS.filter((c) => c.key).map((c) => c.key);
+    const keys = site && !p ? ['photo', 'as'] : CATS.filter((c) => c.key && c.key !== 'attend').map((c) => c.key);
     $('#wCats').innerHTML = CATS.filter((c) => keys.includes(c.key)).map((c) => `<label><input type="radio" name="cat" value="${c.key}" ${c.key === sel ? 'checked' : ''}><span>${c.label}</span></label>`).join('');
     if (!fW.querySelector('input[name=cat]:checked')) fW.querySelector('input[name=cat]').checked = true;
     fW.text.value = p ? p.text : '';

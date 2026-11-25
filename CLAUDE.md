@@ -24,7 +24,7 @@
 5. 인쇄·레이아웃을 바꿨으면 PDF 로 뽑아 A4 가로 한 장, 선 굵기를 확인한다.
 6. 데이터 저장 방식을 바꿨으면 에뮬레이터에서 기존 데이터가 지워지지 않는지, migrate 가 되는지 확인한다.
    - Firebase 규칙(`firebase/database.rules.json`)을 바꿨으면 `bash tools/test-rules.sh` 통과 + 막혀야 할 것/돼야 할 것 시험을 `firebase/rules.test.mjs` 에 추가한다.
-   - 로그인·회원 화면을 바꿨으면 `tools/test/e2e-auth.cjs`, Band 를 바꿨으면 `tools/test/e2e-band.cjs` 화면 시험을 돌린다. 알림(`worker/push.js`)을 바꿨으면 `tools/test/push.test.mjs`.
+   - 로그인·회원 화면을 바꿨으면 `tools/test/e2e-auth.cjs`, Band 를 바꿨으면 `tools/test/e2e-band.cjs`, Site 를 바꿨으면 `tools/test/e2e-site.cjs` 화면 시험을 돌린다. 알림(`worker/push.js`)을 바꿨으면 `tools/test/push.test.mjs`.
 7. 푸시 후 GitHub Actions(pages / release)가 성공했는지 `gh run list` 로 확인하고, 실패하면 바로 고친다.
 - 검토에서 문제가 나오면 고친 뒤 처음부터 다시 검토한다. 통과하지 못한 채 올리지 않는다.
 
