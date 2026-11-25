@@ -93,7 +93,7 @@
     const ab = $('#attBtn'); if (ab) ab.onclick = doAttend;
   }
 
-  // 4주 캘린더: 이번 주 막대만 공정 색, 나머지 주·완료한 공정은 회색
+  // 4주 캘린더: 모든 막대를 공정 색으로 (이번 주는 칸 배경으로 구분)
   function calCard(s, tl, edit) {
     const day = S.today(), att = attendOf(s.id), thisWeek = sundayOf(day), drag = edit && canDrag();
     const weeks = [0, 1, 2, 3].map((k) => [...Array(7)].map((_, i) => S.addDays(weekBase, k * 7 + i)));
@@ -117,7 +117,7 @@
       }).join('');
       const bars = segs.map((g) => {
         const live = preview && preview.id === g.t.id; // 끄는 중인 막대는 어느 주든 제 색
-        const color = live || (isNow && !g.t.done) ? colorOf(tl, g.t) : '';
+        const color = colorOf(tl, g.t);
         return `<span class="st-seg ${color ? 'now' : ''} ${live ? 'live' : ''} ${drag ? 'drag' : ''}" data-t="${esc(g.t.id)}" style="left:calc(${(g.a / 7) * 100}% + 3px);width:calc(${((g.b - g.a) / 7) * 100}% - 6px);top:${32 + g.l * 24}px;${color ? 'background:' + color : ''}" title="${esc(g.t.name)} ${g.n}일">${drag && g.s ? '<i class="hl" data-edge="start"></i>' : ''}${esc(g.t.name)}${g.b - g.a > 1 ? ` ${g.n}일` : ''}${drag && g.e ? '<i class="x" data-clear title="일정 지우기">✕</i><i class="hr" data-edge="end"></i>' : ''}</span>`;
       }).join('');
       return `<div class="st-wk ${isNow ? 'now' : ''}" style="min-height:${Math.max(84, 38 + lanes.length * 24)}px">${cells}${bars}</div>`;
@@ -125,7 +125,7 @@
     const a = weeks[0][0], b = weeks[3][6];
     return `<div class="card st-calcard"><div class="card-h"><div class="st-nav" style="margin-left:0"><button type="button" data-wk="-7" aria-label="한 주 앞">‹</button></div>
       <h2>${S.md(a)} ~ ${S.md(b)} 공정 일정</h2><div class="st-nav" style="margin-left:0"><button type="button" data-wk="7" aria-label="한 주 뒤">›</button><button type="button" data-wk="0">이번 주</button></div>
-      <span class="st-ro" style="margin-left:auto">이번 주 공정만 색으로 보여요${edit ? (drag ? ' · 막대를 끌어 옮기고 끝을 끌어 늘려요 · ✕ 로 일정 지우기 · 날짜를 누르면 그날 쉬는 날 정하기' : ' · 날짜를 누르면 그날 공정 고르기') : ''}</span></div>
+      <span class="st-ro" style="margin-left:auto">${edit ? (drag ? '막대를 끌어 옮기고 끝을 끌어 늘려요 · ✕ 로 일정 지우기 · 날짜를 누르면 그날 쉬는 날 정하기' : '날짜를 누르면 그날 공정 고르기') : ''}</span></div>
       <div class="st-scroll"><div class="st-month"><div class="st-wh">${WD.map((d, i) => `<span class="${i === 0 ? 'red' : i === 6 ? 'blue' : ''}">${d}</span>`).join('')}</div>${rows}</div></div></div>`;
   }
 

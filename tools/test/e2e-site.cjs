@@ -98,11 +98,11 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await a.check(`.st-daypop input[data-t="${mokId}"]`); await new Promise((r) => setTimeout(r, 600));
   log((await get(`site/p1/tasks/${mokId}/minus/${TODAY}`)) === null, '다시 켜면 하는 날');
   await a.click('.st-daypop [data-close]');
-  // 이번 주가 아닌 주의 막대는 회색 (타일: 8~9일 뒤)
+  // 이번 주가 아닌 주의 막대도 제 색 (타일: 8~9일 뒤)
   const taId = await a.getAttribute(li('타일'), 'data-t');
   await put(`site/p1/tasks/${taId}/start`, plus(8)); await put(`site/p1/tasks/${taId}/end`, plus(9));
   await a.waitForSelector('.st-seg:has-text("타일")');
-  log((await a.locator('.st-seg.now:has-text("타일")').count()) === 0, '이번 주가 아닌 공정 막대는 회색');
+  log((await a.locator('.st-seg.now:has-text("타일")').count()) === 1, '이번 주가 아닌 공정 막대도 색으로');
   // 진행률: 일정이 지난 날만큼 (철거 3일 지남 / 철거3 + 목공5 + 타일2 + 날짜 없는 8)
   const chId = await a.getAttribute(li('철거'), 'data-t');
   await put(`site/p1/tasks/${chId}/start`, plus(-3)); await put(`site/p1/tasks/${chId}/end`, plus(-1));
