@@ -107,11 +107,19 @@ button.st-day:hover { background: rgba(241, 191, 82, .12); }
 /* 막대 끌기 */
 .st-seg.drag { pointer-events: auto; cursor: grab; }
 body.st-dragging, body.st-dragging * { cursor: grabbing !important; user-select: none; }
-.st-seg .hl, .st-seg .hr { position: absolute; top: 0; bottom: 0; width: 9px; cursor: ew-resize; }
-.st-seg .hl { left: 0; border-left: 3px solid rgba(255,255,255,.7); border-radius: 6px 0 0 6px; }
-.st-seg .hr { right: 0; border-right: 3px solid rgba(255,255,255,.7); border-radius: 0 6px 6px 0; }
-.st-seg:not(.now) .hl, .st-seg:not(.now) .hr { border-color: rgba(0,0,0,.18); }
-.st-day.hl { background: rgba(241, 191, 82, .32) !important; }
+/* 막대 끝 손잡이: 늘 보이는 밝은 끝 (잡고 끌면 늘리기/줄이기) */
+.st-seg .hl, .st-seg .hr { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; background: rgba(255,255,255,.38); }
+.st-seg .hl { left: 0; border-radius: 6px 0 0 6px; }
+.st-seg .hr { right: 0; border-radius: 0 6px 6px 0; }
+.st-seg:not(.now) .hl, .st-seg:not(.now) .hr { background: rgba(0,0,0,.09); }
+.st-seg.live { box-shadow: 0 4px 12px rgba(0,0,0,.25); z-index: 3; opacity: .95; }
+/* 일정 지우기 ✕ (막대에 마우스를 올리면) */
+.st-seg .x { display: none; position: absolute; right: 11px; top: 2px; width: 16px; height: 16px; line-height: 16px; border-radius: 50%; background: rgba(0,0,0,.35); color: #fff; font-style: normal; font-size: 10px; text-align: center; cursor: pointer; }
+.st-seg.drag:hover .x { display: block; }
+body.st-dragging .st-seg .x { display: none !important; }
+.st-tp.drop-clear { outline: 2px dashed #e5484d; outline-offset: 4px; border-radius: 8px; background: #fff5f5; }
+.st-tp.drop-clear::after { content: '여기에 놓으면 일정이 지워져요'; display: block; text-align: center; color: #c22; font-size: 12px; font-weight: 700; padding: 6px; }
+.st-dpl .clr { margin-left: auto; border: 0; background: none; color: #c22; font-size: 11px; cursor: pointer; text-decoration: underline; }
 
 /* 달력 (일요일·공휴일 빨강, 토요일 파랑) */
 .st-cal { position: absolute; z-index: 70; width: 300px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.15); }

@@ -67,7 +67,12 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   { // 막대 위 오늘 칸에서 잡아 하루 뒤 칸으로
     const bar = await a.locator(`.st-seg[data-t="${mokId}"] >> nth=0`).boundingBox(), c0 = await a.locator(segIn(TODAY)).boundingBox(), c1 = await a.locator(segIn(plus(1))).boundingBox();
     const y = bar.y + bar.height / 2;
-    await a.mouse.move(c0.x + c0.width / 2, y); await a.mouse.down(); await a.mouse.move(c1.x + c1.width / 2, y, { steps: 8 }); await a.mouse.up();
+    await a.mouse.move(c0.x + c0.width / 2, y); await a.mouse.down(); await a.mouse.move(c1.x + c1.width / 2, y, { steps: 8 });
+    // 손을 떼기 전: 막대가 제 색으로 따라 움직이고, 저장은 아직
+    const live = await a.locator(`.st-seg.live[data-t="${mokId}"]`).count(), lc = await a.locator(`.st-seg.live[data-t="${mokId}"] >> nth=0`).evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => '');
+    log(live >= 1 && !/rgb\(217, 213, 203\)/.test(lc) && (await a.locator('.st-day.hl').count()) === 0 && (await get(`site/p1/tasks/${mokId}/start`)) === TODAY, '끄는 동안 막대가 제 색으로 따라 움직임 (노란 칸 표시 없음, 놓기 전엔 저장 안 함)');
+    await a.screenshot({ path: SH + '/s5-dragging.png' });
+    await a.mouse.up();
   }
   await new Promise((r) => setTimeout(r, 700));
   const m3 = await get(`site/p1/tasks/${mokId}`);
@@ -111,6 +116,32 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await a.waitForFunction(() => document.querySelector('#side .st-ti input.nmc').value === '설비');
   log(true, '공정 순서 바꾸기 (설비 ↑)');
   await a.screenshot({ path: SH + '/s1-site.png' });
+  // 일정 지우기 3가지 (공정은 목록에 남음)
+  const taBar = `.st-seg[data-t="${taId}"]`;
+  await a.hover(`${taBar} >> nth=-1`); await a.click(`${taBar} >> nth=-1 >> .x`);
+  await new Promise((r) => setTimeout(r, 600));
+  const ta1 = await get(`site/p1/tasks/${taId}`);
+  log(!ta1.start && !ta1.end && ta1.name === '타일' && (await a.locator(li('타일')).count()) === 1, '막대 ✕ → 일정만 지워지고 공정은 목록에 남음');
+  // 다시 넣고 → 막대를 왼쪽 목록으로 끌어다 놓기
+  await a.locator(`${li('타일')} .grip`).dragTo(a.locator(`.st-day[data-day="${plus(8)}"]`), { force: true });
+  await a.waitForSelector(taBar);
+  { const b = await a.locator(`${taBar} >> nth=0`).boundingBox(), t = await a.locator('#side .st-tl').boundingBox();
+    await a.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await a.mouse.down(); await a.mouse.move(b.x - 60, b.y, { steps: 4 }); await a.mouse.move(t.x + t.width / 2, t.y + 20, { steps: 10 });
+    log((await a.locator('#side .st-tp.drop-clear').count()) === 1, '막대를 왼쪽 목록 위로 끌면 "놓으면 일정이 지워져요" 표시');
+    await a.mouse.up(); }
+  await new Promise((r) => setTimeout(r, 600));
+  log(!(await get(`site/p1/tasks/${taId}/start`)), '막대를 왼쪽 목록에 놓으면 일정 지우기');
+  // 휴대폰처럼: 날짜 눌러 목록에서 "일정 지우기"
+  await a.locator(`${li('타일')} .grip`).dragTo(a.locator(`.st-day[data-day="${plus(8)}"]`), { force: true });
+  await a.waitForSelector(taBar);
+  await a.locator(`button.st-day[data-day="${plus(8)}"]`).click({ position: { x: 12, y: 10 } }); await a.waitForSelector('.st-daypop');
+  await a.click(`.st-daypop [data-clear-t="${taId}"]`); await new Promise((r) => setTimeout(r, 600));
+  log(!(await get(`site/p1/tasks/${taId}/start`)), '날짜 누른 목록의 "일정 지우기"');
+  // 왼쪽 목록의 ⊘ 버튼
+  await put(`site/p1/tasks/${taId}/start`, plus(8)); await put(`site/p1/tasks/${taId}/end`, plus(9));
+  await a.waitForSelector(`${li('타일')} [data-clear]`, { state: 'attached' });
+  await a.hover(li('타일')); await a.click(`${li('타일')} [data-clear]`); await new Promise((r) => setTimeout(r, 600));
+  log(!(await get(`site/p1/tasks/${taId}/start`)), '왼쪽 목록의 ⊘ (일정 지우기)');
   // 출근 (+ 새 글 알림 요청)
   let notifyReq = null;
   await a.route('**/push/notify', (r) => { notifyReq = r.request().postDataJSON(); r.fulfill({ status: 200, body: '{}' }); });
