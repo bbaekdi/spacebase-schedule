@@ -65,7 +65,7 @@
         ],
         "$pid": {
           ".write": "auth != null && root.child('ws/members').child(auth.uid).exists() && ((!data.exists() && newData.child('uid').val() === auth.uid && newData.child('name').val() === root.child('ws/members').child(auth.uid).child('name').val()) || (data.exists() && newData.exists() && (data.child('uid').val() === auth.uid || root.child('ws/admins').child(auth.uid).val() === true) && newData.child('uid').val() === data.child('uid').val() && newData.child('name').val() === data.child('name').val() && newData.child('at').val() === data.child('at').val()))",
-          ".validate": "newData.hasChildren(['cat', 'text', 'uid', 'name', 'at']) && newData.child('cat').isString() && newData.child('cat').val().matches(/^(photo|as|project|notice)$/) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 5000 && newData.child('at').isNumber() && (newData.child('cat').val() !== 'project' || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40)) && (!newData.child('site').exists() || (newData.child('site').isString() && newData.child('siteName').isString() && newData.child('siteName').val().length <= 40))",
+          ".validate": "newData.hasChildren(['cat', 'text', 'uid', 'name', 'at']) && newData.child('cat').isString() && newData.child('cat').val().matches(/^(photo|as|project|notice)$/) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 5000 && newData.child('at').isNumber() && (newData.child('cat').val() !== 'project' || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40)) && (!newData.child('site').exists() || (newData.child('site').isString() && newData.child('siteName').isString())) && (!newData.child('siteName').exists() || (newData.child('siteName').isString() && newData.child('siteName').val().length > 0 && newData.child('siteName').val().length <= 40))",
           "commentCount": {
             ".write": "auth != null && root.child('ws/members').child(auth.uid).exists()",
             ".validate": "newData.isNumber() && newData.val() >= 0"
@@ -76,7 +76,12 @@
           },
           "asState": {
             ".write": "auth != null && root.child('ws/members').child(auth.uid).exists()",
-            ".validate": "newData.hasChildren(['status', 'by', 'at']) && newData.child('status').isString() && newData.child('status').val().matches(/^(new|doing|done)$/) && newData.child('by').val() === root.child('ws/members').child(auth.uid).child('name').val() && newData.child('at').isNumber() && (!newData.child('owner').exists() || (newData.child('owner').isString() && newData.child('owner').val().length <= 20)) && newData.parent().child('cat').val() === 'as'"
+            ".validate": "newData.hasChildren(['status', 'by', 'at']) && newData.child('status').isString() && newData.child('status').val().matches(/^(new|doing|done)$/) && newData.child('by').val() === root.child('ws/members').child(auth.uid).child('name').val() && newData.child('at').isNumber() && (!newData.child('owner').exists() || (newData.child('owner').isString() && newData.child('owner').val().length <= 120)) && newData.parent().child('cat').val() === 'as'"
+          },
+          "form": {
+            "$f": {
+              ".validate": "newData.isString() && newData.val().length <= 2000"
+            }
           }
         }
       },

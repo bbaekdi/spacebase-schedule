@@ -18,7 +18,7 @@
   const PAGE = 50;
 
   let me = null, db = null, posts = [], limit = PAGE, cat = '', query = '', openId = null, cmtRef = null;
-  let projects = {}, memberNames = [], site = null, sitePosts = [], siteRef = null, asOpenOnly = false;
+  let projects = {}, staff = [], site = null, sitePosts = [], siteRef = null, asOpenOnly = false;
   try { cat = sessionStorage.getItem('bd_cat') || ''; asOpenOnly = sessionStorage.getItem('bd_asopen') === '1'; } catch {}
 
   function ago(t) {
@@ -42,8 +42,13 @@
   const asStatus = (p) => (p.asState && p.asState.status) || 'new';
   const ICON_CMT = '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/></svg>';
   const ICON_PIN = '<svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>';
-  const siteChip = (p) => (p.site && p.siteName ? `<a class="bd-site" href="#site=${encodeURIComponent(p.site)}" title="현장 방 열기">${ICON_PIN}${mark(p.siteName)}</a>` : '');
-  const asBadge = (p) => (p.cat === 'as' ? `<span class="bd-as ${asStatus(p)}">${AS[asStatus(p)]}${p.asState && p.asState.owner ? ' · ' + esc(p.asState.owner) : ''}</span>` : '');
+  const siteChip = (p) => (p.site && p.siteName ? `<a class="bd-site" href="#site=${encodeURIComponent(p.site)}" title="현장 방 열기">${ICON_PIN}${mark(p.siteName)}</a>`
+    : p.siteName && p.cat !== 'project' ? `<span class="bd-site plain">${ICON_PIN}${mark(p.siteName)}</span>` : '');
+  const asBadge = (p) => {
+    if (p.cat !== 'as') return '';
+    const o = String((p.asState && p.asState.owner) || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return `<span class="bd-as ${asStatus(p)}">${AS[asStatus(p)]}${o.length ? ' · ' + esc(o[0]) + (o.length > 1 ? ` 외 ${o.length - 1}명` : '') : ''}</span>`;
+  };
 
   // ---------- 목록 ----------
   function drawCats() {
@@ -79,7 +84,7 @@
     const q = query.toLowerCase();
     const base = site ? sitePosts : posts;
     const shown = base.filter((p) => !p.deleted && (!cat || p.cat === cat) && !(cat === 'as' && asOpenOnly && asStatus(p) === 'done')
-      && (!q || (p.text + ' ' + p.name + ' ' + (p.siteName || '')).toLowerCase().includes(q)));
+      && (!q || (p.text + ' ' + p.name + ' ' + (p.siteName || '') + ' ' + ((p.asState && p.asState.owner) || '')).toLowerCase().includes(q)));
     $('#msg').textContent = query ? `"${query}" 찾은 글 ${shown.length}개` + (!site && posts.length >= limit ? ' (최근 글에서 찾았어요. 아래 "이전 글 더 보기"를 누르면 더 찾아요)' : '') : '';
     $('#more').classList.toggle('hidden', !!site || posts.length < limit);
     if (!shown.length) {
@@ -168,27 +173,109 @@
   // ---------- 글쓰기 / 고치기 ----------
   const dW = $('#dlgWrite'), fW = $('#fWrite');
   let editing = null;
-  const siteOptions = (cur) => {
-    const list = Object.entries(projects).filter(([id, v]) => !v.closed || id === cur).sort((a, b) => b[1].at - a[1].at);
-    return `<option value="">현장 고르기 (선택)</option>${list.map(([id, v]) => `<option value="${esc(id)}" ${id === cur ? 'selected' : ''}>${esc(v.siteName)}</option>`).join('')}`;
+  // 자동 양식 (지금 밴드에 올리던 글 모양을 따름). 칸에 넣은 값은 form 에, 번호 줄 모양 글은 text 에 저장한다.
+  const FORMS = {
+    project: [
+      { k: 'client', label: '발주처명', req: 1 },
+      { k: 'type', label: '형태', ph: '예: 오피스, 카페, 병원' },
+      { k: 'address', label: '위치(현장주소)', ph: '예: ○○시 ○○구 ○○로 00, ○동 ○호' },
+      { k: 'area', label: '평수', ph: '예: 100평 (대략적)' },
+      { k: 'period', label: '공사기간', period: 1, ph: '예: 2027년 1월 6일 ~ 설날 전 입주 희망' },
+      { k: 'contact', label: '발주처 담당자', ph: '이름 직함 (예: 홍길동 팀장)' },
+      { k: 'phone', label: '연락처', tel: 1, ph: '010-0000-0000' },
+      { k: 'etc', label: '기타', multi: 1, ph: '예: 예산 미정' },
+    ],
+    as: [
+      { k: 'kind', label: 'A/S 기간', ph: '예: 하자보수 기간, 추가공사' },
+      { k: 'recv', label: '접수일', date: 1 },
+      { k: 'contact', label: '발주처 담당자', ph: '이름 직함 (예: 홍길동 팀장)' },
+      { k: 'phone', label: '연락처', tel: 1, ph: '010-0000-0000' },
+      { k: 'req', label: '요청내용', multi: 1, req: 1, ph: '예: 업무석 확장, 회의실 신설' },
+      { k: 'plan', label: '작업예정일', ph: '예: 12월 둘째 주 / 빠른 진행 요청' },
+    ],
   };
+  const mdDay = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${+m[2]}월 ${+m[3]}일` : String(s || ''); };
+  const ymdKo = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[1]}년 ${+m[2]}월 ${+m[3]}일` : ''; };
+  const who = (f) => [f.contact, f.phone].filter(Boolean).join(' ');
+  // 번호 줄 모양 글 만들기 (찾기·목록·홈 카드에 쓰임)
+  function compose(c, f, siteName) {
+    if (c === 'project') {
+      const rows = [['발주처명', f.client], ['형태', f.type], ['위치(현장주소)', f.address], ['평수', f.area], ['공사기간', f.period], ['발주처 담당자', who(f)], ['기타', f.etc]].filter((r) => r[1]);
+      return rows.map((r, i) => `${i + 1}. ${r[0]} _ ${r[1]}`).join('\n');
+    }
+    const rows = [['발주처명', siteName], ['A/S 기간', f.kind], ['접수일', mdDay(f.recv)], ['발주처 담당자', who(f)]].filter((r) => r[1]);
+    let t = rows.map((r, i) => `${i + 1}.${r[0]} : ${r[1]}`).join('\n');
+    if (f.req) t += (t ? '\n' : '') + '요청내용 :\n' + f.req;
+    if (f.plan) t += (t ? '\n' : '') + '작업예정일 : ' + f.plan;
+    return t;
+  }
+  const staffLabel = (m) => [m.name, m.rank].filter(Boolean).join(' ');
+  const ownersOf = (p) => String((p.asState && p.asState.owner) || '').split(',').map((s) => s.trim()).filter(Boolean);
+  function ownerChips(sel, name) {
+    const all = [...new Set([...staff.map(staffLabel), ...sel])];
+    if (!all.length) return '<div class="bd-hint">주간 스케줄 직원표에 이름이 없어요.</div>';
+    return `<div class="bd-owners">${all.map((n) => `<label><input type="checkbox" name="${name}" value="${esc(n)}" ${sel.includes(n) ? 'checked' : ''}><span>${esc(n)}</span></label>`).join('')}</div>`;
+  }
+
+  const siteOptions = (cur, direct) => {
+    const list = Object.entries(projects).filter(([id, v]) => !v.closed || id === cur).sort((a, b) => b[1].at - a[1].at);
+    return `<option value="">현장 고르기 (선택)</option>${list.map(([id, v]) => `<option value="${esc(id)}" ${id === cur ? 'selected' : ''}>${esc(v.siteName)}</option>`).join('')}${direct ? `<option value="__direct" ${cur === '__direct' ? 'selected' : ''}>✏️ 직접 입력</option>` : ''}`;
+  };
+  const useForm = (c) => !!FORMS[c] && (!editing || !!editing.form || editing.cat !== c);
+  const field = (d, val) => {
+    const v = esc(val || ''), nm = 'f_' + d.k, req = d.req ? ' <b>*</b>' : '';
+    if (d.multi) return `<label class="bd-f"><span>${d.label}${req}</span><textarea name="${nm}" rows="3" maxlength="2000" placeholder="${esc(d.ph || '')}">${v}</textarea></label>`;
+    if (d.date) return `<label class="bd-f"><span>${d.label}</span><input type="date" name="${nm}" value="${v}"></label>`;
+    if (d.period) return `<label class="bd-f"><span>${d.label}</span><div class="bd-frow"><input name="${nm}" maxlength="200" placeholder="${esc(d.ph || '')}" value="${v}"><input type="date" name="f_periodStart" title="시작일 고르기"></div></label>`;
+    return `<label class="bd-f"><span>${d.label}${req}</span><input name="${nm}" ${d.tel ? 'type="tel" inputmode="tel"' : ''} maxlength="200" placeholder="${esc(d.ph || '')}" value="${v}"></label>`;
+  };
+  let siteNameTouched = false;
   function writeExtras() {
     const c = (fW.querySelector('input[name=cat]:checked') || {}).value;
-    const p = editing || {};
+    const p = editing || {}, f = (editing && editing.cat === c && editing.form) || {};
+    const form = useForm(c);
     let h = '';
     if (c === 'project') {
-      h += `<input name="siteName" maxlength="40" placeholder="현장 이름 (예: ○○빌딩 3층 사무실)" value="${esc(p.siteName || '')}">`;
+      if (form) {
+        h += FORMS.project.slice(0, 2).map((d) => field(d, f[d.k])).join('');
+        h += `<label class="bd-f"><span>현장 이름 <b>*</b> <small>(발주처명 + 형태로 자동)</small></span><input name="siteName" maxlength="40" value="${esc(p.siteName || '')}"></label>`;
+        h += FORMS.project.slice(2).map((d) => field(d, f[d.k])).join('');
+      } else h += `<input name="siteName" maxlength="40" placeholder="현장 이름 (예: ○○빌딩 3층 사무실)" value="${esc(p.siteName || '')}">`;
       if (editing) h += `<label class="bd-check"><input type="checkbox" name="closed" ${p.closed ? 'checked' : ''}> 끝난 현장 (현장 고르기 목록에서 숨김)</label>`;
     } else if (c === 'photo' || c === 'as') {
-      const cur = p.site || (!editing && site) || '';
-      h += `<select name="site">${siteOptions(cur)}</select>`;
-      if (!Object.keys(projects).length) h += '<div class="bd-hint">아직 현장이 없어요. <b>프로젝트</b> 게시판에 현장을 먼저 등록하면 여기서 고를 수 있어요.</div>';
-    }
-    if (c === 'as' && !editing) {
-      h += `<select name="owner"><option value="">담당자 (선택)</option>${memberNames.map((n) => `<option>${esc(n)}</option>`).join('')}</select>`;
+      const cur = p.site || (p.siteName && c === 'as' ? '__direct' : '') || (!editing && site) || '';
+      h += `<label class="bd-f"><span>${c === 'as' ? '발주처명 (현장)' : '현장'}</span><select name="site">${siteOptions(cur, c === 'as')}</select></label>`;
+      if (c === 'as') h += `<input name="siteDirect" maxlength="40" placeholder="발주처명 / 현장 이름 직접 입력" value="${esc(!p.site && p.siteName ? p.siteName : '')}" class="${cur === '__direct' ? '' : 'hidden'}">`;
+      if (!Object.keys(projects).length) h += `<div class="bd-hint">아직 현장이 없어요. <b>프로젝트</b> 게시판에 현장을 등록하면 여기서 고를 수 있어요.${c === 'as' ? ' 지금은 "직접 입력"을 골라 주세요.' : ''}</div>`;
+      if (c === 'as' && form) {
+        h += FORMS.as.map((d) => field(d, d.k === 'recv' && !f.recv && !editing ? WS.ymd(new Date()) : f[d.k])).join('');
+        if (!editing) h += `<div class="bd-f"><span>담당자 (여러 명 고를 수 있어요)</span>${ownerChips([], 'owner')}</div>`;
+      }
     }
     $('#wExtra').innerHTML = h;
-    fW.text.placeholder = c === 'project' ? '어떤 프로젝트인지 써 주세요 (발주처, 위치, 공사 기간, 담당 등)' : c === 'as' ? 'A/S 내용을 써 주세요 (어디가, 언제부터, 연락처 등)' : '내용을 써 주세요';
+    fW.text.classList.toggle('hidden', form);
+    fW.text.placeholder = c === 'project' ? '어떤 프로젝트인지 써 주세요' : c === 'as' ? 'A/S 내용을 써 주세요' : '내용을 써 주세요';
+    // 현장 이름 자동 (발주처명 + 형태), 직접 고치면 그때부터는 자동으로 안 바꿈
+    const auto = () => [fW.f_client && fW.f_client.value.trim(), fW.f_type && fW.f_type.value.trim()].filter(Boolean).join(' ');
+    siteNameTouched = !!(editing && editing.siteName && editing.siteName !== auto());
+    if (fW.siteName && fW.f_client) {
+      fW.siteName.oninput = () => { siteNameTouched = true; };
+      const up = () => { if (!siteNameTouched) fW.siteName.value = auto().slice(0, 40); };
+      fW.f_client.oninput = up; fW.f_type.oninput = up;
+    }
+    if (fW.f_periodStart) fW.f_periodStart.onchange = () => {
+      const t = ymdKo(fW.f_periodStart.value); if (!t) return;
+      const cur = fW.f_period.value.trim();
+      fW.f_period.value = t + ' ~ ' + cur.replace(/^\d{4}년 \d+월 \d+일 ~ ?/, '');
+    };
+    // A/S: 현장을 고르면 발주처 담당자·연락처를 프로젝트에서 채움 (비어 있을 때만), 직접 입력 칸 보이기
+    if (c === 'as' && fW.site) fW.site.onchange = () => {
+      fW.siteDirect.classList.toggle('hidden', fW.site.value !== '__direct');
+      if (fW.site.value === '__direct') fW.siteDirect.focus();
+      const pf = (projects[fW.site.value] || {}).form || {};
+      if (fW.f_contact && !fW.f_contact.value) fW.f_contact.value = pf.contact || '';
+      if (fW.f_phone && !fW.f_phone.value) fW.f_phone.value = pf.phone || '';
+    };
   }
   function openWrite(p) {
     editing = p || null;
@@ -202,31 +289,44 @@
     $('#wErr').textContent = '';
     writeExtras();
     dW.showModal();
-    setTimeout(() => fW.text.focus(), 30);
+    setTimeout(() => { const first = fW.querySelector('#wExtra input:not([type=hidden]):not(.hidden), #wExtra select'); (useForm((fW.querySelector('input[name=cat]:checked') || {}).value) && first ? first : fW.text).focus(); }, 30);
   }
   $('#wCats').onchange = writeExtras;
   $('#write').onclick = () => openWrite();
   fW.onsubmit = async (e) => {
     e.preventDefault();
-    const text = fW.text.value.trim(), c = (fW.querySelector('input[name=cat]:checked') || {}).value;
+    const c = (fW.querySelector('input[name=cat]:checked') || {}).value;
     if (!c) return ($('#wErr').textContent = '게시판을 골라 주세요.');
-    const v = { cat: c, text };
+    const err = (m) => { $('#wErr').textContent = m; };
+    const form = useForm(c);
+    let f = null;
+    if (form) {
+      f = {};
+      FORMS[c].forEach((d) => { const el = fW['f_' + d.k]; const val = el ? el.value.trim() : ''; if (val) f[d.k] = val; });
+      const miss = FORMS[c].find((d) => d.req && !f[d.k]);
+      if (miss) return err(miss.label + '을(를) 써 주세요.');
+    }
+    const v = { cat: c, form: f };
     if (c === 'project') {
       v.siteName = (fW.siteName.value || '').trim();
-      if (!v.siteName) return ($('#wErr').textContent = '현장 이름을 써 주세요.');
+      if (!v.siteName) return err('현장 이름을 써 주세요.');
       if (editing) v.closed = fW.closed && fW.closed.checked ? true : null;
-    }
-    if (c === 'photo' || c === 'as') {
+      v.site = null;
+    } else if (c === 'photo' || c === 'as') {
       const sid = fW.site ? fW.site.value : '';
-      v.site = sid || null; v.siteName = sid && projects[sid] ? projects[sid].siteName : null;
-    } else if (c !== 'project') { v.site = null; v.siteName = null; }
+      if (sid === '__direct') {
+        v.site = null; v.siteName = (fW.siteDirect.value || '').trim() || null;
+        if (!v.siteName) return err('발주처명(현장 이름)을 써 주세요.');
+      } else { v.site = sid || null; v.siteName = sid && projects[sid] ? projects[sid].siteName : null; }
+    } else { v.site = null; v.siteName = null; }
     if (c !== 'project' && editing && editing.cat === 'project') v.closed = null;
-    if (!text) return ($('#wErr').textContent = '내용을 써 주세요.');
+    v.text = form ? compose(c, f, v.siteName) : fW.text.value.trim();
+    if (!v.text) return err('내용을 써 주세요.');
     $('#wSave').disabled = true;
     try {
       if (editing) {
-        const changed = Object.keys(v).some((k) => (editing[k] == null ? null : editing[k]) !== v[k]);
-        if (changed) {
+        const same = (a, b) => JSON.stringify(a == null ? null : a) === JSON.stringify(b == null ? null : b);
+        if (Object.keys(v).some((k) => !same(editing[k], v[k]))) {
           if (c === 'as' && !editing.asState) v.asState = { status: 'new', by: me.name, at: Date.now() };
           if (c !== 'as' && editing.asState) v.asState = null;
           await db.ref('board/posts/' + editing.id).update({ ...v, editedAt: Date.now() });
@@ -235,12 +335,16 @@
         const now = Date.now();
         const post = { ...v, uid: me.uid, name: me.name, at: now, commentCount: 0 };
         Object.keys(post).forEach((k) => post[k] == null && delete post[k]);
-        if (c === 'as') { post.asState = { status: 'new', by: me.name, at: now }; const o = fW.owner && fW.owner.value; if (o) post.asState.owner = o; }
+        if (c === 'as') {
+          post.asState = { status: 'new', by: me.name, at: now };
+          const o = [...fW.querySelectorAll('input[name=owner]:checked')].map((x) => x.value).join(', ');
+          if (o) post.asState.owner = o.slice(0, 120);
+        }
         await db.ref('board/posts').push(post);
         if (!site && cat && cat !== c) { cat = c; drawCats(); }
       }
       dW.close();
-    } catch (err) { $('#wErr').textContent = '저장하지 못했어요: ' + err.message; }
+    } catch (er) { err('저장하지 못했어요: ' + er.message); }
     finally { $('#wSave').disabled = false; }
   };
 
@@ -251,25 +355,36 @@
     if (p.cat !== 'as') return '';
     const st = asStatus(p), s = p.asState || {};
     return `<div class="bd-asbox"><div class="bd-asrow">${Object.entries(AS).map(([k, l]) => `<button type="button" class="bd-asbtn ${k} ${k === st ? 'on' : ''}" data-as="${k}">${l}</button>`).join('')}</div>
-      <div class="bd-asrow"><label>담당자 <select id="asOwner"><option value="">정하지 않음</option>${[...new Set([...memberNames, ...(s.owner ? [s.owner] : [])])].map((n) => `<option ${n === s.owner ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
-      <span class="bd-sub">${s.by ? `${esc(s.by)} · ${ago(s.at)} 바꿈` : ''}</span></div></div>`;
+      <div class="bd-asrow"><b>담당자</b><span class="bd-sub">${s.by ? `${esc(s.by)} · ${ago(s.at)} 바꿈` : ''}</span></div>
+      ${ownerChips(ownersOf(p), 'asOwner')}</div>`;
+  }
+  const telLink = (s) => { const n = String(s || '').replace(/[^\d+]/g, ''); return n.length >= 8 ? `<a href="tel:${n}">${esc(s)}</a>` : esc(s); };
+  const linkPhones = (s) => esc(s).replace(/(0\d{1,2}[- .]?\d{3,4}[- .]?\d{4})/g, (m) => `<a href="tel:${m.replace(/\D/g, '')}">${m}</a>`);
+  function formView(p) {
+    const f = p.form || {};
+    const rows = p.cat === 'project'
+      ? [['발주처명', esc(f.client)], ['형태', esc(f.type)], ['위치(현장주소)', f.address ? `<a href="https://map.naver.com/p/search/${encodeURIComponent(f.address)}" target="_blank" rel="noopener">${esc(f.address)}</a>` : ''], ['평수', esc(f.area)], ['공사기간', esc(f.period)], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['기타', esc(f.etc)]]
+      : [['발주처명', esc(p.siteName)], ['A/S 기간', esc(f.kind)], ['접수일', esc(mdDay(f.recv))], ['발주처 담당자', [esc(f.contact), telLink(f.phone)].filter(Boolean).join(' ')], ['요청내용', esc(f.req)], ['작업예정일', esc(f.plan)]];
+    return `<dl class="bd-form">${rows.filter((r) => r[1]).map((r) => `<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('')}</dl>`;
   }
   function drawPost(p) {
     $('#pCat').innerHTML = `<span class="bd-chip ${esc(p.cat)}">${catLabel(p.cat)}</span>`;
     $('#pBody').innerHTML = `
       <div class="bd-meta"><b>${esc(p.name)}</b><span>${ago(p.at)}${p.editedAt ? ' · 수정됨' : ''}</span></div>
-      ${p.cat === 'project' ? `<div class="bd-ptitle">${esc(p.siteName)}</div>` : siteChip(p) ? `<div class="bd-sitebar">${siteChip(p)}</div>` : ''}
-      <div class="bd-text">${esc(p.text)}</div>
+      ${p.cat === 'project' ? `<div class="bd-ptitle">${esc(p.siteName)}</div>` : siteChip(p) ? `<div class="bd-sitebar">${siteChip(p)}</div>` : p.siteName ? `<div class="bd-sitebar"><span class="bd-site plain">${ICON_PIN}${esc(p.siteName)}</span></div>` : ''}
+      ${p.form ? formView(p) : `<div class="bd-text">${linkPhones(p.text)}</div>`}
       ${p.cat === 'project' && site !== p.id ? `<a class="btn" style="margin-top:12px" href="#site=${encodeURIComponent(p.id)}">현장 방 열기 ›</a>` : ''}
       ${asBox(p)}
       ${canEdit(p) ? '<div class="bd-acts"><button class="btn" type="button" data-a="edit">고치기</button><button class="btn danger" type="button" data-a="del">지우기</button></div>' : ''}
       <ul class="bd-cmts">${cmts.length ? cmts.map((c) => `<li data-cid="${esc(c.id)}"><div class="who"><b>${esc(c.name)}</b><span>${ago(c.at)}</span>${me && (c.uid === me.uid || me.admin) ? '<button type="button" data-a="cdel">지우기</button>' : ''}</div><div class="t">${esc(c.text)}</div></li>`).join('') : '<li class="none">첫 댓글을 달아 보세요.</li>'}</ul>`;
-    const ow = $('#asOwner');
-    if (ow) ow.onchange = () => setAs(p, asStatus(p), ow.value);
+    $('#pBody').querySelectorAll('input[name=asOwner]').forEach((x) => (x.onchange = () => {
+      const o = [...$('#pBody').querySelectorAll('input[name=asOwner]:checked')].map((y) => y.value).join(', ');
+      setAs(p, asStatus(p), o);
+    }));
   }
   function setAs(p, status, owner) {
     const v = { status, by: me.name, at: Date.now() };
-    if (owner) v.owner = owner;
+    if (owner) v.owner = owner.slice(0, 120);
     return db.ref('board/posts/' + p.id + '/asState').set(v).catch((e) => alert('바꾸지 못했어요: ' + e.message));
   }
   function openPost(id) {
@@ -291,7 +406,7 @@
     if (e.target.closest('a[href^="#site="]')) { dP.close(); return; }
     const b = e.target.closest('button[data-a], button[data-as]'); if (!b) return;
     const p = findPost(openId); if (!p) return;
-    if (b.dataset.as) { const ow = $('#asOwner'); return setAs(p, b.dataset.as, ow ? ow.value : ''); }
+    if (b.dataset.as) return setAs(p, b.dataset.as, ownersOf(p).join(', '));
     if (b.dataset.a === 'edit') { dP.close(); openWrite(p); }
     if (b.dataset.a === 'del') {
       if (!confirm(p.cat === 'project' ? '이 현장(프로젝트) 글을 지울까요?\n현장에 올라온 사진·A/S 글은 지워지지 않아요.' : '이 글을 지울까요?')) return;
@@ -336,8 +451,9 @@
   SBAuth.start().then((a) => {
     me = a; db = firebase.database();
     $('#list').innerHTML = '<div class="bd-empty">불러오는 중…</div>';
-    db.ref('ws/members').once('value').then((s) => {
-      memberNames = [...new Set(Object.values(s.val() || {}).map((m) => m && m.name).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'ko'));
+    // A/S 담당자 목록 = 주간 스케줄 직원표 전 직원 (이름 + 직급)
+    db.ref('spaces/' + a.spaceKey + '/data/members').once('value').then((s) => {
+      const v = s.val(); staff = (Array.isArray(v) ? v : Object.values(v || {})).filter((m) => m && m.name).map((m) => ({ name: String(m.name).trim(), rank: String(m.rank || '').trim() }));
     }).catch(() => {});
     listenProjects();
     listen();

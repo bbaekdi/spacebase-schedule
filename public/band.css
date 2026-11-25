@@ -89,3 +89,26 @@
 .bd-asbtn.on.doing { background: #f1bf52; border-color: #f1bf52; color: #1d1d1b; }
 .bd-asbtn.on.done { background: #6b6b66; border-color: #6b6b66; color: #fff; }
 .bd-sub { color: var(--sub); font-size: 12px; margin-left: auto; }
+
+/* 자동 양식 */
+.bd-f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.bd-f > span { font-weight: 700; color: var(--sub); }
+.bd-f > span b { color: #e5484d; }
+.bd-f > span small { font-weight: 400; }
+.bd-f input, .bd-f select, .bd-f textarea, .bd-extra > input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fff; font-size: 14px; }
+.bd-f textarea { resize: vertical; line-height: 1.5; min-height: 70px; }
+.bd-frow { display: flex; gap: 6px; }
+.bd-frow input[type=date] { flex: 0 0 44px; padding: 10px 6px; color: transparent; }
+.bd-frow input[type=date]::-webkit-datetime-edit { display: none; }
+.bd-owners { display: flex; flex-wrap: wrap; gap: 6px; }
+.bd-owners label { cursor: pointer; }
+.bd-owners input { position: absolute; opacity: 0; pointer-events: none; }
+.bd-owners span { display: inline-block; border: 1px solid var(--line); border-radius: 99px; padding: 5px 11px; font-size: 13px; background: #fff; color: var(--sub); }
+.bd-owners input:checked + span { background: var(--accent-ink); border-color: var(--accent-ink); color: #fff; font-weight: 700; }
+.bd-owners input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bd-form { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; margin: 12px 0 0; font-size: 14px; }
+.bd-form dt { color: var(--sub); font-weight: 700; }
+.bd-form dd { margin: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+.bd-form a, .bd-text a { color: #1f5f9e; }
+.bd-site.plain { color: var(--sub); background: #efede7; }
+@media (max-width: 520px) { .bd-form { grid-template-columns: 1fr; gap: 2px; } .bd-form dd { margin-bottom: 8px; } }

@@ -86,6 +86,13 @@ await no('없는 A/S 상태', A.ref('board/posts/as1/asState').set({ status: 'xx
 await no('A/S 가 아닌 글에 상태', A.ref('board/posts/proj1/asState').set({ status: 'new', by: '관리', at: 13 }));
 await no('비회원 A/S 상태 바꾸기', X.ref('board/posts/as1/asState').set({ status: 'done', by: 'x', at: 13 }));
 await ok('쓴 사람이 현장 끝남 표시', B.ref('board/posts/proj1/closed').set(true));
+
+// ---------- 자동 양식 ----------
+await ok('양식 있는 프로젝트', B.ref('board/posts/proj3').set({ cat: 'project', siteName: '테스트 오피스', text: '1. 발주처명 _ 테스트', form: { client: '테스트', type: '오피스', phone: '010-0000-0000' }, uid: 'b', name: '비', at: 20 }));
+await ok('현장 직접 입력 A/S (현장 방 없이 이름만)', B.ref('board/posts/as3').set({ cat: 'as', siteName: '직접쓴현장', text: '요청', uid: 'b', name: '비', at: 21, asState: { status: 'new', owner: '김가나 책임, 이다라 팀장', by: '비', at: 21 } }));
+await no('현장 이름 너무 김', B.ref('board/posts/as4').set({ cat: 'as', siteName: 'x'.repeat(41), text: '요청', uid: 'b', name: '비', at: 21 }));
+await no('양식 칸이 글자가 아님', B.ref('board/posts/proj4').set({ cat: 'project', siteName: 'x', text: 'x', form: { client: 5 }, uid: 'b', name: '비', at: 20 }));
+await no('양식 칸 너무 김', B.ref('board/posts/proj5').set({ cat: 'project', siteName: 'x', text: 'x', form: { etc: 'x'.repeat(2001) }, uid: 'b', name: '비', at: 20 }));
 // 내보내기
 await ok('관리자가 내보내기', A.ref('ws/members/c').remove());
 await no('내보낸 사람 config 읽기', C.ref('ws/config').once('value'));
