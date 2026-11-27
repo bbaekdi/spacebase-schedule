@@ -312,3 +312,10 @@ body.st-dragging .nmw .x { display: none !important; }
 .holv { display: block; padding: 0; overflow: visible; align-items: initial; writing-mode: horizontal-tb; }
 .holv > span { position: sticky; top: 84px; display: inline-block; writing-mode: vertical-rl; font-size: 11px; line-height: 1; letter-spacing: 1px; white-space: nowrap; padding: 6px 0 0 6px; color: rgba(0, 0, 0, .38); }
 @media print { .holv > span { position: static; color: rgba(0, 0, 0, .4); } }
+
+/* 공휴일 세로 글씨: 글자 수대로 표 세로 칸 전체에 고르게 (자간 자동) */
+.holv { display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; writing-mode: horizontal-tb; padding: 0; overflow: visible; }
+.holv > span { all: unset; }
+.holv > i { font-style: normal; font-size: 15px; font-weight: 700; line-height: 1; color: rgba(0, 0, 0, .27); }
+@media print { .holv > i { color: rgba(0, 0, 0, .35); font-size: 12px; } }
+.holv { justify-content: space-between; padding: 12px 0; box-sizing: border-box; }

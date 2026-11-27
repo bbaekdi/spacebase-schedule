@@ -236,14 +236,13 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   const tdays = await a.locator('table.gt tbody tr:first-child td.d[data-day]').evaluateAll((els) => els.map((e) => e.dataset.day));
   const hd = await a.evaluate((days) => days.find((d) => window.SB_HOLIDAYS[d]), tdays);
   if (hd) {
-    const hv = a.locator(`table.gt tbody tr:first-child td.d[data-day="${hd}"] .holv > span`), hvb = await hv.boundingBox();
-    const hs = await hv.evaluate((e) => { const c = getComputedStyle(e); return { wm: c.writingMode, col: c.color, ov: getComputedStyle(e.parentElement).overflow }; });
-    log((await hv.innerText()) === (await a.evaluate((d) => window.SB_HOLIDAYS[d], hd)) && /vertical/.test(hs.wm) && hvb.height > 20 && hvb.width < 40 && hs.ov === 'visible' && /0\.\d+\)$/.test(hs.col), `공정표: 공휴일 이름이 연하게 세로로 길게 (${hd})`);
-    // 표를 아래로 내려도 보임 (머리 밑에 붙어 따라옴)
-    await a.evaluate(() => { const sc = document.querySelector('.gt-scroll'); sc.scrollTop = 400; });
+    const hn = await a.evaluate((d) => window.SB_HOLIDAYS[d], hd), hc = a.locator(`table.gt tbody tr:first-child td.d[data-day="${hd}"] .holv`);
+    const info = await hc.evaluate((e) => { const c = [...e.children], r = e.getBoundingClientRect(), f = c[0].getBoundingClientRect(), l = c[c.length - 1].getBoundingClientRect(); return { n: c.length, h: r.height, w: r.width, fs: parseFloat(getComputedStyle(c[0]).fontSize), col: getComputedStyle(c[0]).color, span: l.bottom - f.top, ov: getComputedStyle(e.parentElement).overflow }; });
+    log(info.n === [...hn].filter((c) => c.trim()).length && info.fs >= 14 && /0\.\d+\)$/.test(info.col) && info.h > 300 && info.w < 40 && info.ov === 'visible' && info.span > info.h * 0.8, `공정표: 공휴일 이름이 연하고 크게, 글자 수대로 세로 칸에 꽉 차게 (${hd} ${hn}, 글씨 ${info.fs}px, 칸 높이의 ${Math.round((info.span / info.h) * 100)}%)`);
+    await a.evaluate(() => { document.querySelector('.gt-scroll').scrollTop = 400; });
     await new Promise((r) => setTimeout(r, 300));
-    const vis = await a.evaluate((d) => { const sc = document.querySelector('.gt-scroll').getBoundingClientRect(), t = document.querySelector(`table.gt tbody tr:first-child td.d[data-day="${d}"] .holv > span`).getBoundingClientRect(); return { top: t.top - sc.top, bottom: sc.bottom - t.bottom, h: t.height }; }, hd);
-    log(vis.top >= 60 && vis.bottom >= 0 && vis.h > 20, `공정표를 아래로 내려도 공휴일 글씨가 머리 밑에 보임 (머리에서 ${Math.round(vis.top)}px 아래)`);
+    const vis = await a.evaluate((d) => { const sc = document.querySelector('.gt-scroll').getBoundingClientRect(); return [...document.querySelectorAll(`table.gt tbody tr:first-child td.d[data-day="${d}"] .holv > i`)].filter((i) => { const r = i.getBoundingClientRect(); return r.top >= sc.top + 80 && r.bottom <= sc.bottom; }).length; }, hd);
+    log(vis >= 1, `표를 아래로 내려도 공휴일 글자가 보임 (보이는 글자 ${vis}개)`);
     await a.evaluate(() => { document.querySelector('.gt-scroll').scrollTop = 0; });
   } else log(true, '공정표: (이 기간에는 공휴일이 없어 건너뜀)');
   await hv(mokId);
