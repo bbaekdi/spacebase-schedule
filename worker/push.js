@@ -47,7 +47,7 @@ async function dbToken(env) {
   tokCache = { token: j.access_token, until: Date.now() + (j.expires_in - 120) * 1000 };
   return tokCache.token;
 }
-async function db(env, path, method = 'GET', body) {
+export async function db(env, path, method = 'GET', body) {
   const test = /^http:\/\/127\.0\.0\.1:/.test(env.TEST_DB || '');
   const url = (test ? env.TEST_DB : DB) + '/' + path + '.json' + (test ? '?ns=' + PROJECT + '-default-rtdb' : '');
   const auth = test ? 'Bearer owner' : 'Bearer ' + (await dbToken(env));
@@ -91,6 +91,13 @@ async function sendOne(env, sub, payload) {
   const body = await encrypt(payload, sub.p256dh, sub.auth);
   const r = await fetch(sub.endpoint, { method: 'POST', headers: { Authorization: await vapidAuth(env, sub.endpoint), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'high' }, body });
   return r.status;
+}
+
+// 요청한 사람의 uid (Authorization: Bearer <Firebase ID 토큰>). 내 컴퓨터 시험(TEST_DB+TEST_UID)에서만 토큰 확인을 건너뜀. drive.js 도 같이 씀.
+export async function authUid(req, env) {
+  const testing = /^http:\/\/127\.0\.0\.1:/.test(env.TEST_DB || '');
+  if (testing && env.TEST_UID) return env.TEST_UID;
+  return verifyIdToken((req.headers.get('Authorization') || '').replace(/^Bearer /, ''));
 }
 
 // ---------- POST /push/notify ----------

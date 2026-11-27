@@ -46,6 +46,7 @@
 <script src="vendor/firebase-auth-compat.js"></script>
 <script src="auth.js"></script>
 <script src="firebase-config.js"></script>
+<script src="band-config.js"></script>
 <script src="ws-common.js"></script>
 <script src="pwa.js"></script>
 <script>
@@ -91,6 +92,10 @@
     <section class="card"><h1>회원 관리</h1>
       <p class="note">관리자가 받아 준 사람만 사이트에 들어올 수 있어요. 들어오는 방법은 두 가지예요:
       <b>① 초대 링크</b>(1명용, 7일) · <b>② 가입 신청</b>(구글로 로그인하면 아래 "승인 대기"에 나타나요).</p></section>
+    <section class="card" id="drv"><h2>사진 보관 (회사 구글 드라이브)</h2>
+      <p class="note">Band 에 올린 사진이 저장되는 곳이에요. 관리자가 <b>회사 구글 계정</b>으로 한 번 "허용"하면 그 드라이브에 <b>"Band 사진" 폴더</b>가 만들어지고, 현장별·날짜별로 정리돼요. 이 앱은 자기가 만든 사진 파일만 다루고 드라이브의 다른 파일은 보지 못해요.</p>
+      <div class="row"><span id="drvSt" class="note" style="margin:0">확인 중…</span><button class="btn primary" id="drvGo" type="button" disabled>회사 드라이브 연결하기</button></div>
+      <div class="msg" id="drvMsg"></div></section>
     <section class="card"><h2>승인 대기</h2><div id="pend"></div></section>
     <section class="card"><h2>초대 링크 만들기</h2>
       <p class="note">초대할 사람의 이름을 고르고 링크를 만들어 카톡 등으로 보내 주세요. 링크는 <b>한 사람만, 7일 동안</b> 쓸 수 있어요.</p>
@@ -98,6 +103,28 @@
       <div id="newInv"></div><div class="msg" id="invMsg"></div>
       <h3 style="margin-top:18px;font-size:15px">만든 초대 링크</h3><div id="invs"></div></section>
     <section class="card"><h2>회원 목록</h2><div id="mems"></div><div class="msg" id="memMsg"></div></section>`;
+
+  // 사진 보관 연결 (worker/drive.js): 상태 확인 + 관리자가 구글 허락 화면으로
+  {
+    const api = String(window.SB_BAND_API || '').replace(/\/$/, ''), st = root.querySelector('#drvSt'), go = root.querySelector('#drvGo'), msg = root.querySelector('#drvMsg');
+    if (!api) { st.textContent = '중계 주소가 없어요.'; }
+    else {
+      fetch(api + '/drive/status').then((r) => r.json()).then((j) => {
+        st.innerHTML = j.ready ? '<b style="color:#1e7a3c">✓ 연결됨</b>' + (j.at ? ' (' + new Date(j.at).toLocaleDateString('ko-KR') + ')' : '') : j.why === 'setup' ? '아직 서버 설정이 안 됐어요.' : '아직 연결 안 됨';
+        go.textContent = j.ready ? '다시 연결하기 (다른 계정으로 바꿀 때)' : '회사 드라이브 연결하기';
+        go.disabled = j.why === 'setup';
+      }).catch(() => { st.textContent = '상태를 확인하지 못했어요.'; });
+      go.onclick = async () => {
+        go.disabled = true; msg.textContent = '';
+        try {
+          const t = await firebase.auth().currentUser.getIdToken();
+          const r = await fetch(api + '/drive/connect', { method: 'POST', headers: { Authorization: 'Bearer ' + t } });
+          if (!r.ok) throw new Error(await r.text());
+          location.href = (await r.json()).url;
+        } catch (e) { msg.textContent = '연결 화면을 열지 못했어요: ' + e.message; go.disabled = false; }
+      };
+    }
+  }
 
   const fail = (el) => (e) => { document.getElementById(el).textContent = '실패했어요: ' + (e && e.message || e); };
 

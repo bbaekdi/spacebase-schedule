@@ -40,6 +40,8 @@ public/
   calendar.html      회사 캘린더
   auth.js            구글 로그인 + 회원 확인 (승인 대기, 초대 링크, 관리자 비밀번호, 카톡 안 브라우저 안내)
   band.html, band.js, band.css  Band 회사 게시판 (구글 로그인 회원만): 게시판 4개, 글·댓글·찾기, 현장 방(#site=), A/S 처리 상태.
+                     사진(2단계): 글쓰기 "📷 사진 추가"(여러 장, 한 글 30장까지) → 브라우저가 긴 쪽 1920px JPEG(약 300~500KB)로 줄임 → worker/drive.js 가 회사 구글 드라이브 "Band 사진/현장이름/날짜/" 에 저장 → 글에 photos [{id,w,h,s}] 만 저장(Firebase board/posts/<글>/photos). 보기도 중계를 거쳐 로그인한 회원만(GET /drive/photo/<id>, 브라우저가 받아 blob 으로 보여 줌). 글 카드엔 4장까지, 글 보기엔 전부, 사진을 누르면 크게 보기(‹ ›·방향키·밀어 넘기기). 글을 완전히 지울 때(휴지통 "완전 삭제"·30일 지남) 드라이브 사진도 휴지통으로(POST /drive/trash). 글 수정에서는 사진을 못 바꿈.
+                     드라이브 연결: 관리자가 members.html "사진 보관" 카드의 "회사 드라이브 연결하기" → 구글 허락(범위 drive.file = 이 앱이 만든 파일만) → /drive/callback 이 열쇠(refresh token)와 "Band 사진" 폴더 번호를 Firebase driveAuth 칸에 저장(규칙으로 아무도 못 읽음, 중계만 서비스 계정으로 읽음). 필요한 것: 구글 클라우드에서 Drive API 켜기 + OAuth 클라이언트에 승인된 리디렉션 URI `<중계 주소>/drive/callback` 추가 (기존 GOOGLE_CLIENT_ID/SECRET 그대로 씀).
                      Firebase board/posts (프로젝트 글 siteName = 현장, 다른 글 site/siteName, A/S asState), board/comments. 홈(portal.html)에 "Band 새 글" 카드
                      자동 양식: 프로젝트·A/S 는 항목별 칸(form) → 지금 밴드 글 모양의 번호 줄 글(text)로 저장. 날짜는 자체 달력(일요일·공휴일 빨강, 토요일 파랑, holidays.js),
                      위치는 카카오 우편번호 검색(외부 스크립트 t1.kakaocdn.net, 누를 때만 불러옴). A/S 현장 직접 입력, A/S 예정일, A/S 담당자 = 주간 스케줄 직원표(팀별, 여러 명)
@@ -56,13 +58,13 @@ public/
   mail-config.js     SB_MAIL_API (비어 있음 → 메일 카드 숨김)
   band-ics.js, band-extension.html, guide.html, privacy.html, login.html
 desktop/             Electron (main.js, preload.js, preview.html=인쇄 미리보기, setup.html)
-worker/              band-relay.js, google.js, push.js(Band 새 글 알림 보내기), naverworks-mail.js (+ band.toml, wrangler.toml)
+worker/              band-relay.js, google.js, push.js(Band 새 글 알림 보내기), drive.js(Band 사진: 회사 구글 드라이브 저장·보기), naverworks-mail.js (+ band.toml, wrangler.toml)
 extension/           band-fill.js, bandform.js, site-bridge.js
 tools/sync-band.js   예비 밴드 동기화 (band-calendar.yml)
 firebase/            Firebase 규칙(database.rules.json) + 규칙 시험(rules.test.mjs). firebase-rules.yml 이 실제 Firebase 에 올림
 tools/vapid.mjs      알림 열쇠(VAPID)를 Secret FIREBASE_SERVICE_ACCOUNT 에서 만듦 (band-worker.yml 은 비밀 열쇠, pages.yml 은 공개 열쇠 SB_VAPID_PUBLIC)
 tools/test-rules.sh  규칙 시험 (연습용 Firebase), tools/fb-setup.mjs 규칙 올리기·회원 설정 (Actions 전용)
-tools/test/          시험 (연습용 Firebase): emu-seed.mjs, e2e-auth.cjs(로그인 화면), e2e-band.cjs(Band 화면), e2e-site.cjs(Site 화면), push.test.mjs(알림 보내기)
+tools/test/          시험 (연습용 Firebase): emu-seed.mjs, e2e-auth.cjs(로그인 화면), e2e-band.cjs(Band 화면), e2e-site.cjs(Site 화면), push.test.mjs(알림 보내기), drive.test.mjs(사진 중계, 가짜 드라이브), e2e-photo.cjs(사진 화면)
 tools/check.sh       배포 전 검토 (JS 문법, 비밀 값 의심 문자열, 버전↔릴리즈 노트)
 RELEASE-NOTES.md     바뀐 내용 기록 (최신이 위)
 build/               installer.nsi, release.sh, seticon.mjs

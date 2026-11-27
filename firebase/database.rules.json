@@ -83,6 +83,12 @@
             "$f": {
               ".validate": "newData.isString() && newData.val().length <= 2000"
             }
+          },
+          "photos": {
+            ".validate": "newData.hasChildren() && !newData.child('40').exists()",
+            "$n": {
+              ".validate": "newData.hasChild('id') && newData.child('id').isString() && newData.child('id').val().length >= 10 && newData.child('id').val().length <= 80 && (!newData.child('w').exists() || newData.child('w').isNumber()) && (!newData.child('h').exists() || newData.child('h').isNumber()) && (!newData.child('s').exists() || newData.child('s').isNumber())"
+            }
           }
         }
       },

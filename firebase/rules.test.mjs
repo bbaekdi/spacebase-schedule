@@ -88,6 +88,13 @@ await no('비회원 A/S 상태 바꾸기', X.ref('board/posts/as1/asState').set(
 await ok('쓴 사람이 현장 끝남 표시', B.ref('board/posts/proj1/closed').set(true));
 
 // ---------- 자동 양식 ----------
+await ok('사진 있는 글', B.ref('board/posts/ph1').set({ cat: 'photo', siteName: '테스트현장', text: '오늘 사진', photos: [{ id: 'abcdefghij1', w: 1920, h: 1080, s: 400000 }, { id: 'abcdefghij2' }], uid: 'b', name: '비', at: 30 }));
+await no('사진 번호가 너무 짧음', B.ref('board/posts/ph2').set({ cat: 'photo', text: 'x', photos: [{ id: 'abc' }], uid: 'b', name: '비', at: 30 }));
+await no('사진 번호가 글자가 아님', B.ref('board/posts/ph3').set({ cat: 'photo', text: 'x', photos: [{ id: 12345678901 }], uid: 'b', name: '비', at: 30 }));
+await no('사진 41장', B.ref('board/posts/ph4').set({ cat: 'photo', text: 'x', photos: Array.from({ length: 41 }, (_, i) => ({ id: 'abcdefghij' + i })), uid: 'b', name: '비', at: 30 }));
+await no('사진 크기가 숫자가 아님', B.ref('board/posts/ph5').set({ cat: 'photo', text: 'x', photos: [{ id: 'abcdefghij1', w: 'big' }], uid: 'b', name: '비', at: 30 }));
+await no('driveAuth(열쇠 칸)는 회원도 못 읽음', B.ref('driveAuth').once('value'));
+await no('driveAuth 는 관리자도 못 씀', A.ref('driveAuth').set({ rt: 'x' }));
 await ok('양식 있는 프로젝트', B.ref('board/posts/proj3').set({ cat: 'project', siteName: '테스트 오피스', text: '1. 발주처명 _ 테스트', form: { client: '테스트', type: '오피스', phone: '010-0000-0000' }, uid: 'b', name: '비', at: 20 }));
 await ok('현장 직접 입력 A/S (현장 방 없이 이름만)', B.ref('board/posts/as3').set({ cat: 'as', siteName: '직접쓴현장', text: '요청', uid: 'b', name: '비', at: 21, asState: { status: 'new', owner: '김가나 책임, 이다라 팀장', by: '비', at: 21 } }));
 await no('현장 이름 너무 김', B.ref('board/posts/as4').set({ cat: 'as', siteName: 'x'.repeat(41), text: '요청', uid: 'b', name: '비', at: 21 }));

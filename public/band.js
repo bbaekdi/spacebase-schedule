@@ -25,6 +25,95 @@
   let projects = {}, staff = [], site = null, sitePosts = [], siteRef = null, asOpenOnly = false;
   try { cat = sessionStorage.getItem('bd_cat') || ''; asOpenOnly = sessionStorage.getItem('bd_asopen') === '1'; } catch {}
 
+  // ---------- 사진 (회사 구글 드라이브, 중계 worker/drive.js) ----------
+  const API = String(window.SB_BAND_API || '').replace(/\/$/, '');
+  const MAX_PH = 30;
+  let driveReady = false;
+  const idToken = () => firebase.auth().currentUser.getIdToken();
+  const kstDay = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const phList = (p) => (Array.isArray(p.photos) ? p.photos : Object.values(p.photos || {})).filter((x) => x && x.id);
+  async function checkDrive() {
+    if (!API) return false;
+    try { driveReady = !!(await (await fetch(API + '/drive/status')).json()).ready; } catch { driveReady = false; }
+    return driveReady;
+  }
+  // 올리기 전에 휴대폰 안에서 줄이기: 긴 쪽 1920픽셀, JPEG (보통 300~500KB)
+  async function shrink(file) {
+    let bmp;
+    try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+    catch { bmp = await new Promise((res, rej) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => { URL.revokeObjectURL(u); res(im); }; im.onerror = () => { URL.revokeObjectURL(u); rej(new Error('사진을 읽지 못했어요')); }; im.src = u; }); }
+    const w0 = bmp.width || bmp.naturalWidth, h0 = bmp.height || bmp.naturalHeight, k = Math.min(1, 1920 / Math.max(w0, h0));
+    const w = Math.max(1, Math.round(w0 * k)), h = Math.max(1, Math.round(h0 * k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(bmp, 0, 0, w, h);
+    if (bmp.close) bmp.close();
+    const toBlob = (q) => new Promise((r) => c.toBlob(r, 'image/jpeg', q));
+    let q = 0.8, blob = await toBlob(q);
+    while (blob && blob.size > 700 * 1024 && q > 0.45) { q -= 0.1; blob = await toBlob(q); }
+    if (!blob) throw new Error('사진을 줄이지 못했어요');
+    return { blob, w, h };
+  }
+  // 사진 보기: 로그인한 회원만 (중계가 확인). 받은 사진은 이 화면 안에서만 기억.
+  const phCache = new Map(), phQ = []; let phActive = 0;
+  function photoUrl(id) {
+    if (phCache.has(id)) return phCache.get(id);
+    const pr = new Promise((res, rej) => { phQ.push({ id, res, rej }); phPump(); });
+    phCache.set(id, pr); pr.catch(() => phCache.delete(id));
+    return pr;
+  }
+  function phPump() {
+    while (phActive < 4 && phQ.length) {
+      const j = phQ.shift(); phActive++;
+      (async () => {
+        try {
+          const r = await fetch(`${API}/drive/photo/${encodeURIComponent(j.id)}`, { headers: { Authorization: 'Bearer ' + (await idToken()) } });
+          if (!r.ok) throw new Error('사진 ' + r.status);
+          j.res(URL.createObjectURL(await r.blob()));
+        } catch (e) { j.rej(e); } finally { phActive--; phPump(); }
+      })();
+    }
+  }
+  const phIO = 'IntersectionObserver' in window ? new IntersectionObserver((ents) => ents.forEach((en) => { if (en.isIntersecting) { phIO.unobserve(en.target); phLoad(en.target); } }), { rootMargin: '300px' }) : null;
+  function phLoad(img) {
+    const box = img.closest('.bd-phi');
+    photoUrl(img.dataset.ph).then((u) => { img.src = u; if (box) { box.classList.add('loaded'); box.classList.remove('err'); } }).catch(() => { if (box) box.classList.add('err'); });
+  }
+  function hydrate(root) { root.querySelectorAll('img[data-ph]:not([src])').forEach((img) => (phIO ? phIO.observe(img) : phLoad(img))); }
+  // 글 카드(작게 4장까지) / 글 보기(전부)
+  function phGrid(p, big) {
+    const L = phList(p); if (!L.length) return '';
+    const shown = big ? L : L.slice(0, 4);
+    return `<div class="bd-ph ${big ? 'big' : 'n' + Math.min(L.length, 4)}">${shown.map((x, i) => `<button type="button" class="bd-phi" data-pi="${i}" aria-label="사진 ${i + 1} 크게 보기"><img data-ph="${esc(x.id)}" alt="">${!big && i === 3 && L.length > 4 ? `<span class="more">+${L.length - 3}</span>` : ''}</button>`).join('')}</div>`;
+  }
+  // 크게 보기: 밀어서(또는 ‹ ›, 방향키) 넘기기
+  const dLB = $('#dlgPhoto'); let lb = { ids: [], i: 0 };
+  function openLB(p, i) {
+    lb = { ids: phList(p).map((x) => x.id), i: Math.max(0, i) };
+    if (!lb.ids.length) return;
+    dLB.classList.toggle('one', lb.ids.length === 1);
+    if (!dLB.open) dLB.showModal();
+    lbShow();
+  }
+  function lbShow() {
+    const id = lb.ids[lb.i], img = $('#lbImg'), msg = $('#lbMsg');
+    $('#lbCnt').textContent = `${lb.i + 1} / ${lb.ids.length}`;
+    img.removeAttribute('src'); msg.textContent = '불러오는 중…';
+    photoUrl(id).then((u) => { if (lb.ids[lb.i] === id) { img.src = u; msg.textContent = ''; } }).catch(() => { if (lb.ids[lb.i] === id) msg.textContent = '사진을 불러오지 못했어요'; });
+    [lb.i - 1, lb.i + 1].forEach((j) => { if (lb.ids[j]) photoUrl(lb.ids[j]).catch(() => {}); });
+  }
+  const lbGo = (d) => { const n = lb.i + d; if (n < 0 || n >= lb.ids.length) return; lb.i = n; lbShow(); };
+  dLB.addEventListener('click', (e) => {
+    if (e.target.closest('[data-lbx]') || e.target === dLB || e.target.classList.contains('bd-lbimg')) return dLB.close();
+    const b = e.target.closest('[data-lb]'); if (b) lbGo(+b.dataset.lb);
+  });
+  dLB.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') lbGo(-1); if (e.key === 'ArrowRight') lbGo(1); });
+  { let x0 = null; dLB.addEventListener('touchstart', (e) => { x0 = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true }); dLB.addEventListener('touchend', (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) lbGo(dx < 0 ? 1 : -1); }); }
+  // 글을 완전히 지울 때 드라이브의 사진도 휴지통으로 (실패해도 글 지우기는 계속)
+  async function dropPhotos(id) {
+    if (!API) return;
+    try { await fetch(API + '/drive/trash', { method: 'POST', headers: { Authorization: 'Bearer ' + (await idToken()), 'Content-Type': 'application/json' }, body: JSON.stringify({ post: id }) }); } catch {}
+  }
+
   function ago(t) {
     const s = (Date.now() - t) / 1000;
     if (s < 60) return '방금';
@@ -78,6 +167,7 @@
         <div class="bd-meta">${isNew(p) ? '<span class="bd-new">새 글</span>' : ''}<span class="bd-chip ${esc(p.cat)}">${catLabel(p.cat)}</span>${asBadge(p)}<b>${mark(p.name)}</b><span>${ago(p.at)}${p.editedAt ? ' · 수정됨' : ''}</span></div>
         ${pj ? `<div class="bd-ptitle">${mark(p.siteName)}${p.closed ? ' <span class="bd-as done">끝난 현장</span>' : ''}</div>` : siteChip(p) ? `<div class="bd-sitebar">${siteChip(p)}</div>` : ''}
         <div class="bd-text">${mark(p.text)}</div>
+        ${phGrid(p, false)}
         <div class="bd-foot"><span>${ICON_CMT}댓글 ${p.commentCount || 0}</span>${pj ? `<a class="bd-room" href="#site=${encodeURIComponent(p.id)}">현장 방 열기${n ? ` (글 ${n})` : ''} ›</a>` : ''}</div>
       </article>`;
   }
@@ -98,11 +188,14 @@
       return;
     }
     $('#list').innerHTML = shown.map(card).join('');
+    hydrate($('#list'));
   }
   $('#list').onclick = (e) => {
     const tb = e.target.closest('[data-tr]'); if (tb) return trashAct(tb.dataset.tr, tb.closest('.bd-post').dataset.id);
     if (trash) return;
     if (e.target.closest('a')) return; // 현장 칩·현장 방 링크
+    const ph = e.target.closest('.bd-phi');
+    if (ph) { const pa = ph.closest('.bd-post'), pp = pa && findPost(pa.dataset.id); if (pp) return openLB(pp, +ph.dataset.pi); }
     const a = e.target.closest('.bd-post'); if (a) openPost(a.dataset.id);
   };
   $('#list').onkeydown = (e) => { if (e.key === 'Enter' && !e.target.closest('a')) { const a = e.target.closest('.bd-post'); if (a) openPost(a.dataset.id); } };
@@ -191,13 +284,19 @@
     trashRef = db.ref('board/posts').orderByChild('deleted/at').startAt(1);
     trashRef.on('value', (snap) => {
       const out = [], old = [];
-      snap.forEach((c) => { const v = { id: c.key, ...c.val() }; if (!v.deleted) return; if (daysLeft(v) <= 0) old.push(v.id); else if (me.admin || v.uid === me.uid) out.push(v); });
+      snap.forEach((c) => {
+        const v = { id: c.key, ...c.val() }; if (!v.deleted) return;
+        if (daysLeft(v) <= 0) old.push(v); else if (me.admin || v.uid === me.uid) out.push(v);
+      });
       trashPosts = out.sort((a, b) => b.deleted.at - a.deleted.at);
       drawTrash();
-      // 30일 지난 글은 관리자가 휴지통을 열 때 정리 (글·댓글·읽음 기록)
+      // 30일 지난 글은 관리자가 휴지통을 열 때 정리 (글·댓글·읽음 기록, 드라이브의 사진은 드라이브 휴지통으로)
       if (me.admin && old.length) {
-        const up = {}; old.forEach((id) => { up['posts/' + id] = null; up['comments/' + id] = null; up['reads/' + id] = null; });
-        db.ref('board').update(up).catch(() => {});
+        (async () => {
+          for (const v of old) if (phList(v).length) await dropPhotos(v.id);
+          const up = {}; old.forEach((v) => { up['posts/' + v.id] = null; up['comments/' + v.id] = null; up['reads/' + v.id] = null; });
+          db.ref('board').update(up).catch(() => {});
+        })();
       }
     });
     window.scrollTo(0, 0);
@@ -224,6 +323,7 @@
       if (act === 'restore') await db.ref('board/posts/' + id + '/deleted').remove();
       if (act === 'purge') {
         if (!confirm('이 글을 완전히 삭제할까요?\n댓글까지 모두 없어지고 되돌릴 수 없어요.')) return;
+        if (phList(p).length) await dropPhotos(id);
         await db.ref('board').update({ ['posts/' + id]: null, ['comments/' + id]: null, ['reads/' + id]: null });
       }
     } catch (e) { alert((act === 'restore' ? '되돌리지' : '삭제하지') + ' 못했어요: ' + e.message); }
@@ -231,6 +331,51 @@
 
   // ---------- 글쓰기 / 고치기 ----------
   const dW = $('#dlgWrite'), fW = $('#fWrite');
+  // 고른 사진: {key, url, blob, w, h, state: busy|ready|done|bad, id}
+  let picked = [], pickSeq = 0;
+  const clearPicked = () => { picked.forEach((x) => x.url && URL.revokeObjectURL(x.url)); picked = []; drawThumbs(); };
+  function drawThumbs() {
+    $('#wThumbs').innerHTML = picked.map((x) => `<div class="bd-th ${x.state}" data-k="${x.key}">${x.url ? `<img src="${x.url}" alt="">` : ''}${x.blob ? `<span class="kb">${Math.round(x.blob.size / 1024)}KB</span>` : ''}<button class="rm" type="button" data-rm aria-label="이 사진 빼기">✕</button></div>`).join('');
+    $('#wPhNote').textContent = picked.length ? `사진 ${picked.length}장 (최대 ${MAX_PH}장)` : '한 번에 여러 장 고를 수 있어요. 휴대폰 안에서 줄여서 올려요.';
+  }
+  async function pickFiles(files) {
+    const room = MAX_PH - picked.length;
+    const list = [...files].slice(0, Math.max(0, room));
+    if (files.length > list.length) $('#wErr').textContent = `사진은 한 글에 ${MAX_PH}장까지예요. ${files.length - list.length}장은 뺐어요.`;
+    const items = list.map((f) => ({ key: ++pickSeq, file: f, state: 'busy' }));
+    picked.push(...items); drawThumbs();
+    for (const it of items) {
+      try { const r = await shrink(it.file); Object.assign(it, r, { url: URL.createObjectURL(r.blob), state: 'ready' }); }
+      catch (e) { it.state = 'bad'; picked = picked.filter((x) => x !== it); $('#wErr').textContent = `"${it.file.name || '사진'}" 은(는) 줄이지 못해서 뺐어요.`; }
+      delete it.file; drawThumbs();
+    }
+  }
+  $('#wFile').onchange = (e) => { const f = e.target.files; if (f && f.length) pickFiles(f); e.target.value = ''; };
+  $('#wThumbs').onclick = (e) => { const b = e.target.closest('[data-rm]'); if (!b) return; const k = +b.closest('.bd-th').dataset.k, it = picked.find((x) => x.key === k); if (it && it.url) URL.revokeObjectURL(it.url); picked = picked.filter((x) => x.key !== k); drawThumbs(); };
+  dW.addEventListener('close', clearPicked);
+  // 줄인 사진을 하나씩 올림 (못 올린 것만 다시 시도, 글은 전부 올라간 뒤에 저장)
+  async function uploadPicked(siteName) {
+    const todo = picked.filter((x) => x.state !== 'done'), n = picked.length;
+    let done = n - todo.length, bad = 0, why = '';
+    const one = async (it) => {
+      for (let t = 0; t < 2; t++) {
+        try {
+          const r = await fetch(`${API}/drive/upload?site=${encodeURIComponent(siteName || '')}&day=${kstDay()}`, { method: 'POST', headers: { Authorization: 'Bearer ' + (await idToken()), 'Content-Type': 'image/jpeg' }, body: it.blob });
+          if (r.ok) { it.id = (await r.json()).id; it.state = 'done'; return; }
+          why = (await r.text()).slice(0, 60); if (r.status < 500) break;
+        } catch (e) { why = '인터넷 연결을 확인해 주세요'; }
+      }
+      it.state = 'bad'; bad++;
+    };
+    const q = [...todo];
+    await Promise.all([0, 1].map(async () => { while (q.length) { const it = q.shift(); await one(it); done++; $('#wSave').textContent = `사진 올리는 중 ${Math.min(done, n)}/${n}`; drawThumbs(); } }));
+    if (bad) throw new Error(`사진 ${bad}장을 올리지 못했어요 (${why}). 다시 "올리기"를 누르면 못 올린 사진만 다시 올려요.`);
+    return picked.map((x) => ({ id: x.id, w: x.w, h: x.h, s: x.blob.size }));
+  }
+  function showPhotoBox(p) {
+    const on = driveReady && !p;
+    $('#wPhotos').classList.toggle('hidden', !on);
+  }
   let editing = null;
   // 자동 양식 (지금 밴드에 올리던 글 모양을 따름). 칸에 넣은 값은 form 에, 번호 줄 모양 글은 text 에 저장한다.
   const FORMS = {
@@ -361,6 +506,7 @@
     if (!fW.querySelector('input[name=cat]:checked')) fW.querySelector('input[name=cat]').checked = true;
     fW.text.value = p ? p.text : '';
     $('#wErr').textContent = '';
+    clearPicked(); showPhotoBox(p);
     writeExtras();
     dW.showModal();
     setTimeout(() => { const first = fW.querySelector('#wExtra input:not([type=hidden]):not(.hidden), #wExtra select'); (useForm((fW.querySelector('input[name=cat]:checked') || {}).value) && first ? first : fW.text).focus(); }, 30);
@@ -502,7 +648,9 @@
     } else { v.site = null; v.siteName = null; }
     if (c !== 'project' && editing && editing.cat === 'project') v.closed = null;
     v.text = form ? compose(c, f, v.siteName) : fW.text.value.trim();
-    if (!v.text) return err('내용을 써 주세요.');
+    if (!v.text && !(picked.length && !editing)) return err('내용을 써 주세요.');
+    if (!v.text) v.text = `사진 ${picked.length}장`;
+    if (picked.some((x) => x.state === 'busy')) return err('사진을 줄이는 중이에요. 잠시 뒤에 다시 눌러 주세요.');
     $('#wSave').disabled = true;
     try {
       if (editing) {
@@ -514,7 +662,8 @@
         }
       } else {
         const now = Date.now();
-        const post = { ...v, uid: me.uid, name: me.name, at: now, commentCount: 0 };
+        const photos = picked.length ? await uploadPicked(v.siteName) : null;
+        const post = { ...v, uid: me.uid, name: me.name, at: now, commentCount: 0, ...(photos ? { photos } : {}) };
         Object.keys(post).forEach((k) => post[k] == null && delete post[k]);
         if (c === 'as') {
           post.asState = { status: 'new', by: me.name, at: now };
@@ -528,7 +677,7 @@
       }
       dW.close();
     } catch (er) { err('저장하지 못했어요: ' + er.message); }
-    finally { $('#wSave').disabled = false; }
+    finally { $('#wSave').disabled = false; $('#wSave').textContent = editing ? '저장' : '올리기'; }
   };
 
   // ---------- 글 보기 + 댓글 + A/S 상태 ----------
@@ -556,10 +705,12 @@
       <div class="bd-meta"><b>${esc(p.name)}</b><span>${ago(p.at)}${p.editedAt ? ' · 수정됨' : ''}</span></div>
       ${p.cat === 'project' ? `<div class="bd-ptitle">${esc(p.siteName)}</div>` : siteChip(p) ? `<div class="bd-sitebar">${siteChip(p)}</div>` : p.siteName ? `<div class="bd-sitebar"><span class="bd-site plain">${ICON_PIN}${esc(p.siteName)}</span></div>` : ''}
       ${p.form ? formView(p) : `<div class="bd-text">${linkPhones(p.text)}</div>`}
+      ${phGrid(p, true)}
       ${p.cat === 'project' && site !== p.id ? `<a class="btn" style="margin-top:12px" href="#site=${encodeURIComponent(p.id)}">현장 방 열기 ›</a>` : ''}
       ${asBox(p)}
       ${canEdit(p) ? '<div class="bd-acts"><button class="btn" type="button" data-a="edit">수정</button><button class="btn danger" type="button" data-a="del">삭제</button></div>' : ''}
       <ul class="bd-cmts">${cmts.length ? cmts.map((c) => `<li data-cid="${esc(c.id)}"><div class="who"><b>${esc(c.name)}</b><span>${ago(c.at)}</span>${me && (c.uid === me.uid || me.admin) ? '<button type="button" data-a="cdel">삭제</button>' : ''}</div><div class="t">${esc(c.text)}</div></li>`).join('') : '<li class="none">첫 댓글을 달아 보세요.</li>'}</ul>`;
+    hydrate($('#pBody'));
     $('#pBody').querySelectorAll('input[name=asOwner]').forEach((x) => (x.onchange = () => {
       const o = [...$('#pBody').querySelectorAll('input[name=asOwner]:checked')].map((y) => y.value).join(', ');
       setAs(p, asStatus(p), o);
@@ -588,6 +739,8 @@
   }
   dP.addEventListener('close', () => { openId = null; if (cmtRef) { cmtRef.off(); cmtRef = null; } if (!site && !trash) drawList(); });
   $('#pBody').onclick = async (e) => {
+    const phb = e.target.closest('.bd-phi');
+    if (phb) { const pp = findPost(openId); if (pp) openLB(pp, +phb.dataset.pi); return; }
     if (e.target.closest('a[href^="#site="]')) { dP.close(); return; }
     const b = e.target.closest('button[data-a], button[data-as]'); if (!b) return;
     const p = findPost(openId); if (!p) return;
@@ -661,6 +814,7 @@
     me = a; db = firebase.database();
     $('#list').innerHTML = '<div class="bd-empty">불러오는 중…</div>';
     drawBell();
+    checkDrive().then(() => { if (dW.open && !editing) showPhotoBox(null); });
     db.ref('board/myreads/' + a.uid).on('value', (s) => { myReads = s.val() || {}; if (!site && !trash && !openId) drawList(); });
     // A/S 담당자 목록 = 주간 스케줄 직원표 전 직원 (이름 + 직급)
     db.ref('spaces/' + a.spaceKey + '/data/members').once('value').then((s) => {
