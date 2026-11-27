@@ -38,125 +38,104 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log(/진행 현장\s*테스트 오피스/.test(side) && /기간 미정 현장/.test(side) && /지난 현장 \(1\)/.test(side) && !/수주 전 현장/.test(side), '현장 목록: 진행 / 기간 미정 / 지난 현장 (PROJECT 구분만)');
   log((await a.locator('.st-head h1').innerText()) === '테스트 오피스', '진행 현장이 먼저 열림');
   log(/소장: 김테스트 대리/.test(await a.locator('.st-head').innerText()), '소장 = 주간 스케줄 시공 담당(약칭 김 → 김테스트 대리)');
-  // 왼쪽 공정 목록
-  log((await a.locator('#side .st-tp').count()) === 1 && (await a.locator('.st-tasks').count()) === 0, '공정 목록은 왼쪽 현장 목록 밑 (아래쪽 공정 목록·날짜 칸 없음)');
-  await a.click('#side [data-default]'); await a.waitForFunction(() => document.querySelectorAll('#side .st-ti').length === 11);
-  log(true, '기본 공정 목록 11개 넣기');
-  log((await a.locator('.st-wk').count()) === 4, '캘린더 4주 (지난주·이번 주·다음 주·다다음 주)');
-  const W0 = await a.getAttribute('.st-wk >> nth=0 >> .st-day >> nth=0', 'data-day');
-  const sun = (d) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() - x.getDay()); return kst(new Date(x.getTime() + 9 * 3600e3)); };
-  log(W0 === kst(new Date(new Date(sun(TODAY) + 'T00:00:00').getTime() - 7 * 864e5 + 9 * 3600e3)), '첫 주 = 지난주 일요일');
-  await a.click('[data-wk="7"]'); const W1 = await a.getAttribute('.st-wk >> nth=0 >> .st-day >> nth=0', 'data-day'); await a.click('[data-wk="0"]');
-  log(W1 > W0, '› 누르면 한 주씩 넘어감');
-  const li = (n) => `#side .st-ti:has(input.nmc[value="${n}"])`;
-  const mokId = await a.getAttribute(li('목공'), 'data-t');
-  // 목록에서 오늘 날짜로 끌어다 놓기
-  await a.locator(`${li('목공')} .grip`).dragTo(a.locator(`.st-day[data-day="${TODAY}"]`));
-  await a.waitForFunction(() => [...document.querySelectorAll('.st-seg')].some((x) => /목공/.test(x.textContent)));
-  const m1 = await get(`site/p1/tasks/${mokId}`);
-  log(m1.start === TODAY && m1.end === TODAY, '목록에서 날짜로 끌어다 놓기 → 그날 하루 막대');
-  // 끝 잡아 늘리기 (오늘 → 4일 뒤)
-  const pdrag = async (from, to) => { const f = await a.locator(from).boundingBox(), t = await a.locator(to).boundingBox(); await a.mouse.move(f.x + f.width / 2, f.y + f.height / 2); await a.mouse.down(); await a.mouse.move(t.x + t.width / 2, t.y + t.height - 8, { steps: 8 }); await a.mouse.move(t.x + t.width / 2, t.y + t.height - 6); await a.mouse.up(); };
-  await pdrag(`.st-seg[data-t="${mokId}"] .hr`, `.st-day[data-day="${plus(4)}"]`);
-  await new Promise((r) => setTimeout(r, 700));
-  const m2 = await get(`site/p1/tasks/${mokId}`);
-  log(m2.start === TODAY && m2.end === plus(4), '막대 끝 잡아 늘리기 → 오늘~4일 뒤 (5일)');
-  // 막대 가운데 끌어 옮기기 (+1일) 후 되돌리기
-  const segIn = (d) => `.st-day[data-day="${d}"]`;
-  await a.waitForSelector(`.st-seg[data-t="${mokId}"]`);
-  { // 막대 위 오늘 칸에서 잡아 하루 뒤 칸으로
-    const bar = await a.locator(`.st-seg[data-t="${mokId}"] >> nth=0`).boundingBox(), c0 = await a.locator(segIn(TODAY)).boundingBox(), c1 = await a.locator(segIn(plus(1))).boundingBox();
-    const y = bar.y + bar.height / 2;
-    await a.mouse.move(c0.x + c0.width / 2, y); await a.mouse.down(); await a.mouse.move(c1.x + c1.width / 2, y, { steps: 8 });
-    // 손을 떼기 전: 막대가 제 색으로 따라 움직이고, 저장은 아직
-    const live = await a.locator(`.st-seg.live[data-t="${mokId}"]`).count(), lc = await a.locator(`.st-seg.live[data-t="${mokId}"] >> nth=0`).evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => '');
-    log(live >= 1 && !/rgb\(217, 213, 203\)/.test(lc) && (await a.locator('.st-day.hl').count()) === 0 && (await get(`site/p1/tasks/${mokId}/start`)) === TODAY, '끄는 동안 막대가 제 색으로 따라 움직임 (노란 칸 표시 없음, 놓기 전엔 저장 안 함)');
-    await a.screenshot({ path: SH + '/s5-dragging.png' });
-    await a.mouse.up();
-  }
-  await new Promise((r) => setTimeout(r, 700));
-  const m3 = await get(`site/p1/tasks/${mokId}`);
-  log(m3.start === plus(1) && m3.end === plus(5), `막대 끌어 옮기기 → 하루 뒤로, 기간은 그대로 (${m3.start}~${m3.end})`);
-  log((await a.locator(`${li('목공')} .grip:not(.off)`).count()) === 0 && (await a.locator(`${li('목공')}[draggable="true"]`).count()) === 0, '일정이 있는 공정은 목록에서 끌 수 없음 (옮기기는 막대 끌기 하나)');
-  { // 막대를 다시 하루 앞으로
-    const bar = await a.locator(`.st-seg[data-t="${mokId}"] >> nth=0`).boundingBox(), c1 = await a.locator(segIn(plus(1))).boundingBox(), c0 = await a.locator(segIn(TODAY)).boundingBox();
-    const y = bar.y + bar.height / 2;
-    await a.mouse.move(c1.x + c1.width / 2, y); await a.mouse.down(); await a.mouse.move(c0.x + c0.width / 2, y, { steps: 8 }); await a.mouse.up();
-  }
-  await new Promise((r) => setTimeout(r, 700));
-  const m4 = await get(`site/p1/tasks/${mokId}`);
-  log(m4.start === TODAY && m4.end === plus(4), '막대를 다시 끌어 오늘~4일 뒤로');
-  await a.waitForSelector('.st-wk.now .st-seg.now:has-text("목공")');
-  log(true, '캘린더: 이번 주 목공 막대가 색으로');
-  await a.waitForFunction(() => /오늘: 목공/.test(document.querySelector('.st-head').innerText), null, { timeout: 5000 }).catch(() => {});
-  log(/오늘: 목공/.test(await a.locator('.st-head').innerText()), '머리: "오늘: 목공"');
-  // 날짜 눌러 그날 하는 공정 고치기
-  await a.locator(`button.st-day[data-day="${TODAY}"]`).click({ position: { x: 12, y: 10 } }); await a.waitForSelector('.st-daypop');
-  log(await a.isChecked(`.st-daypop input[data-t="${mokId}"]`), '날짜를 누르면 그날 하는 공정 목록 (목공 켜짐)');
-  await a.uncheck(`.st-daypop input[data-t="${mokId}"]`); await new Promise((r) => setTimeout(r, 600));
-  log((await get(`site/p1/tasks/${mokId}/minus/${TODAY}`)) === true, '끄면 그날만 쉬는 날');
-  await a.check(`.st-daypop input[data-t="${mokId}"]`); await new Promise((r) => setTimeout(r, 600));
-  log((await get(`site/p1/tasks/${mokId}/minus/${TODAY}`)) === null, '다시 켜면 하는 날');
-  await a.click('.st-daypop [data-close]');
-  // 이번 주가 아닌 주의 막대도 제 색 (타일: 8~9일 뒤)
-  const taId = await a.getAttribute(li('타일'), 'data-t');
-  await put(`site/p1/tasks/${taId}/start`, plus(8)); await put(`site/p1/tasks/${taId}/end`, plus(9));
-  await a.waitForSelector('.st-seg:has-text("타일")');
-  log((await a.locator('.st-seg.now:has-text("타일")').count()) === 1, '이번 주가 아닌 공정 막대도 색으로');
-  // 진행률: 일정이 지난 날만큼 (철거 3일 지남 / 철거3 + 목공5 + 타일2 + 날짜 없는 8)
-  const chId = await a.getAttribute(li('철거'), 'data-t');
-  await put(`site/p1/tasks/${chId}/start`, plus(-3)); await put(`site/p1/tasks/${chId}/end`, plus(-1));
-  await a.waitForFunction(() => /진행률 17%/.test(document.querySelector('.st-head').innerText));
-  log(true, '공정을 등록하면 진행률이 바뀜 (지난 날만큼, 17%)');
-  await a.check(`${li('목공')} input.chk`); await a.waitForFunction(() => /진행률 44%/.test(document.querySelector('.st-head').innerText));
-  log(true, '완료 체크 → 진행률 올라감 (44%)');
-  // 왼쪽에서 공정 추가 · 이름 고치기 · 순서
-  await a.fill('#side .st-add input', '필름'); await a.press('#side .st-add input', 'Enter');
-  await a.waitForSelector(li('필름'));
-  log((await a.locator(`${li('필름')} .dd`).innerText()) === '일정 없음', '왼쪽에서 공정 추가 (Enter)');
-  await a.fill(`${li('청소')} input.nmc`, '준공 청소'); await a.locator(`${li('청소')} input.nmc`).press('Tab');
-  await a.waitForSelector(li('준공 청소'));
+  // 공정표 한 장 (왼쪽엔 현장 목록만)
+  log((await a.locator('#side .st-tp').count()) === 0 && (await a.locator('.gt').count()) === 1 && (await a.locator('.st-calcard').count()) === 0, '공정표 한 장 (왼쪽엔 현장 목록만, 4주 캘린더 없음)');
+  const row = (n) => `tr:has(.nmt:text-is("${n}"))`, cell = (id, d) => `tr[data-t="${id}"] td.d[data-day="${d}"]`;
+  // 표준 공정표 넣기: 착공일 기준 날짜 (착공 = 10일 전)
+  await a.click('[data-std]'); await a.fill('.gt-std input[name=st]', plus(-10)); await a.click('.gt-std button[type=submit]');
+  await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 37);
+  log(true, '표준 공정표 넣기 → 공정 37개');
+  log((await a.locator('td.cat[rowspan="4"]:has-text("목공사")').count()) === 1 && (await a.locator('td.cat:has-text("보양,철거공사")').count()) === 1, '공종 칸이 세로로 합쳐짐 (목공사 4줄)');
+  const mokId = await a.getAttribute(row('벽체 MDF 마감판넬 작업'), 'data-t');
+  const m0 = await get(`site/p1/tasks/${mokId}`);
+  log(m0.cat === '목공사' && m0.start === plus(-1) && m0.end === plus(3), `표준 날짜: 벽체 MDF = 착공 10~14일째 (${m0.start}~${m0.end})`);
+  const wsId = await a.getAttribute(row('위생 설비 공사'), 'data-t'), ws0 = await get(`site/p1/tasks/${wsId}`);
+  log(ws0.start === plus(-3) && ws0.end === plus(3) && !!ws0.plus[plus(20)] && !!ws0.plus[plus(21)] && (await a.locator(`tr[data-t="${wsId}"] td.d.on`).count()) === 9, '떨어진 두 기간도 회색 칸 (위생 설비 8~14일 + 31~32일, 9칸)');
+  log((await a.locator('thead th.mo').count()) >= 2 && (await a.locator('thead th.dn.td').innerText()) === String(+TODAY.slice(8)) && (await a.locator('thead th.dp.jg').innerText()) === '준공', '머리: 월·일·요일·기간 / 오늘 칸 / 준공 칸');
+  log((await a.locator('thead th.dw.red').count()) >= 1 && (await a.locator('thead th.dw.blue').count()) >= 1, '일요일 빨강·토요일 파랑');
+  log((await a.locator(`${cell(mokId, TODAY)}`).evaluate((el) => getComputedStyle(el).backgroundColor)).replace(/\s/g, '') !== 'rgb(255,255,255)', '하는 날은 회색 칸');
+  log(/오늘: [\s\S]*/.test(await a.locator('.st-head').innerText()) && /벽체 MDF/.test(await a.locator('.st-head').innerText()), '머리: 오늘 하는 공정');
+  // 공정 목록 고치기: 추가 (공종 + 이름) · 이름 · 순서
+  await a.click('[data-listedit]');
+  await a.fill('.gt-add input[name=cat]', '목공사'); await a.fill('.gt-add input[name=nm]', '필름'); await a.press('.gt-add input[name=nm]', 'Enter');
+  await a.waitForSelector('tr[data-t] input.nmc[value="필름"]');
+  const names = async () => a.locator('tr[data-t]').evaluateAll((trs) => trs.map((t) => (t.querySelector('input.nmc') || t.querySelector('.nmt')).value || t.querySelector('.nmt').textContent));
+  let nm = await names();
+  log(nm.indexOf('필름') === nm.indexOf('천정 MDF보드 작업') + 1, '공정 추가: 같은 공종 맨 아래에 (공종 칸 입력)');
+  const jb = a.locator('tr[data-t] input.nmc[value="잔손보기"]'); await jb.fill('잔손 보기'); await jb.press('Tab');
+  await a.waitForSelector('tr[data-t] input.nmc[value="잔손 보기"]');
   log(true, '공정 이름 고치기');
-  await a.hover(li('설비')); await a.click(`${li('설비')} [data-mv="-1"]`);
-  await a.waitForFunction(() => document.querySelector('#side .st-ti input.nmc').value === '설비');
-  log(true, '공정 순서 바꾸기 (설비 ↑)');
+  const fId = await a.getAttribute('tr:has(input.nmc[value="필름"])', 'data-t');
+  await a.click(`tr[data-t="${fId}"] [data-mv="-1"]`); await a.waitForFunction(async () => true);
+  await a.waitForFunction((id) => { const t = [...document.querySelectorAll('tr[data-t]')]; return t.findIndex((x) => x.dataset.t === id) < t.findIndex((x) => /MDF보드/.test(x.innerHTML)); }, fId);
+  log(true, '공정 순서 바꾸기 (필름 ↑)');
+  await a.click('[data-listedit]'); await a.waitForSelector('tr[data-t] .nmt');
+  // 일정 넣기: 일정 없는 공정의 빈 칸을 끌어 칠하기 (오늘 → 2일 뒤)
+  const pdrag = async (from, to, hold) => { await a.locator(from).scrollIntoViewIfNeeded(); const f = await a.locator(from).boundingBox(), t = await a.locator(to).boundingBox(); await a.mouse.move(f.x + f.width / 2, f.y + f.height / 2); await a.mouse.down(); await a.mouse.move(t.x + t.width / 2, t.y + t.height / 2, { steps: 8 }); if (hold) return hold(); await a.mouse.up(); await new Promise((r) => setTimeout(r, 700)); };
+  await pdrag(cell(fId, TODAY), cell(fId, plus(2)));
+  const f1 = await get(`site/p1/tasks/${fId}`);
+  log(f1.start === TODAY && f1.end === plus(2), '빈 칸 끌어 칠하기 → 오늘~2일 뒤 (일정 없는 공정만)');
+  // 끝 손잡이로 늘리기 (→ 4일 뒤)
+  await pdrag(`${cell(fId, plus(2))} .hr`, cell(fId, plus(4)));
+  const f2 = await get(`site/p1/tasks/${fId}`);
+  log(f2.start === TODAY && f2.end === plus(4), '끝 손잡이 끌어 늘리기 → 오늘~4일 뒤');
+  // 회색 칸 끌어 옮기기 (+1일): 끄는 동안 제 모습으로 따라오고 저장은 아직
+  await pdrag(cell(fId, TODAY), cell(fId, plus(1)), async () => {
+    log((await a.locator(`tr.live[data-t="${fId}"]`).count()) === 1 && (await get(`site/p1/tasks/${fId}/start`)) === TODAY && (await a.locator(`${cell(fId, plus(5))}.on`).count()) === 1, '끄는 동안 회색 칸이 따라 움직임 (놓기 전엔 저장 안 함)');
+    await a.screenshot({ path: SH + '/s5-dragging.png' });
+    await a.mouse.up(); await new Promise((r) => setTimeout(r, 700));
+  });
+  const f3 = await get(`site/p1/tasks/${fId}`);
+  log(f3.start === plus(1) && f3.end === plus(5), `회색 칸 끌어 옮기기 → 하루 뒤로, 기간은 그대로 (${f3.start}~${f3.end})`);
+  await pdrag(cell(fId, plus(1)), cell(fId, TODAY));
+  const f4 = await get(`site/p1/tasks/${fId}`);
+  log(f4.start === TODAY && f4.end === plus(4), '다시 오늘~4일 뒤로');
+  // 일정 있는 공정의 빈 칸을 끌어도 새 일정이 안 생김 (같은 기능은 한 가지 방법)
+  await pdrag(cell(mokId, plus(10)), cell(mokId, plus(12)));
+  const m1 = await get(`site/p1/tasks/${mokId}`);
+  log(m1.start === plus(-1) && m1.end === plus(3) && !m1.plus, '일정 있는 공정의 빈 칸 끌기 → 아무 일 없음');
+  // 칸 누르기: 하는 날은 쉬는 날로, 다시 누르면 하는 날 / 기간 밖 빈 칸은 그날 더하기
+  await a.click(cell(fId, plus(2))); await new Promise((r) => setTimeout(r, 600));
+  log((await get(`site/p1/tasks/${fId}/minus/${plus(2)}`)) === true && (await a.locator(`${cell(fId, plus(2))}.on`).count()) === 0, '칸 누르기: 그날만 쉬는 날');
+  await a.click(cell(fId, plus(2))); await new Promise((r) => setTimeout(r, 600));
+  log((await get(`site/p1/tasks/${fId}/minus/${plus(2)}`)) === null, '다시 누르면 하는 날');
+  await a.click(cell(fId, plus(8))); await new Promise((r) => setTimeout(r, 600));
+  log((await get(`site/p1/tasks/${fId}/plus/${plus(8)}`)) === true, '빈 칸 누르기: 그날 더하기');
+  await a.click(cell(fId, plus(8))); await new Promise((r) => setTimeout(r, 600));
+  // 진행률: 완료 체크하면 올라감
+  const pct = async () => +(/진행률 (\d+)%/.exec(await a.locator('.st-head').innerText()) || [0, -1])[1];
+  const p0 = await pct();
+  await a.check(`tr[data-t="${wsId}"] input.chk`); await a.waitForFunction((v) => +(/진행률 (\d+)%/.exec(document.querySelector('.st-head').innerText) || [0, -1])[1] > v, p0);
+  log((await a.locator(`tr.done[data-t="${wsId}"]`).count()) === 1, `완료 체크 → 진행률 올라감 (${p0}% → ${await pct()}%)`);
   await a.screenshot({ path: SH + '/s1-site.png' });
-  // 일정 지우기 3가지 (공정은 목록에 남음)
-  const taBar = `.st-seg[data-t="${taId}"]`;
-  await a.hover(`${taBar} >> nth=-1`); await a.click(`${taBar} >> nth=-1 >> .x`);
+  // 일정 지우기: ✕ (공정은 표에 남음)
+  await a.hover(`tr[data-t="${fId}"]`); await a.click(`tr[data-t="${fId}"] .x`);
   await new Promise((r) => setTimeout(r, 600));
-  const ta1 = await get(`site/p1/tasks/${taId}`);
-  log(!ta1.start && !ta1.end && ta1.name === '타일' && (await a.locator(li('타일')).count()) === 1, '막대 ✕ → 일정만 지워지고 공정은 목록에 남음');
-  // 다시 넣기 (일정이 없으니 목록에서 끌 수 있음) → 막대를 왼쪽 목록에 놓아도 안 지워짐
-  await a.locator(`${li('타일')} .grip`).dragTo(a.locator(`.st-day[data-day="${plus(8)}"]`), { force: true });
-  await a.waitForSelector(taBar);
-  { const b = await a.locator(`${taBar} >> nth=0`).boundingBox(), t = await a.locator('#side .st-tl').boundingBox();
-    await a.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await a.mouse.down(); await a.mouse.move(t.x + t.width / 2, t.y + 20, { steps: 10 }); await a.mouse.up(); }
-  await new Promise((r) => setTimeout(r, 600));
-  log(!!(await get(`site/p1/tasks/${taId}/start`)) && (await a.locator('.st-tp.drop-clear').count()) === 0, '막대를 왼쪽 목록에 놓아도 안 지워짐 (지우기는 ✕ 하나)');
-  // PC 날짜 누르기: 일정 있는 공정의 쉬는 날만, "일정 지우기" 없음
-  await a.locator(`button.st-day[data-day="${TODAY}"]`).click({ position: { x: 12, y: 10 } }); await a.waitForSelector('.st-daypop');
-  const pcPop = await a.locator('.st-daypop').innerText();
-  log((await a.locator('.st-daypop [data-clear-t]').count()) === 0 && !/전기/.test(pcPop) && /목공/.test(pcPop), 'PC 날짜 누르기: 일정 있는 공정의 쉬는 날만 (일정 지우기·일정 없는 공정 없음)');
-  await a.click('.st-daypop [data-close]');
-  log((await a.locator(`${li('타일')} [data-clear]`).count()) === 0, '왼쪽 목록에는 일정 지우기 버튼 없음');
+  const f5 = await get(`site/p1/tasks/${fId}`);
+  log(!f5.start && !f5.end && !f5.plus && !f5.minus && f5.name === '필름' && (await a.locator(`tr[data-t="${fId}"]`).count()) === 1 && (await a.locator(`tr[data-t="${fId}"] td.d.on`).count()) === 0, '이름 옆 ✕ → 일정만 지워지고 공정은 표에 남음');
+  // 데이터 안 지움: 이전 방식(공종 없음) 공정도 "기타" 로 보임
+  await put('site/p1/tasks/old1', { name: '옛날 공정', order: 99, start: TODAY, end: TODAY });
+  await a.waitForSelector('tr:has(.nmt:text-is("옛날 공정"))');
+  log((await a.locator('td.cat:has-text("기타")').count()) >= 1, '공종 없는 예전 공정도 "기타" 로 보임 (안 사라짐)');
+  await a.click('[data-listedit]'); await a.click('tr:has(input.nmc[value="옛날 공정"]) [data-del]'); await new Promise((r) => setTimeout(r, 600));
+  log((await get('site/p1/tasks/old1')) === null, '공정 삭제'); await a.click('[data-listedit]');
   // 출근 (+ 새 글 알림 요청)
   let notifyReq = null;
   await a.route('**/push/notify', (r) => { notifyReq = r.request().postDataJSON(); r.fulfill({ status: 200, body: '{}' }); });
   await a.click('#attBtn'); await a.waitForSelector('.st-attend .done');
   log((await a.locator('.st-attend .done').innerText()) === '✓ 출근함', '출근 → "✓ 출근함" (시간 없음)');
-  log(/✓ 출근/.test(await a.locator(`.st-day[data-day="${TODAY}"]`).innerText()), '캘린더 오늘 칸에 출근 표시');
+  log(/✓/.test(await a.locator(`tr.att td.d[data-day="${TODAY}"]`).innerText()), '공정표 출근 줄에 오늘 출근 표시');
   const posts = Object.values((await get('board/posts')) || {});
   log(posts.some((x) => x.cat === 'attend' && /김테스트 출근 · \d\d:\d\d/.test(x.text) && x.siteName === '테스트 오피스'), 'Band "출근" 게시판에 자동 글');
   await new Promise((r) => setTimeout(r, 800));
   log(!!notifyReq && !!notifyReq.post, '출근하면 새 글 알림 보내기 요청');
   await a.locator('.st-head').screenshot({ path: SH + '/s0-head.png' });
-  await a.locator('.st-calcard').screenshot({ path: SH + '/s4-calendar.png' });
+  await a.locator('.gt-card').screenshot({ path: SH + '/s4-calendar.png' });
   // 다른 직원 (소장 아님)
   const { p: b } = await user('b@test.com', '이시험', false);
   await b.waitForSelector('.st-head h1');
-  log((await b.locator('#attBtn').count()) === 0 && (await b.locator('#side .st-add').count()) === 0 && (await b.locator('button.st-day').count()) === 0 && (await b.locator('.st-seg.drag').count()) === 0, '소장 아닌 직원: 출근·추가·끌기 없음 (보기만)');
-  log(/✓ 출근/.test(await b.locator('.st-calcard').innerText()), '다른 직원도 출근한 날을 봄');
+  log((await b.locator('#attBtn').count()) === 0 && (await b.locator('[data-std]').count()) === 0 && (await b.locator('.gt-add').count()) === 0 && (await b.locator('.gt.edit').count()) === 0 && (await b.locator('.gt .nmw .x').count()) === 0 && (await b.locator('.gt input.chk').count()) === 0, '소장 아닌 직원: 출근·추가·끌기 없음 (보기만)');
+  log(/✓/.test(await b.locator('tr.att').innerText()), '다른 직원도 출근한 날을 봄');
   await b.goto(B + 'band.html'); await b.waitForTimeout(1500);
   log(!/출근 ·/.test(await b.locator('#list').innerText()), 'Band "전체"에는 출근 글이 안 섞임');
   await b.click('#cats button:has-text("출근")'); await b.waitForTimeout(300);
@@ -166,27 +145,28 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await b.click('#dlgWrite [data-close]');
   // 홈 카드
   await a.goto(B + 'portal.html'); await a.waitForSelector('#mySiteCard:not(.hidden) .mysite');
-  log(/테스트 오피스[\s\S]*오늘: 목공[\s\S]*✓ 출근함/.test(await a.locator('#mySiteCard').innerText()), '홈 "오늘 내 현장": 오늘 공정 + 출근함');
+  log(/테스트 오피스[\s\S]*오늘: [\s\S]*벽체 MDF[\s\S]*✓ 출근함/.test(await a.locator('#mySiteCard').innerText()), '홈 "오늘 내 현장": 오늘 공정 + 출근함');
   await a.waitForTimeout(800); await a.screenshot({ path: SH + '/s2-home.png' });
   await b.goto(B + 'portal.html'); await b.waitForTimeout(2000);
   log(await b.locator('#mySiteCard').isHidden(), '소장 아닌 직원은 "오늘 내 현장" 카드 없음');
   // 관리자 (소장 아님): 출근 버튼·오늘 내 현장 카드 보임
   const { p: c } = await user('c@test.com', '박관리', true);
   await c.waitForSelector('.st-head h1');
-  log((await c.locator('#attBtn').count()) === 1 && (await c.locator('#side .st-add').count()) === 1, '관리자: 출근 버튼 + 수정 가능');
+  log((await c.locator('#attBtn').count()) === 1 && (await c.locator('[data-std]').count()) === 1, '관리자: 출근 버튼 + 수정 가능');
   await c.goto(B + 'portal.html'); await c.waitForSelector('#mySiteCard:not(.hidden) .mysite');
   log(/테스트 오피스/.test(await c.locator('#mySiteCard').innerText()) && (await c.locator('#mySiteCard [data-att]').count()) === 1, '관리자: 홈 "오늘 내 현장" 카드 + 출근 버튼');
   // 휴대폰
   const { p: m } = await user('a@test.com', '김테스트', false, { ...devices['iPhone 13'] });
   await m.waitForSelector('.st-head h1'); await m.waitForTimeout(500);
   log(await m.locator('#pick').isVisible(), '휴대폰: 현장 고르기 칸');
-  log(await m.locator('.st-mobonly .st-ti').first().isVisible() && (await m.locator('.st-ti[draggable="true"]').count()) === 0 && (await m.locator('.st-seg.drag').count()) === 0, '휴대폰: 공정 목록은 위쪽, 끌기 없음 (날짜 눌러 고치기)');
-  // 휴대폰: 날짜 눌러 일정 지우기·일정 없는 공정 시작
-  const mch = await m.getAttribute('.st-mobonly .st-ti:has(.nmc:text-is("철거")), .st-mobonly .st-ti:has(input.nmc[value="철거"])', 'data-t');
-  await m.locator(`button.st-day[data-day="${plus(-1)}"]`).click({ position: { x: 10, y: 10 } }); await m.waitForSelector('.st-daypop');
-  log(/전기/.test(await m.locator('.st-daypop').innerText()), '휴대폰 날짜 누르기: 일정 없는 공정도 보임 (그날로 시작)');
-  await m.click(`.st-daypop [data-clear-t="${mch}"]`); await new Promise((r) => setTimeout(r, 600));
-  log(!(await get(`site/p1/tasks/${mch}/start`)), '휴대폰 날짜 누르기: "일정 지우기"');
+  log((await m.locator('.gt').count()) === 1 && (await m.locator('.gt.drag').count()) === 0 && (await m.locator('.gt.edit').count()) === 1, '휴대폰: 같은 공정표 (끌기 없음, 칸 누르기)');
+  const mf = fId;
+  await m.locator(`tr[data-t="${mf}"] td.d[data-day="${TODAY}"]`).scrollIntoViewIfNeeded();
+  await m.locator(`tr[data-t="${mf}"] td.d[data-day="${TODAY}"]`).tap(); await new Promise((r) => setTimeout(r, 700));
+  const mf1 = await get(`site/p1/tasks/${mf}`);
+  log(mf1.start === TODAY && mf1.end === TODAY, '휴대폰 칸 누르기: 일정 없는 공정은 그날로 시작');
+  await m.locator(`tr[data-t="${mf}"] .x`).first().tap(); await new Promise((r) => setTimeout(r, 700));
+  log(!(await get(`site/p1/tasks/${mf}/start`)), '휴대폰: ✕ 로 일정 지우기');
   await m.screenshot({ path: SH + '/s3-mobile.png', fullPage: true });
   // 구글 로그인 꺼진 기기
   const P = await br.newContext(); await P.addInitScript(() => { try { localStorage.setItem('sb_emu', '1'); } catch {} });

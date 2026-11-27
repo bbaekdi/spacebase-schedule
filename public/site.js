@@ -75,7 +75,7 @@
     const sc = $('.gt-scroll');
     if (sc) {
       if (sl !== null && scrolledFor === s.id) sc.scrollLeft = sl;
-      else { scrolledFor = s.id; const td = sc.querySelector('thead th.td'); if (td) sc.scrollLeft = Math.max(0, td.offsetLeft - sc.clientWidth / 2); }
+      else { scrolledFor = s.id; const td = sc.querySelector('thead th.td'); if (td) { const fx = (sc.querySelector('th.nm') || {}).offsetLeft + (sc.querySelector('th.nm') || {}).offsetWidth || 0; sc.scrollLeft = Math.max(0, td.offsetLeft - fx - (sc.clientWidth - fx) / 2); } }
     }
   }
 
@@ -98,7 +98,7 @@
 
   function gtCard(s, tlRaw, edit) {
     const tl = tlRaw, drag = edit && canDrag();
-    const help = !edit ? '보기만 (수정: 소장님·관리자)' : listEdit ? '공종·공정 이름, 순서, 삭제를 고쳐요' : drag ? '빈 칸을 끌어 일정 넣기 · 회색 칸을 끌어 옮기기 · 끝을 끌어 늘리기 · ✕ 지우기 · 칸 누르기 = 그날 켜고 끄기' : '칸을 눌러 그날 켜고 끄기 · ✕ 지우기';
+    const help = !edit ? '보기만 (수정: 소장님·관리자)' : listEdit ? '공종·공정 이름, 순서, 삭제를 고쳐요' : drag ? '빈 칸을 끌어 일정 넣기 · 회색 칸을 끌어 옮기기 · 끝을 끌어 늘리기 · 이름 옆 ✕ = 일정 지우기 · 칸 누르기 = 그날 켜고 끄기' : '칸을 눌러 그날 켜고 끄기 · 이름 옆 ✕ = 일정 지우기';
     return `<div class="card gt-card"><div class="card-h"><h2>공정표</h2><span class="st-ro">${help}</span>
         <span class="gt-btns">${edit ? `<button type="button" class="btn ${listEdit ? 'primary' : ''}" data-listedit>${listEdit ? '다 고쳤어요' : '공정 목록 고치기'}</button><button type="button" class="btn" data-std>표준 공정표 넣기</button>` : ''}<button type="button" class="btn" data-print>인쇄</button></span></div>
       ${stdOpen && edit ? stdForm(s, tl) : ''}
@@ -130,23 +130,22 @@
       <tr>${days.map((d) => { const n = n0 ? S.diffDays(n0, d) + 1 : 0; return `<th class="dp ${colCls(d)}">${d === jg ? '준공' : n > 0 ? n : ''}</th>`; }).join('')}</tr></thead>`;
     const groups = groupsOf(tl);
     const rows = groups.map(([cat, ts]) => ts.map((t, k) => {
-      const ds = S.daysOf(t), last = ds[ds.length - 1];
+      const ds = S.daysOf(t);
       const cells = days.map((d) => {
         const on = S.activeOn(t, d);
         const hl = drag && on && d === t.start ? '<i class="hl" data-edge="start"></i>' : '';
         const hr = drag && on && d === (t.end || t.start) ? '<i class="hr" data-edge="end"></i>' : '';
-        const x = edit && !listEdit && d === last ? '<i class="x" data-clear title="일정 지우기">✕</i>' : '';
-        return `<td class="d ${on ? 'on' : ''} ${colCls(d)}" data-day="${d}">${hl}${hr}${x}</td>`;
+        return `<td class="d ${on ? 'on' : ''} ${colCls(d)}" data-day="${d}">${hl}${hr}</td>`;
       }).join('');
       const catCell = listEdit && edit ? `<td class="cat"><input type="text" class="catc" value="${esc(t.cat || '')}" list="gtCats" maxlength="20" placeholder="기타" aria-label="공종"></td>`
         : k === 0 ? `<td class="cat" rowspan="${ts.length}">${esc(cat)}</td>` : '';
       const i = tl.findIndex((x) => x.id === t.id);
       const nmCell = listEdit && edit
         ? `<td class="nm"><div class="nmw"><input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공정 이름"><span class="acts"><button type="button" data-mv="-1" ${i ? '' : 'disabled'} aria-label="위로">▲</button><button type="button" data-mv="1" ${i < tl.length - 1 ? '' : 'disabled'} aria-label="아래로">▼</button><button type="button" class="del" data-del aria-label="삭제">삭제</button></span></div></td>`
-        : `<td class="nm"><div class="nmw">${edit ? `<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료">` : t.done ? '<span class="ok">✓</span>' : ''}<span class="nmt" title="${esc(t.name)}">${esc(t.name)}</span></div></td>`;
+        : `<td class="nm"><div class="nmw">${edit ? `<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료">` : t.done ? '<span class="ok">✓</span>' : ''}<span class="nmt" title="${esc(t.name)}">${esc(t.name)}</span>${edit && ds.length ? '<i class="x" data-clear title="일정 지우기 (공정 이름은 남아요)">✕</i>' : ''}</div></td>`;
       return `<tr class="${k === 0 ? 'g1' : ''} ${t.done ? 'done' : ''} ${preview && preview.id === t.id ? 'live' : ''}" data-t="${esc(t.id)}">${catCell}${nmCell}${cells}</tr>`;
     }).join('')).join('');
-    const attRow = `<tr class="att g1"><td class="cat" colspan="2">출근</td>${days.map((d) => { const a = Object.values(att[d] || {}); return `<td class="d ${colCls(d)}" ${a.length ? `title="${esc(a.map((x) => x.name).join(', '))}"` : ''}>${a.length ? '✓' : ''}</td>`; }).join('')}</tr>`;
+    const attRow = `<tr class="att g1"><td class="cat" colspan="2">출근</td>${days.map((d) => { const a = Object.values(att[d] || {}); return `<td class="d ${colCls(d)}" data-day="${d}" ${a.length ? `title="${esc(a.map((x) => x.name).join(', '))}"` : ''}>${a.length ? '✓' : ''}</td>`; }).join('')}</tr>`;
     return `<table class="gt ${drag && !listEdit ? 'drag' : ''} ${edit && !listEdit ? 'edit' : ''}" style="--n:${days.length}"><colgroup><col class="c-cat"><col class="c-nm">${days.map(() => '<col class="c-d">').join('')}</colgroup>${head}<tbody>${rows}${attRow}</tbody></table>`;
   }
 
@@ -263,8 +262,9 @@
     document.body.classList.add('st-dragging');
   });
   document.addEventListener('pointermove', (e) => {
-    if (!drag || drag.mode === 'tap') return;
+    if (!drag) return;
     const d = dayAt(e.clientX, e.clientY); if (!d || d === drag.to) return;
+    if (drag.mode === 'tap') { drag.moved = true; return; } // 일정 있는 공정의 빈 칸을 끌면 아무 일도 안 함
     drag.to = d;
     const next = drag.mode === 'resize' ? resized(drag.t, drag.edge, d) : drag.mode === 'paint' ? painted(drag.from, d) : shifted(drag.t, S.diffDays(drag.from, d));
     preview = { id: drag.id, task: next };
@@ -275,6 +275,7 @@
     const g = drag; drag = null; document.body.classList.remove('st-dragging');
     const commit = preview && preview.id === g.id ? preview.task : null;
     preview = null;
+    if (g.mode === 'tap' && g.moved) return;
     if (g.to === g.from || !commit) { renderTable(); return toggleDay(g.id, g.from); } // 움직이지 않았으면 = 칸 누르기
     tRef(g.id).update({ ...commit, ...stamp() }).catch(fail);
     renderTable();

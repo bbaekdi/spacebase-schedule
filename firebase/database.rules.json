@@ -131,7 +131,7 @@
         "tasks": {
           "$tid": {
             ".write": "auth != null && root.child('ws/members').child(auth.uid).exists()",
-            ".validate": "newData.hasChildren(['name', 'order']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 30 && newData.child('order').isNumber() && (!newData.child('start').exists() || newData.child('start').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)) && (!newData.child('end').exists() || newData.child('end').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)) && (!newData.child('done').exists() || newData.child('done').isBoolean())",
+            ".validate": "newData.hasChildren(['name', 'order']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 30 && newData.child('order').isNumber() && (!newData.child('cat').exists() || (newData.child('cat').isString() && newData.child('cat').val().length <= 20)) && (!newData.child('start').exists() || newData.child('start').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)) && (!newData.child('end').exists() || newData.child('end').val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)) && (!newData.child('done').exists() || newData.child('done').isBoolean())",
             "plus": {
               "$d": {
                 ".validate": "$d.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.val() === true"
@@ -149,7 +149,7 @@
               ".validate": "newData.isNumber()"
             },
             "$other": {
-              ".validate": "$other === 'name' || $other === 'order' || $other === 'start' || $other === 'end' || $other === 'done'"
+              ".validate": "$other === 'name' || $other === 'cat' || $other === 'order' || $other === 'start' || $other === 'end' || $other === 'done'"
             }
           }
         },
