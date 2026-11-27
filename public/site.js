@@ -1,8 +1,9 @@
 // Site: 현장 공정 스케줄표 + 출근 (구글 로그인 회원만)
 // 현장 목록·소장은 주간 스케줄에서 읽기만 한다. 공정·출근은 Firebase site/<현장id>/... (site-core.js)
 // 화면: 왼쪽 = 현장 목록, 오른쪽 = 현장 머리 + 회사 공정표 양식 표(공종 · 공종 상세 · 공사기간 날짜 칸, 하는 날은 회색 칸) + 아래 3주 캘린더.
+// 캘린더(공정표 위, 지난주·이번 주·다음 주): 막대는 "공종 며칠" 만(그 공종 공정이 하나라도 있는 날). 이번 주만 색을 채우고 지난주·다음 주는 속이 빈 점선.
+//   PC 에서 막대를 끌면 그 공종의 모든 공정이 같이 옮겨짐. 넣기·늘리기·지우기·그날 쉬기는 공정표에서만 (같은 기능은 한 가지 방법).
 // 표: PC 빈 칸 끌기 = 일정 넣기(일정 없는 공정), 회색 칸 끌기 = 옮기기, 끝 손잡이 = 늘리기·줄이기, 이름 옆 ✕ = 지우기, 칸 누르기 = 그날 켜고 끄기. 휴대폰은 칸 누르기.
-// 캘린더(지난주·이번 주·다음 주): PC 일정 없는 공정 칩을 날짜로 끌기, 막대 끌기·끝 끌기·✕, 날짜 누르기 = 그날 켜고 끄기. 휴대폰은 날짜 눌러 넣기·켜고 끄기·지우기.
 // 착공·준공 고치기 = 주간 스케줄 공사기간(period 글자)도 같이 바뀜. 일정 등록 = 회사 캘린더(calendar/items/site-<현장id>)에 현장 이름으로 한 건.
 (function () {
   const S = SBSite, esc = WS.esc;
@@ -15,8 +16,9 @@
   const home = () => S.addDays(sundayOf(S.today()), -7); // 지난주 일요일부터 3주
   let weekBase = home();
   const canDrag = () => matchMedia('(pointer: fine)').matches && innerWidth > 900;
-  let preview = null; // 끄는 동안 그 공정의 바뀐 모습 {id, task}
-  const withPreview = (tl) => (preview ? tl.map((t) => (t.id === preview.id ? { ...t, ...preview.task, id: t.id } : t)) : tl);
+  let preview = null; // 끄는 동안 바뀐 모습 {tasks: {공정id: {start,end,plus,minus}}} (표는 공정 하나, 캘린더는 공종 통째)
+  const withPreview = (tl) => (preview ? tl.map((t) => (preview.tasks[t.id] ? { ...t, ...preview.tasks[t.id], id: t.id } : t)) : tl);
+  const isLive = (id) => !!(preview && preview.tasks[id]);
 
   const canEdit = (site) => !!me && (me.admin || S.isManager(site, sched.members, me.name));
   const tasksOf = (id) => (siteData[id] && siteData[id].tasks) || {};
@@ -26,6 +28,7 @@
   const lists = () => S.sites(sched);
   const flash = (msg) => { const d = document.createElement('div'); d.className = 'st-flash'; d.textContent = msg; document.body.append(d); setTimeout(() => d.remove(), 3500); };
   const catOf = (t) => String(t.cat || '').trim() || '기타';
+  const bigDate = (d) => (d ? `${d.slice(2, 4)}.${d.slice(5, 7)}.${d.slice(8)}<em>${WD[S.parse(d).getDay()]}</em>` : '<em class="no">미정</em>');
 
   // ---------- 왼쪽: 현장 목록 ----------
   function sitesHtml() {
@@ -57,11 +60,11 @@
     const state = s.en && s.en < day ? ['end', '끝남'] : s.st && s.st > day ? ['soon', '준비 중'] : ['', '진행 중'];
     const wk0 = sundayOf(day), weekDays = [...Array(7)].map((_, i) => S.addDays(wk0, i));
     const weekCount = tl.filter((t) => weekDays.some((d) => S.activeOn(t, d))).length;
-    const periodText = s.st || s.en ? `${S.yy(s.st) || '?'} ~ ${S.yy(s.en) || '준공일 미정'}` : `공사기간: ${esc(s.period || '미정')}`;
     $('#main').innerHTML = `${pickHtml()}
       <div class="st-head card">
         <div class="tt"><h1>${esc(s.name)}</h1>
-          <div class="sub">${periodText}${canEdit(s) ? ' <button type="button" class="st-link" data-per>기간 고치기</button>' : ''} · 진행률 ${pc}%${nowT.length ? ` · 오늘: <b>${nowT.map((t) => esc(t.name)).join(', ')}</b>` : ''}${nx ? ` · 다음: ${esc(nx.t.name)} (D-${S.diffDays(day, nx.day)})` : ''}</div>
+          <div class="st-per"><span class="pd"><small>착공</small><b>${bigDate(s.st)}</b></span><span class="pa">→</span><span class="pd"><small>준공</small><b>${bigDate(s.en)}</b></span>${!s.st && !s.en ? `<span class="pt">공사기간: ${esc(s.period || '미정')}</span>` : ''}${canEdit(s) ? '<button type="button" class="btn st-peredit" data-per>수정</button>' : ''}</div>
+          <div class="sub">진행률 ${pc}%${nowT.length ? ` · 오늘: <b>${nowT.map((t) => esc(t.name)).join(', ')}</b>` : ''}${nx ? ` · 다음: ${esc(nx.t.name)} (D-${S.diffDays(day, nx.day)})` : ''}</div>
           <div class="sub">소장: ${mg.length ? mg.map((m) => esc((m.name + ' ' + m.rank).trim())).join(', ') : '주간 스케줄 "시공 담당"이 비어 있어요'}</div>
           ${perOpen && canEdit(s) ? perForm(s) : ''}</div>
         <div class="st-attend"><span class="st-badge ${state[0]}">${state[1]}</span>
@@ -73,8 +76,8 @@
         <div class="st-stat"><div class="k">이번 주 공정</div><div class="v">${weekCount}<small> / ${tl.length}</small></div><div class="s">${S.md(weekDays[0])} ~ ${S.md(weekDays[6])}</div></div>
         <div class="st-stat"><div class="k">진행률</div><div class="v">${pc}<small>%</small></div><div class="st-bar"><i style="width:${pc}%"></i></div><div class="s">공정 일정이 지난 만큼 · 완료 ${tl.filter((t) => t.done).length} / ${tl.length}</div></div>
       </div>
-      ${gtCard(s, tl, canEdit(s))}
-      ${calCard(s, withPreview(tl), canEdit(s))}`;
+      ${calCard(s, withPreview(tl), canEdit(s))}
+      ${gtCard(s, tl, canEdit(s))}`;
     const pick = $('#pick'); if (pick) pick.onchange = () => { location.hash = 's=' + encodeURIComponent(pick.value); };
     // 옆으로 밀어 둔 자리 유지, 처음 열 때는 오늘이 보이게
     const sc = $('.gt-scroll');
@@ -148,7 +151,7 @@
       const nmCell = listEdit && edit
         ? `<td class="nm"><div class="nmw"><input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공정 이름"><span class="acts"><button type="button" data-mv="-1" ${i ? '' : 'disabled'} aria-label="위로">▲</button><button type="button" data-mv="1" ${i < tl.length - 1 ? '' : 'disabled'} aria-label="아래로">▼</button><button type="button" class="del" data-del aria-label="삭제">삭제</button></span></div></td>`
         : `<td class="nm"><div class="nmw">${edit ? `<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료">` : t.done ? '<span class="ok">✓</span>' : ''}<span class="nmt" title="${esc(t.name)}">${esc(t.name)}</span>${edit && ds.length ? '<i class="x" data-clear title="일정 지우기 (공정 이름은 남아요)">✕</i>' : ''}</div></td>`;
-      return `<tr class="${k === 0 ? 'g1' : ''} ${t.done ? 'done' : ''} ${preview && preview.id === t.id ? 'live' : ''}" data-t="${esc(t.id)}">${catCell}${nmCell}${cells}</tr>`;
+      return `<tr class="${k === 0 ? 'g1' : ''} ${t.done ? 'done' : ''} ${isLive(t.id) ? 'live' : ''}" data-t="${esc(t.id)}">${catCell}${nmCell}${cells}</tr>`;
     }).join('')).join('');
     return `<table class="gt ${drag && !listEdit ? 'drag' : ''} ${edit && !listEdit ? 'edit' : ''}" style="--n:${days.length}"><colgroup><col class="c-cat"><col class="c-nm">${days.map(() => '<col class="c-d">').join('')}</colgroup>${head}<tbody>${rows}</tbody></table>`;
   }
@@ -159,39 +162,45 @@
       <span class="st-ro">주간 스케줄의 공사기간도 같이 바뀌어요. 준공일은 비워 둬도 돼요.</span></form>`;
   }
 
-  // ---------- 3주 캘린더 (지난주 · 이번 주 · 다음 주) ----------
+  // ---------- 3주 캘린더 (지난주 · 이번 주 · 다음 주): 공종별 막대 ----------
+  const catColor = (tl, cat) => COLORS[Math.max(0, groupsOf(tl).findIndex(([c]) => c === cat)) % COLORS.length];
   function calCard(s, tl, edit) {
     const day = S.today(), thisWeek = sundayOf(day), drag = edit && canDrag();
     const weeks = [0, 1, 2].map((k) => [...Array(7)].map((_, i) => S.addDays(weekBase, k * 7 + i)));
+    // 공종마다: 일이 있는 날(그 공종 공정이 하나라도 있는 날)과 이어진 날 수
+    const cats = groupsOf(tl).map(([cat, ts]) => {
+      const set = new Set(ts.flatMap((t) => S.daysOf(t))), run = new Map(), ds = [...set].sort();
+      for (let i = 0; i < ds.length;) { let j = i; while (j + 1 < ds.length && S.addDays(ds[j], 1) === ds[j + 1]) j++; for (let k = i; k <= j; k++) run.set(ds[k], j - i + 1); i = j + 1; }
+      return { cat, set, run, color: catColor(tl, cat) };
+    }).filter((c) => c.set.size);
     const rows = weeks.map((w) => {
       const isNow = w[0] === thisWeek, segs = [];
-      tl.forEach((t) => {
-        const ds = S.daysOf(t); if (!ds.length) return;
-        const first = ds[0], last = ds[ds.length - 1];
+      cats.forEach((c) => {
         let st = -1;
         for (let i = 0; i <= 7; i++) {
-          const on = i < 7 && S.activeOn(t, w[i]);
+          const on = i < 7 && c.set.has(w[i]);
           if (on && st < 0) st = i;
-          if (!on && st >= 0) { segs.push({ t, a: st, b: i, s: w[st] === first, e: w[i - 1] === last, n: ds.length }); st = -1; }
+          if (!on && st >= 0) { segs.push({ c, a: st, b: i, n: c.run.get(w[st]) }); st = -1; }
         }
       });
       const lanes = [];
       segs.forEach((g) => { let l = lanes.findIndex((end) => end <= g.a); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = g.b; g.l = l; });
-      const cells = w.map((d) => `<${edit ? 'button type="button"' : 'div'} class="st-day ${d === day ? 'today' : ''}" data-day="${d}"><span class="n ${dayCls(d)}">${+d.slice(8) === 1 || d === w[0] ? `${+d.slice(5, 7)}/${+d.slice(8)}` : +d.slice(8)}</span></${edit ? 'button' : 'div'}>`).join('');
+      const cells = w.map((d) => `<div class="st-day ${d === day ? 'today' : ''}" data-day="${d}"><span class="n ${dayCls(d)}">${+d.slice(8) === 1 || d === w[0] ? `${+d.slice(5, 7)}/${+d.slice(8)}` : +d.slice(8)}</span></div>`).join('');
       const bars = segs.map((g) => {
-        const live = preview && preview.id === g.t.id;
-        return `<span class="st-seg now ${live ? 'live' : ''} ${drag ? 'drag' : ''}" data-t="${esc(g.t.id)}" style="left:calc(${(g.a / 7) * 100}% + 3px);width:calc(${((g.b - g.a) / 7) * 100}% - 6px);top:${32 + g.l * 24}px;background:${colorOf(tl, g.t)}" title="${esc(g.t.name)} ${g.n}일">${drag && g.s ? '<i class="hl" data-edge="start"></i>' : ''}${esc(g.t.name)}${g.b - g.a > 1 ? ` ${g.n}일` : ''}${drag && g.e ? '<i class="x" data-clear title="일정 지우기">✕</i><i class="hr" data-edge="end"></i>' : ''}</span>`;
+        const live = ts_live(tl, g.c.cat);
+        const fill = isNow ? `background:${g.c.color};color:#fff;` : `background:#fff;color:${g.c.color};border:1.5px dashed ${g.c.color};line-height:17px;`;
+        return `<span class="st-seg ${isNow ? 'now' : 'off'} ${live ? 'live' : ''} ${drag ? 'drag' : ''}" data-cat="${esc(g.c.cat)}" style="left:calc(${(g.a / 7) * 100}% + 3px);width:calc(${((g.b - g.a) / 7) * 100}% - 6px);top:${32 + g.l * 24}px;${fill}" title="${esc(g.c.cat)} ${g.n}일">${esc(g.c.cat)} ${g.n}일</span>`;
       }).join('');
       return `<div class="st-wk ${isNow ? 'now' : ''}" style="min-height:${Math.max(84, 38 + lanes.length * 24)}px">${cells}${bars}</div>`;
     }).join('');
     const a = weeks[0][0], b = weeks[2][6];
-    const free = tl.filter((t) => !S.daysOf(t).length);
-    const tray = drag ? `<div class="st-tray"><b>일정 없는 공정</b>${free.length ? free.map((t) => `<span class="st-chip" draggable="true" data-t="${esc(t.id)}" title="날짜로 끌어다 놓으세요">⋮⋮ ${esc(t.name)}</span>`).join('') : '<span class="st-ro">모든 공정에 일정이 있어요</span>'}<span class="st-ro">→ 캘린더 날짜로 끌어다 놓기</span></div>` : '';
+    const help = drag ? '막대를 끌면 그 공종의 공정이 모두 같이 옮겨져요 · 이번 주는 색, 지난주·다음 주는 점선' : '이번 주는 색, 지난주·다음 주는 점선';
     return `<div class="card st-calcard"><div class="card-h"><div class="st-nav" style="margin-left:0"><button type="button" data-wk="-7" aria-label="한 주 앞">‹</button></div>
       <h2>${S.md(a)} ~ ${S.md(b)} 공정 캘린더</h2><div class="st-nav" style="margin-left:0"><button type="button" data-wk="7" aria-label="한 주 뒤">›</button><button type="button" data-wk="0">이번 주</button></div>
-      <span class="st-ro" style="margin-left:auto">${edit ? (drag ? '막대를 끌어 옮기고 끝을 끌어 늘려요 · ✕ 로 일정 지우기 · 날짜를 누르면 그날 쉬는 날 정하기' : '날짜를 누르면 그날 공정 고르기') : ''}</span></div>
-      ${tray}<div class="st-scroll"><div class="st-month"><div class="st-wh">${WD.map((d, i) => `<span class="${i === 0 ? 'red' : i === 6 ? 'blue' : ''}">${d}</span>`).join('')}</div>${rows}</div></div></div>`;
+      <span class="st-ro" style="margin-left:auto">${help}</span></div>
+      <div class="st-scroll"><div class="st-month"><div class="st-wh">${WD.map((d, i) => `<span class="${i === 0 ? 'red' : i === 6 ? 'blue' : ''}">${d}</span>`).join('')}</div>${rows}</div></div></div>`;
   }
+  const ts_live = (tl, cat) => !!preview && tl.some((t) => catOf(t) === cat && isLive(t.id));
 
   // ---------- 저장 ----------
   const tRef = (id) => db.ref('site/' + cur.id + '/tasks/' + id);
@@ -247,11 +256,6 @@
       flash(`캘린더에 "${s.name}" 일정을 ${ex ? '바꿨어요' : '등록했어요'}. (${S.md(s.st)} ~ ${S.md(s.en)})`);
     } catch (e) { fail(e); }
   }
-  // 캘린더: 일정 없는 공정을 날짜로 놓기 (그날 하루)
-  function placeTask(id, day) {
-    const t = tasksOf(cur.id)[id]; if (!t || S.daysOf(t).length) return;
-    return tRef(id).update({ start: day, end: day, ...stamp() }).catch(fail);
-  }
   // 표준 공정표 넣기: 이름이 같은 공정은 공종·날짜만 바꾸고, 없는 공정은 새로 (다른 공정은 그대로)
   function putStd(st) {
     const tl = S.taskList(tasksOf(cur.id)), byName = new Map(tl.map((t) => [S.norm(t.name), t]));
@@ -268,17 +272,15 @@
 
   // ---------- 누르기 ----------
   document.addEventListener('click', (e) => {
-    if (dayPop && !e.target.closest('.st-daypop') && !e.target.closest('.st-day')) closeDayPop();
     if (!e.target.closest('#side, #main')) return;
     if (e.target.closest('[data-print]')) return window.print();
     const wk = e.target.closest('[data-wk]');
-    if (wk) { weekBase = +wk.dataset.wk ? S.addDays(weekBase, +wk.dataset.wk) : home(); closeDayPop(); return renderCal(); }
+    if (wk) { weekBase = +wk.dataset.wk ? S.addDays(weekBase, +wk.dataset.wk) : home(); return renderCal(); }
     if (!cur || !canEdit(cur)) return;
     const tasks = tasksOf(cur.id);
     if (e.target.closest('[data-calreg]')) return registerCal();
     if (e.target.closest('[data-per]')) { perOpen = !perOpen; return drawMain(); }
     if (e.target.closest('[data-perclose]')) { perOpen = false; return drawMain(); }
-    const dc = e.target.closest('button.st-day[data-day]'); if (dc) { if (justDragged) return; e.stopPropagation(); return openDayPop(dc); }
     if (e.target.closest('[data-listedit]')) { listEdit = !listEdit; return drawMain(); }
     if (e.target.closest('[data-std]')) { stdOpen = !stdOpen; return drawMain(); }
     if (e.target.closest('[data-stdclose]')) { stdOpen = false; return drawMain(); }
@@ -330,24 +332,15 @@
   const renderTable = () => { const sc = $('.gt-scroll'); if (!sc || !cur) return; const l = sc.scrollLeft; sc.innerHTML = gtTable(cur, withPreview(S.taskList(tasksOf(cur.id))), canEdit(cur)); sc.scrollLeft = l; };
   const renderCal = () => { const el = document.querySelector('.st-calcard'); if (el && cur) el.outerHTML = calCard(cur, withPreview(S.taskList(tasksOf(cur.id))), canEdit(cur)); };
   const renderLive = () => { renderTable(); renderCal(); };
-  // 일정 없는 공정 칩 → 캘린더 날짜 (HTML 끌어다 놓기)
-  document.addEventListener('dragstart', (e) => { const c = e.target.closest && e.target.closest('.st-chip[draggable="true"]'); if (!c) return; e.dataTransfer.setData('text/plain', 'sbtask:' + c.dataset.t); e.dataTransfer.effectAllowed = 'move'; c.classList.add('dragging'); });
-  document.addEventListener('dragend', (e) => { const c = e.target.closest && e.target.closest('.st-chip'); if (c) c.classList.remove('dragging'); });
-  document.addEventListener('dragover', (e) => { if (!(e.target.closest && e.target.closest('.st-month'))) return; if (dayAt(e.clientX, e.clientY)) e.preventDefault(); });
-  document.addEventListener('drop', (e) => {
-    if (!(e.target.closest && e.target.closest('.st-month'))) return;
-    const d = dayAt(e.clientX, e.clientY); if (!d) return;
-    const v = e.dataTransfer.getData('text/plain') || ''; if (!v.startsWith('sbtask:')) return;
-    e.preventDefault(); placeTask(v.slice(7), d);
-  });
-  let drag = null, justDragged = false;
+  let drag = null;
   document.addEventListener('pointerdown', (e) => {
     const seg = e.target.closest && e.target.closest('.st-seg.drag');
-    if (seg && e.button === 0 && cur && !e.target.closest('[data-clear]')) { // 캘린더 막대: 옮기기 / 끝 늘리기
-      const day = dayAt(e.clientX, e.clientY), t = tasksOf(cur.id)[seg.dataset.t];
-      if (!day || !t) return;
+    if (seg && e.button === 0 && cur) { // 캘린더 막대: 그 공종의 공정을 모두 같이 옮기기
+      const day = dayAt(e.clientX, e.clientY); if (!day) return;
+      const ts = S.taskList(tasksOf(cur.id)).filter((t) => catOf(t) === seg.dataset.cat && S.daysOf(t).length);
+      if (!ts.length) return;
       e.preventDefault();
-      drag = { src: 'cal', id: seg.dataset.t, mode: e.target.dataset && e.target.dataset.edge ? 'resize' : 'move', edge: (e.target.dataset && e.target.dataset.edge) || null, from: day, to: day, t };
+      drag = { src: 'cal', mode: 'move', cat: seg.dataset.cat, ts, from: day, to: day };
       document.body.classList.add('st-dragging');
       return;
     }
@@ -367,48 +360,28 @@
     const d = dayAt(e.clientX, e.clientY); if (!d || d === drag.to) return;
     if (drag.mode === 'tap') { drag.moved = true; return; } // 일정 있는 공정의 빈 칸을 끌면 아무 일도 안 함
     drag.to = d;
-    const next = drag.mode === 'resize' ? resized(drag.t, drag.edge, d) : drag.mode === 'paint' ? painted(drag.from, d) : shifted(drag.t, S.diffDays(drag.from, d));
-    preview = { id: drag.id, task: next };
+    if (drag.src === 'cal') { const n = S.diffDays(drag.from, d); preview = { tasks: Object.fromEntries(drag.ts.map((t) => [t.id, shifted(t, n)])) }; }
+    else {
+      const next = drag.mode === 'resize' ? resized(drag.t, drag.edge, d) : drag.mode === 'paint' ? painted(drag.from, d) : shifted(drag.t, S.diffDays(drag.from, d));
+      preview = { tasks: { [drag.id]: next } };
+    }
     renderLive();
   });
   document.addEventListener('pointerup', () => {
     if (!drag) return;
     const g = drag; drag = null; document.body.classList.remove('st-dragging');
-    const commit = preview && preview.id === g.id ? preview.task : null;
-    preview = null;
-    justDragged = true; setTimeout(() => (justDragged = false), 0);
+    const commit = preview; preview = null;
     if (g.mode === 'tap' && g.moved) return;
-    if (g.to === g.from || !commit) { // 움직이지 않았으면: 표 = 칸 누르기, 캘린더 = 날짜 누르기(그날 공정 고르기)
+    if (g.to === g.from || !commit) { // 움직이지 않았으면: 표 = 칸 누르기, 캘린더 = 아무 일 없음
       renderLive();
-      if (g.src === 'cal') { const c = document.querySelector(`.st-month button.st-day[data-day="${g.from}"]`); if (c) openDayPop(c); return; }
-      return toggleDay(g.id, g.from);
+      if (g.src === 'table') return toggleDay(g.id, g.from);
+      return;
     }
-    tRef(g.id).update({ ...commit, ...stamp() }).catch(fail);
+    const up = {};
+    Object.entries(commit.tasks).forEach(([id, t]) => { up[id + '/start'] = t.start || null; up[id + '/end'] = t.end || null; up[id + '/plus'] = t.plus || null; up[id + '/minus'] = t.minus || null; up[id + '/by'] = me.name; up[id + '/at'] = Date.now(); });
+    db.ref('site/' + cur.id + '/tasks').update(up).catch(fail);
     renderLive();
   });
-
-  // ---------- 캘린더 날짜 누르기: 그날 하는 공정 고르기 ----------
-  let dayPop = null;
-  const closeDayPop = () => { if (dayPop) { dayPop.remove(); dayPop = null; } };
-  function openDayPop(cell) {
-    closeDayPop();
-    const d = cell.dataset.day, all = S.taskList(tasksOf(cur.id)), pc = canDrag();
-    // PC: 넣기는 칩 끌기, 지우기는 막대 ✕ → 여기서는 일정 있는 공정의 그날 켜고 끄기(쉬는 날)만
-    const tl = pc ? all.filter((t) => S.daysOf(t).length) : all;
-    dayPop = document.createElement('div'); dayPop.className = 'st-cal st-daypop';
-    dayPop.innerHTML = `<b>${S.yy(d)} 하는 공정</b>${tl.length ? `<div class="st-dpl">${tl.map((t) => `<label><input type="checkbox" data-t="${esc(t.id)}" ${S.activeOn(t, d) ? 'checked' : ''}><i style="background:${colorOf(all, t)}"></i>${esc(t.name)}${!pc && S.daysOf(t).length ? `<button type="button" class="clr" data-clear-t="${esc(t.id)}">일정 지우기</button>` : ''}</label>`).join('')}</div>`
-      : `<div class="st-none">${pc ? '일정이 있는 공정이 없어요. 위의 "일정 없는 공정"을 날짜로 끌어다 놓으세요.' : '공정이 아직 없어요.'}</div>`}<div class="st-calf"><span>${pc ? '<small class="st-ro">끄면 그날만 쉬는 날</small>' : ''}</span><button type="button" data-close>닫기</button></div>`;
-    dayPop.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (e.target.closest('[data-close]')) closeDayPop();
-      const c = e.target.closest('[data-clear-t]'); if (c) { e.preventDefault(); closeDayPop(); clearSchedule(c.dataset.clearT); }
-    });
-    dayPop.addEventListener('change', (e) => { if (e.target.dataset.t) toggleDay(e.target.dataset.t, d); });
-    document.body.append(dayPop);
-    const r = cell.getBoundingClientRect();
-    dayPop.style.top = window.scrollY + r.bottom + 4 + 'px';
-    dayPop.style.left = Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - 308)) + 'px';
-  }
 
   // ---------- 시작 ----------
   function route() {
@@ -416,7 +389,7 @@
     const L = lists();
     const prev = cur && cur.id;
     cur = L.all.find((s) => s.id === id) || (id ? null : L.active[0] || L.undated[0] || null);
-    if ((cur && cur.id) !== prev) { listEdit = false; stdOpen = false; perOpen = false; closeDayPop(); }
+    if ((cur && cur.id) !== prev) { listEdit = false; stdOpen = false; perOpen = false; }
     drawSide(); drawMain();
   }
   window.addEventListener('hashchange', route);
