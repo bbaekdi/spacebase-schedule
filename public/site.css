@@ -161,7 +161,7 @@ body.st-dragging .st-seg .x { display: none !important; }
 .gt-std input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
 .gt-scroll { overflow: auto; max-height: 76vh; border: 1px solid #222; }
 .gt { border-collapse: collapse; table-layout: fixed; width: 100%; min-width: calc(340px + var(--n) * 24px); font-size: 11px; background: #fff; }
-.gt col.c-cat { width: 100px; } .gt col.c-nm { width: 240px; } .gt col.c-d { width: auto; }
+.gt col.c-cat { width: 128px; } .gt col.c-nm { width: 240px; } .gt col.c-d { width: auto; }
 .gt th, .gt td { border: 1px solid #cfcfcf; padding: 0; height: 24px; text-align: center; overflow: hidden; }
 .gt thead th { background: #fff; font-weight: 700; height: 20px; position: sticky; z-index: 3; }
 .gt thead tr:nth-child(1) th { top: 0; } .gt thead tr:nth-child(2) th { top: 20px; } .gt thead tr:nth-child(3) th { top: 40px; } .gt thead tr:nth-child(4) th { top: 60px; }
@@ -171,8 +171,8 @@ body.st-dragging .st-seg .x { display: none !important; }
 .gt th.dp { font-weight: 400; color: #555; }
 .gt th.td { background: #fff3c4; }
 .gt td.cat, .gt td.nm { position: sticky; background: #fff; z-index: 2; text-align: center; font-weight: 600; border-color: #222; }
-.gt td.cat { left: 0; } .gt td.nm { left: 100px; text-align: left; font-weight: 400; border-color: #cfcfcf; }
-.gt thead th.cat, .gt tbody td.cat { left: 0; } .gt thead th.nm { left: 100px; }
+.gt td.cat { left: 0; } .gt td.nm { left: 128px; text-align: left; font-weight: 400; border-color: #cfcfcf; }
+.gt thead th.cat, .gt tbody td.cat { left: 0; } .gt thead th.nm { left: 128px; }
 .gt thead th.cat, .gt thead th.nm { z-index: 4; }
 .gt tr.g1 td, .gt tr.g1 th { border-top: 1px solid #222; }
 .gt td.wk { background: #fcf6f6; }
@@ -273,7 +273,7 @@ body.st-dragging .nmw .x { display: none !important; }
 
 /* 줄 바로 고치기: ⋮⋮ 끌기 · ＋ － 는 마우스를 올릴 때만 */
 .gt col.c-nm { width: 320px; }
-.gt { min-width: calc(420px + var(--n) * 24px); }
+.gt { min-width: calc(448px + var(--n) * 24px); }
 .nmw .acts { display: none; gap: 3px; align-items: center; flex: 0 0 auto; }
 .gt tr:hover .nmw .acts, .gt tr:focus-within .nmw .acts { display: flex; }
 .nmw .x { display: block; }

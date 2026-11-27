@@ -45,6 +45,8 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await a.click('[data-std]'); await a.fill('.gt-std input[name=st]', plus(-10)); await a.click('.gt-std button[type=submit]');
   await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 37);
   log(true, '표준 공정표 넣기 → 공정 37개');
+  const cut = await a.locator('td.cat input.catc').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth).map((e) => e.value));
+  log(cut.length === 0, `공종 칸 글자가 잘리지 않음 ${cut.length ? '(잘림: ' + cut.join(', ') + ')' : ''}`);
   log((await a.locator('td.cat[rowspan="4"]:has(input.catc[value="목공사"])').count()) === 1 && (await a.locator('td.cat:has(input.catc[value="보양,철거공사"])').count()) === 1, '공종 칸이 세로로 합쳐짐 (목공사 4줄)');
   const mokId = await a.getAttribute(row('벽체 MDF 마감판넬 작업'), 'data-t');
   const m0 = await get(`site/p1/tasks/${mokId}`);
