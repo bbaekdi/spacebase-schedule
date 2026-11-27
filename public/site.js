@@ -23,8 +23,8 @@
   const canEdit = (site) => !!me && (me.admin || S.isManager(site, sched.members, me.name));
   const tasksOf = (id) => (siteData[id] && siteData[id].tasks) || {};
   const dayCls = (d) => { const w = S.parse(d).getDay(); return w === 0 || H()[d] ? 'red' : w === 6 ? 'blue' : ''; };
-  const COLORS = ['#e5484d', '#0f8a6a', '#2f6fd8', '#a33b6b', '#1d1d1b', '#c26a12', '#3f7f2a', '#d4572a', '#7c6be0', '#1e9e7a', '#b8860b', '#5a6b8c'];
-  const colorOf = (tl, t) => COLORS[Math.max(0, tl.findIndex((x) => x.id === t.id)) % COLORS.length];
+  // 파스텔 그라데이션 (노랑 → 연두 → 초록 → 민트 → 하늘 → 파랑) 14칸. 옆 공종끼리 색이 멀도록 5칸씩 건너 고름
+  const PAL = Array.from({ length: 14 }, (_, i) => { const h = Math.round(48 + i * (170 / 13)); return { fill: `hsl(${h} 70% 76%)`, line: `hsl(${h} 48% 36%)` }; });
   const lists = () => S.sites(sched);
   const flash = (msg) => { const d = document.createElement('div'); d.className = 'st-flash'; d.textContent = msg; document.body.append(d); setTimeout(() => d.remove(), 3500); };
   const catOf = (t) => String(t.cat || '').trim() || '기타';
@@ -64,7 +64,6 @@
       <div class="st-head card">
         <div class="tt"><h1>${esc(s.name)}</h1>
           <div class="st-per"><span class="pd"><small>착공</small><b>${bigDate(s.st)}</b></span><span class="pa">→</span><span class="pd"><small>준공</small><b>${bigDate(s.en)}</b></span>${!s.st && !s.en ? `<span class="pt">공사기간: ${esc(s.period || '미정')}</span>` : ''}${canEdit(s) ? '<button type="button" class="btn st-peredit" data-per>수정</button>' : ''}</div>
-          <div class="sub">진행률 ${pc}%${nowT.length ? ` · 오늘: <b>${nowT.map((t) => esc(t.name)).join(', ')}</b>` : ''}${nx ? ` · 다음: ${esc(nx.t.name)} (D-${S.diffDays(day, nx.day)})` : ''}</div>
           <div class="sub">소장: ${mg.length ? mg.map((m) => esc((m.name + ' ' + m.rank).trim())).join(', ') : '주간 스케줄 "시공 담당"이 비어 있어요'}</div>
           ${perOpen && canEdit(s) ? perForm(s) : ''}</div>
         <div class="st-attend"><span class="st-badge ${state[0]}">${state[1]}</span>
@@ -163,7 +162,7 @@
   }
 
   // ---------- 3주 캘린더 (지난주 · 이번 주 · 다음 주): 공종별 막대 ----------
-  const catColor = (tl, cat) => COLORS[Math.max(0, groupsOf(tl).findIndex(([c]) => c === cat)) % COLORS.length];
+  const catColor = (tl, cat) => PAL[(Math.max(0, groupsOf(tl).findIndex(([c]) => c === cat)) * 5) % PAL.length];
   function calCard(s, tl, edit) {
     const day = S.today(), thisWeek = sundayOf(day), drag = edit && canDrag();
     const weeks = [0, 1, 2].map((k) => [...Array(7)].map((_, i) => S.addDays(weekBase, k * 7 + i)));
@@ -171,7 +170,7 @@
     const cats = groupsOf(tl).map(([cat, ts]) => {
       const set = new Set(ts.flatMap((t) => S.daysOf(t))), run = new Map(), ds = [...set].sort();
       for (let i = 0; i < ds.length;) { let j = i; while (j + 1 < ds.length && S.addDays(ds[j], 1) === ds[j + 1]) j++; for (let k = i; k <= j; k++) run.set(ds[k], j - i + 1); i = j + 1; }
-      return { cat, set, run, color: catColor(tl, cat) };
+      return { cat, set, run, col: catColor(tl, cat) };
     }).filter((c) => c.set.size);
     const rows = weeks.map((w) => {
       const isNow = w[0] === thisWeek, segs = [];
@@ -188,7 +187,7 @@
       const cells = w.map((d) => `<div class="st-day ${d === day ? 'today' : ''}" data-day="${d}"><span class="n ${dayCls(d)}">${+d.slice(8) === 1 || d === w[0] ? `${+d.slice(5, 7)}/${+d.slice(8)}` : +d.slice(8)}</span></div>`).join('');
       const bars = segs.map((g) => {
         const live = ts_live(tl, g.c.cat);
-        const fill = isNow ? `background:${g.c.color};color:#fff;` : `background:#fff;color:${g.c.color};border:1.5px dashed ${g.c.color};line-height:17px;`;
+        const fill = isNow ? `background:${g.c.col.fill};color:#2b2b28;` : `background:#fff;color:${g.c.col.line};border:1.5px dashed ${g.c.col.line};line-height:17px;`;
         return `<span class="st-seg ${isNow ? 'now' : 'off'} ${live ? 'live' : ''} ${drag ? 'drag' : ''}" data-cat="${esc(g.c.cat)}" style="left:calc(${(g.a / 7) * 100}% + 3px);width:calc(${((g.b - g.a) / 7) * 100}% - 6px);top:${32 + g.l * 24}px;${fill}" title="${esc(g.c.cat)} ${g.n}일">${esc(g.c.cat)} ${g.n}일</span>`;
       }).join('');
       return `<div class="st-wk ${isNow ? 'now' : ''}" style="min-height:${Math.max(84, 38 + lanes.length * 24)}px">${cells}${bars}</div>`;

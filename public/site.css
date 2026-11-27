@@ -257,14 +257,14 @@ body.st-dragging .nmw .x { display: none !important; }
 @media print { .st-calcard, .st-flash { display: none !important; } }
 
 /* 착공·준공 큰 날짜 */
-.st-per { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 4px 0 8px; }
+.st-per { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 8px; }
 .st-per .pd { display: flex; flex-direction: column; line-height: 1.15; }
-.st-per .pd small { font-size: 12px; font-weight: 700; color: var(--sub); }
-.st-per .pd b { font-size: 28px; font-weight: 800; letter-spacing: -.5px; }
-.st-per .pd b em { font-size: 14px; font-style: normal; font-weight: 700; color: var(--sub); margin-left: 6px; letter-spacing: 0; }
-.st-per .pd b em.no { font-size: 20px; margin: 0; }
-.st-per .pa { font-size: 22px; color: var(--sub); }
+.st-per .pd small { font-size: 11px; font-weight: 700; color: var(--sub); }
+.st-per .pd b { font-size: 19px; font-weight: 800; letter-spacing: -.5px; }
+.st-per .pd b em { font-size: 12px; font-style: normal; font-weight: 700; color: var(--sub); margin-left: 6px; letter-spacing: 0; }
+.st-per .pd b em.no { font-size: 15px; margin: 0; }
+.st-per .pa { font-size: 15px; color: var(--sub); }
 .st-per .pt { font-size: 13px; color: var(--sub); }
-.st-peredit { padding: 7px 16px; font-size: 13px; }
+.st-per .st-peredit { padding: 3px 10px; font-size: 11px; min-height: 0; line-height: 1.5; border-radius: 8px; }
 /* 캘린더 막대: 이번 주 = 색 채움, 지난주·다음 주 = 속 빈 점선 (공종 이름 + 며칠) */
 .st-seg.off { box-shadow: none; font-weight: 700; }

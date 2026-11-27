@@ -54,7 +54,7 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await a.locator('thead th.mo').count()) >= 2 && (await a.locator('thead th.dn.td').innerText()) === String(+TODAY.slice(8)) && (await a.locator('thead th.dp.jg').innerText()) === '준공', '머리: 월·일·요일·기간 / 오늘 칸 / 준공 칸');
   log((await a.locator('thead th.dw.red').count()) >= 1 && (await a.locator('thead th.dw.blue').count()) >= 1, '일요일 빨강·토요일 파랑');
   log((await a.locator(`${cell(mokId, TODAY)}`).evaluate((el) => getComputedStyle(el).backgroundColor)).replace(/\s/g, '') !== 'rgb(255,255,255)', '하는 날은 회색 칸');
-  log(/오늘: [\s\S]*/.test(await a.locator('.st-head').innerText()) && /벽체 MDF/.test(await a.locator('.st-head').innerText()), '머리: 오늘 하는 공정');
+  log(/오늘 공정[\s\S]*벽체 MDF/.test(await a.locator('.st-stats').innerText()) && !/진행률 \d+%\s*·/.test(await a.locator('.st-head').innerText()), '오늘 하는 공정은 위 카드에 (머리의 긴 한 줄은 없앰)');
   // 공정 목록 고치기: 추가 (공종 + 이름) · 이름 · 순서
   await a.click('[data-listedit]');
   await a.fill('.gt-add input[name=cat]', '목공사'); await a.fill('.gt-add input[name=nm]', '필름'); await a.press('.gt-add input[name=nm]', 'Enter');
@@ -103,9 +103,9 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await get(`site/p1/tasks/${fId}/plus/${plus(8)}`)) === true, '빈 칸 누르기: 그날 더하기');
   await a.click(cell(fId, plus(8))); await new Promise((r) => setTimeout(r, 600));
   // 진행률: 완료 체크하면 올라감
-  const pct = async () => +(/진행률 (\d+)%/.exec(await a.locator('.st-head').innerText()) || [0, -1])[1];
+  const pct = async () => +(/(\d+)\s*%/.exec(await a.locator('.st-stat:has-text("진행률") .v').innerText()) || [0, -1])[1];
   const p0 = await pct();
-  await a.check(`tr[data-t="${wsId}"] input.chk`); await a.waitForFunction((v) => +(/진행률 (\d+)%/.exec(document.querySelector('.st-head').innerText) || [0, -1])[1] > v, p0);
+  await a.check(`tr[data-t="${wsId}"] input.chk`); await a.waitForFunction((v) => +(/(\d+)\s*%/.exec([...document.querySelectorAll('.st-stat')].find((x) => /진행률/.test(x.innerText)).querySelector('.v').innerText) || [0, -1])[1] > v, p0);
   log((await a.locator(`tr.done[data-t="${wsId}"]`).count()) === 1, `완료 체크 → 진행률 올라감 (${p0}% → ${await pct()}%)`);
   await a.screenshot({ path: SH + '/s1-site.png' });
   // 일정 지우기: ✕ (공정은 표에 남음)
@@ -145,7 +145,8 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await a.goto(B + 'site.html'); await a.waitForSelector('.gt');
   // 큰 날짜 · 수정 버튼
   const fs = await a.locator('.st-per .pd b').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
-  log((await a.locator('.st-per .pd b').count()) === 2 && fs >= 24 && (await a.locator('.st-per .pd b').first().innerText()).startsWith(plus(-12).slice(2).replace(/-/g, '.')) && (await a.locator('[data-per]').innerText()) === '수정', '착공·준공 날짜가 크게 따로 보임 + 버튼 이름 "수정"');
+  const h1s = await a.locator('.st-head h1').evaluate((e) => parseFloat(getComputedStyle(e).fontSize)), bw = (await a.locator('[data-per]').boundingBox()).width;
+  log((await a.locator('.st-per .pd b').count()) === 2 && fs >= 16 && fs < h1s && bw < 70 && (await a.locator('.st-per .pd b').first().innerText()).startsWith(plus(-12).slice(2).replace(/-/g, '.')) && (await a.locator('[data-per]').innerText()) === '수정', '착공·준공 날짜가 따로 보임(현장 이름보다 작게) + 작은 "수정" 버튼');
   // 캘린더: 공정표 위, 3주, "공종 며칠" 만
   const sun = (d) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() - x.getDay()); return kst(new Date(x.getTime() + 9 * 3600e3)); };
   const W0 = await a.getAttribute('.st-wk >> nth=0 >> .st-day >> nth=0', 'data-day');
@@ -159,7 +160,7 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await a.locator('.st-seg[data-cat="전기공사"]').first().innerText()).trim() === '전기공사 19일', '며칠 = 그 공종 공정이 있는 날 (전기공사 19일)');
   const sty = (sel) => a.locator(sel).first().evaluate((e) => { const c = getComputedStyle(e); return { bg: c.backgroundColor, bs: c.borderTopStyle, bc: c.borderTopColor, fg: c.color }; });
   const now = await sty('.st-wk.now .st-seg'), off = await sty('.st-wk:not(.now) .st-seg');
-  log(now.bg !== 'rgb(255, 255, 255)' && now.fg === 'rgb(255, 255, 255)', '이번 주 막대는 색이 채워짐');
+  log(now.bg !== 'rgb(255, 255, 255)' && now.fg !== 'rgb(255, 255, 255)', '이번 주 막대는 파스텔 색이 채워짐 (진한 글씨)');
   log(off.bs === 'dashed' && off.bg === 'rgb(255, 255, 255)' && off.bc === off.fg && off.bc !== 'rgb(255, 255, 255)', '지난주·다음 주 막대는 속이 비고 같은 색 점선');
   // 표 → 캘린더 연동: 표에서 일정 없는 공정에 날짜를 칠하면 그 공종 막대가 바로 생김
   await a.locator('.gt-card').scrollIntoViewIfNeeded();
