@@ -336,3 +336,6 @@ body.st-dragging .nmw .x { display: none !important; }
   .gt { width: 100% !important; min-width: 0 !important; }
   .gt col.c-cat { width: 52px !important; } .gt col.c-nm { width: 120px !important; } .gt col.c-d { width: auto !important; }
 }
+/* 머리(월·일·요일·기간)와 공정 줄 사이의 진한 선: 표를 내려도 머리와 함께 늘 보임 */
+.gt thead th.dp, .gt thead th.cat, .gt thead th.nm { box-shadow: inset 0 -2px 0 #222; }
+.gt thead th.dp.td { box-shadow: inset 2px 0 0 #f1bf52, inset -2px 0 0 #f1bf52, inset 0 -2px 0 #222; }
