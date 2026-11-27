@@ -295,3 +295,15 @@ body.st-dragging .nmw .x { display: none !important; }
 .nmw .acts .pm { border: 1px solid #bdb9ad; background: #fff; color: #333; border-radius: 6px; min-width: 30px; height: 22px; line-height: 18px; padding: 0 6px; font-size: 19px; font-weight: 700; cursor: pointer; }
 .nmw .acts .pm:hover { background: #eef6ff; border-color: #2f6fd8; color: #2f6fd8; }
 .nmw .acts .pm.del:hover { background: #fdeeee; border-color: #c22; color: #c22; }
+
+/* ✕ ＋ － 는 같은 크기·같은 모양 */
+.nmw .pm, .nmw .acts .pm { min-width: 30px; height: 22px; line-height: 18px; padding: 0 6px; font-size: 18px; font-weight: 700; border: 1px solid #bdb9ad; background: #fff; color: #333; border-radius: 6px; cursor: pointer; flex: 0 0 auto; }
+.nmw .pm.clr, .nmw .acts .pm.clr { color: #c22; font-size: 15px; }
+.nmw > .pm.clr { display: block; margin-left: auto; }
+/* 공휴일·명절 이름 */
+.st-day .hol { flex: 1; min-width: 0; margin: 0 0 0 6px; font-size: 10px; line-height: 22px; color: #e03b3b; opacity: .85; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gt td.d { position: relative; }
+.holv { position: absolute; left: 0; top: 0; width: 100%; height: var(--tbh, 400px); display: flex; justify-content: flex-start; align-items: center; writing-mode: vertical-rl; font-size: 10px; line-height: 1; letter-spacing: 1px; white-space: nowrap; overflow: hidden; color: rgba(0, 0, 0, .3); pointer-events: none; z-index: 1; padding-top: 6px; box-sizing: border-box; }
+@media print { .holv { color: rgba(0, 0, 0, .35); } }
+.nmw .pm, .nmw .acts .pm, .nmw .acts .pm.clr, .nmw > .pm.clr { box-sizing: border-box; width: 30px; min-width: 30px; max-width: 30px; height: 22px; padding: 0; text-align: center; }
+.gt td.d { overflow: visible; }

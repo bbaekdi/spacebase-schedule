@@ -181,7 +181,7 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await a.locator(`tr.done[data-t="${wsId}"]`).count()) === 1, `완료 체크 → 진행률 올라감 (${p0}% → ${await pct()}%)`);
   await a.screenshot({ path: SH + '/s1-site.png' });
   // 일정 지우기: ✕ (공정은 표에 남음)
-  await a.hover(`tr[data-t="${fId}"]`); await a.click(`tr[data-t="${fId}"] .x`);
+  await a.hover(`tr[data-t="${fId}"]`); await a.click(`tr[data-t="${fId}"] [data-clear]`);
   await new Promise((r) => setTimeout(r, 600));
   const f5 = await get(`site/p1/tasks/${fId}`);
   log(!f5.start && !f5.end && !f5.plus && !f5.minus && f5.name === '필름' && (await a.locator(`tr[data-t="${fId}"]`).count()) === 1 && (await a.locator(`tr[data-t="${fId}"] td.d.on`).count()) === 0, '이름 옆 ✕ → 일정만 지워지고 공정은 표에 남음');
@@ -227,6 +227,22 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await a.locator('.st-wk').count()) === 3 && W0 === S_add(sun(TODAY), -7), '캘린더 3주: 지난주 · 이번 주 · 다음 주');
   await a.click('[data-wk="7"]'); const W1 = await a.getAttribute('.st-wk >> nth=0 >> .st-day >> nth=0', 'data-day'); await a.click('[data-wk="0"]');
   log(W1 === S_add(W0, 7), '› 누르면 한 주씩 넘어감');
+  // 공휴일 이름: 캘린더 날짜 옆에 작게 / 공정표에는 연한 세로 글씨
+  const nh = await a.evaluate((t) => Object.keys(window.SB_HOLIDAYS).sort().find((d) => d > t), TODAY), nhName = await a.evaluate((d) => window.SB_HOLIDAYS[d], nh);
+  for (let i = 0; i < 70 && !(await a.locator(`.st-month .st-day[data-day="${nh}"]`).count()); i++) await a.click('[data-wk="7"]');
+  const hol = a.locator(`.st-month .st-day[data-day="${nh}"] .hol`);
+  log((await hol.innerText()) === nhName && (await hol.evaluate((e) => parseFloat(getComputedStyle(e).fontSize))) <= 11, `캘린더: 공휴일 옆에 이름이 작게 (${nh} ${nhName})`);
+  await a.click('[data-wk="0"]');
+  const tdays = await a.locator('table.gt tbody tr:first-child td.d[data-day]').evaluateAll((els) => els.map((e) => e.dataset.day));
+  const hd = await a.evaluate((days) => days.find((d) => window.SB_HOLIDAYS[d]), tdays);
+  if (hd) {
+    const hv = a.locator(`table.gt tbody tr:first-child td.d[data-day="${hd}"] .holv`), hvb = await hv.boundingBox();
+    const hs = await hv.evaluate((e) => { const c = getComputedStyle(e); return { wm: c.writingMode, col: c.color, ov: getComputedStyle(e.parentElement).overflow }; });
+    log((await hv.innerText()) === (await a.evaluate((d) => window.SB_HOLIDAYS[d], hd)) && /vertical/.test(hs.wm) && hvb.height > 300 && hvb.width < 40 && hs.ov === 'visible' && /0\.\d+\)$/.test(hs.col), `공정표: 공휴일 이름이 연하게 세로로 길게 (${hd})`);
+  } else log(true, '공정표: (이 기간에는 공휴일이 없어 건너뜀)');
+  await hv(mokId);
+  const sizes = await a.evaluate((id) => ['[data-clear]', '[data-ins]', '[data-del]'].map((q) => { const b = document.querySelector(`tr[data-t="${id}"] ${q}`).getBoundingClientRect(); return Math.round(b.width) + 'x' + Math.round(b.height); }), mokId);
+  log(new Set(sizes).size === 1 && parseInt(sizes[0]) >= 28, `✕ ＋ － 버튼이 모두 같은 크기·모양 (${sizes.join(' / ')})`);
   const segTexts = await a.locator('.st-seg').allInnerTexts();
   log(segTexts.length > 0 && segTexts.every((t) => /^.+ \d+일$/.test(t.trim())) && !segTexts.some((t) => /벽체|설치|작업/.test(t)), `막대는 "공종 며칠" 만 (${segTexts.slice(0, 3).join(' / ')} …)`);
   log((await a.locator('.st-seg[data-cat="전기공사"]').first().innerText()).trim() === '전기공사 19일', '며칠 = 그 공종 공정이 있는 날 (전기공사 19일)');
@@ -261,7 +277,7 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   // 다른 직원 (소장 아님)
   const { p: b } = await user('b@test.com', '이시험', false);
   await b.waitForSelector('.st-head h1');
-  log((await b.locator('[data-calreg]').count()) === 0 && (await b.locator('[data-per]').count()) === 0 && (await b.locator('.st-seg.drag').count()) === 0 && (await b.locator('[data-std]').count()) === 0 && (await b.locator('.gt-add').count()) === 0 && (await b.locator('.gt.edit').count()) === 0 && (await b.locator('.gt .nmw .x').count()) === 0 && (await b.locator('.gt input.chk').count()) === 0, '소장 아닌 직원: 일정 등록·기간 고치기·추가·끌기 없음 (보기만)');
+  log((await b.locator('[data-calreg]').count()) === 0 && (await b.locator('[data-per]').count()) === 0 && (await b.locator('.st-seg.drag').count()) === 0 && (await b.locator('[data-std]').count()) === 0 && (await b.locator('.gt-add').count()) === 0 && (await b.locator('.gt.edit').count()) === 0 && (await b.locator('.gt [data-clear]').count()) === 0 && (await b.locator('.gt input.chk').count()) === 0, '소장 아닌 직원: 일정 등록·기간 고치기·추가·끌기 없음 (보기만)');
   log((await b.locator('.gt td.d.on').count()) > 0 && (await b.locator('.st-seg').count()) > 0, '다른 직원도 표·캘린더를 봄');
   await b.goto(B + 'band.html'); await b.waitForTimeout(1500);
   await put('board/posts/old_att', { cat: 'attend', text: '옛 출근 글', siteName: '테스트 오피스', uid: 'x', name: '옛', at: 5, commentCount: 0 });
@@ -292,7 +308,7 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await m.locator(`tr[data-t="${mf}"] td.d[data-day="${TODAY}"]`).tap(); await new Promise((r) => setTimeout(r, 700));
   const mf1 = await get(`site/p1/tasks/${mf}`);
   log(mf1.start === TODAY && mf1.end === TODAY, '휴대폰 칸 누르기: 일정 없는 공정은 그날로 시작');
-  await m.locator(`tr[data-t="${mf}"] .x`).first().tap(); await new Promise((r) => setTimeout(r, 700));
+  await m.locator(`tr[data-t="${mf}"] [data-clear]`).first().tap(); await new Promise((r) => setTimeout(r, 700));
   log(!(await get(`site/p1/tasks/${mf}/start`)), '휴대폰: ✕ 로 일정 지우기');
   log((await m.locator('.st-wk').count()) === 3 && (await m.locator('.st-seg.drag').count()) === 0 && (await m.locator('.st-seg').count()) > 0, '휴대폰: 3주 캘린더는 보기만');
   await m.screenshot({ path: SH + '/s3-mobile.png', fullPage: true });

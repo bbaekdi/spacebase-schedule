@@ -77,6 +77,7 @@
       </div>
       ${calCard(s, withPreview(tl), canEdit(s))}
       ${gtCard(s, tl, canEdit(s))}`;
+    fitHol();
     if (focusSel) { const el = $(focusSel); if (el) { el.focus(); if (el.select) el.select(); focusSel = null; } }
     const pick = $('#pick'); if (pick) pick.onchange = () => { location.hash = 's=' + encodeURIComponent(pick.value); };
     // 옆으로 밀어 둔 자리 유지, 처음 열 때는 오늘이 보이게
@@ -87,6 +88,8 @@
     }
   }
 
+  // 공휴일 세로 글씨 높이 = 표 몸통 높이
+  const fitHol = () => document.querySelectorAll('table.gt').forEach((t) => { const b = t.querySelector('tbody'); if (b) t.style.setProperty('--tbh', b.offsetHeight + 'px'); });
   // 표에 보일 날짜: 공사기간 전체 (공정이 기간 밖에 있으면 그만큼 넓힘)
   function daysRange(s, tl) {
     const ds = tl.flatMap((t) => S.daysOf(t)).sort();
@@ -135,13 +138,16 @@
       <tr>${days.map((d) => `<th class="dw ${dayCls(d)} ${colCls(d)}">${WD[S.parse(d).getDay()]}</th>`).join('')}</tr>
       <tr>${days.map((d) => { const n = n0 ? S.diffDays(n0, d) + 1 : 0; return `<th class="dp ${colCls(d)}">${d === jg ? '준공' : n > 0 ? n : ''}</th>`; }).join('')}</tr></thead>`;
     const groups = groupsOf(tl);
+    let firstRow = true; // 공휴일·명절 이름은 첫 줄 칸에 세로로 길게 (칸은 합치지 않음)
     const rows = groups.map(([cat, ts]) => ts.map((t, k) => {
+      const isFirst = firstRow; firstRow = false;
       const ds = S.daysOf(t);
       const cells = days.map((d) => {
         const on = S.activeOn(t, d);
         const hl = drag && on && d === t.start ? '<i class="hl" data-edge="start"></i>' : '';
         const hr = drag && on && d === (t.end || t.start) ? '<i class="hr" data-edge="end"></i>' : '';
-        return `<td class="d ${on ? 'on' : ''} ${colCls(d)}" data-day="${d}">${hl}${hr}</td>`;
+        const hv = isFirst && H()[d] ? `<span class="holv">${esc(H()[d])}</span>` : '';
+        return `<td class="d ${on ? 'on' : ''} ${colCls(d)}" data-day="${d}">${hv}${hl}${hr}</td>`;
       }).join('');
       // 공종 칸: PC 는 바로 고치는 글자칸 (합쳐진 칸 = 그 공종 전체 이름 바꾸기) + 마우스를 올리면 ＋(아래에 새 공종)
       const catCell = k !== 0 ? '' : drag
@@ -149,8 +155,8 @@
         : `<td class="cat" rowspan="${ts.length}">${esc(cat)}</td>`;
       // 공종 상세 칸: PC 는 바로 고치는 글자칸 + ⋮⋮(끌어서 순서) + 마우스를 올리면 ✕ ＋ －, 휴대폰은 글자만 (✕ 는 누를 수 있음)
       const nmCell = drag
-        ? `<td class="nm"><div class="nmw"><span class="rgrip" title="끌어서 줄 순서 바꾸기 (또는 Alt+↑/↓)">⋮⋮</span><input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료"><input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공종 상세 (눌러서 바로 수정)"><span class="acts">${ds.length ? '<i class="x" data-clear title="일정 지우기 (이름은 남아요)">✕</i>' : ''}<button type="button" class="pm" data-ins="1" title="이 줄 아래에 줄 추가">＋</button><button type="button" class="pm del" data-del title="이 줄 삭제 (Ctrl+Z 로 되돌려요)">－</button></span></div></td>`
-        : `<td class="nm"><div class="nmw">${edit ? `<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료">` : t.done ? '<span class="ok">✓</span>' : ''}<span class="nmt" title="${esc(t.name)}">${esc(t.name)}</span>${edit && ds.length ? '<i class="x" data-clear title="일정 지우기 (공정 이름은 남아요)">✕</i>' : ''}</div></td>`;
+        ? `<td class="nm"><div class="nmw"><span class="rgrip" title="끌어서 줄 순서 바꾸기 (또는 Alt+↑/↓)">⋮⋮</span><input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료"><input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공종 상세 (눌러서 바로 수정)"><span class="acts">${ds.length ? '<button type="button" class="pm clr" data-clear title="일정 지우기 (이름은 남아요)">✕</button>' : ''}<button type="button" class="pm" data-ins="1" title="이 줄 아래에 줄 추가">＋</button><button type="button" class="pm del" data-del title="이 줄 삭제 (Ctrl+Z 로 되돌려요)">－</button></span></div></td>`
+        : `<td class="nm"><div class="nmw">${edit ? `<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료">` : t.done ? '<span class="ok">✓</span>' : ''}<span class="nmt" title="${esc(t.name)}">${esc(t.name)}</span>${edit && ds.length ? '<button type="button" class="pm clr" data-clear title="일정 지우기 (공정 이름은 남아요)">✕</button>' : ''}</div></td>`;
       return `<tr class="${k === 0 ? 'g1' : ''} ${t.done ? 'done' : ''} ${isLive(t.id) ? 'live' : ''}" data-t="${esc(t.id)}">${catCell}${nmCell}${cells}</tr>`;
     }).join('')).join('');
     return `<table class="gt ${drag ? 'drag' : ''} ${edit ? 'edit' : ''}" style="--n:${days.length}"><colgroup><col class="c-cat"><col class="c-nm">${days.map(() => '<col class="c-d">').join('')}</colgroup>${head}<tbody>${rows}</tbody></table>`;
@@ -185,7 +191,7 @@
       });
       const lanes = [];
       segs.forEach((g) => { let l = lanes.findIndex((end) => end <= g.a); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = g.b; g.l = l; });
-      const cells = w.map((d) => `<div class="st-day ${d === day ? 'today' : ''}" data-day="${d}"><span class="n ${dayCls(d)}">${+d.slice(8) === 1 || d === w[0] ? `${+d.slice(5, 7)}/${+d.slice(8)}` : +d.slice(8)}</span></div>`).join('');
+      const cells = w.map((d) => `<div class="st-day ${d === day ? 'today' : ''}" data-day="${d}"><span class="n ${dayCls(d)}">${+d.slice(8) === 1 || d === w[0] ? `${+d.slice(5, 7)}/${+d.slice(8)}` : +d.slice(8)}</span>${H()[d] ? `<span class="hol" title="${esc(H()[d])}">${esc(H()[d])}</span>` : ''}</div>`).join('');
       const bars = segs.map((g) => {
         const live = ts_live(tl, g.c.cat);
         const fill = isNow ? `background:${g.c.col.fill};color:#2b2b28;` : `background:#fff;color:${g.c.col.line};border:1.5px dashed ${g.c.col.line};line-height:17px;`;
@@ -409,7 +415,7 @@
   // 마우스 아래 날짜 (어느 줄이든 그 열의 날짜)
   const dayAt = (x, y) => { const el = document.elementsFromPoint(x, y).find((n) => n.matches && n.matches('table.gt td[data-day], .st-month .st-day[data-day]')); return el ? el.dataset.day : null; };
   // 표만 다시 그림 (끄는 동안)
-  const renderTable = () => { const sc = $('.gt-scroll'); if (!sc || !cur) return; const l = sc.scrollLeft; sc.innerHTML = gtTable(cur, withPreview(S.taskList(tasksOf(cur.id))), canEdit(cur)); sc.scrollLeft = l; };
+  const renderTable = () => { const sc = $('.gt-scroll'); if (!sc || !cur) return; const l = sc.scrollLeft; sc.innerHTML = gtTable(cur, withPreview(S.taskList(tasksOf(cur.id))), canEdit(cur)); sc.scrollLeft = l; fitHol(); };
   const renderCal = () => { const el = document.querySelector('.st-calcard'); if (el && cur) el.outerHTML = calCard(cur, withPreview(S.taskList(tasksOf(cur.id))), canEdit(cur)); };
   const renderLive = () => { renderTable(); renderCal(); };
   let drag = null;
