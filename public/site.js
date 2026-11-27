@@ -106,7 +106,7 @@
 
   function gtCard(s, tlRaw, edit) {
     const tl = tlRaw, drag = edit && canDrag();
-    const help = !edit ? '보기만 (수정: 소장님·관리자)' : listEdit ? '엑셀처럼 줄 옆의 +위 / +아래 로 줄을 넣고, 삭제로 줄을 지워요 · 공종 칸에 새 이름을 쓰면 새 공종이 돼요' : drag ? '일정 없는 공정은 그 줄의 빈 칸을 마우스로 끌어 칠하면 일정이 돼요 · 회색 칸을 끌면 옮기기 · 끝을 끌면 늘리기 · 이름 옆 ✕ = 일정 지우기 · 칸 누르기 = 그날 켜고 끄기' : '칸을 눌러 그날 켜고 끄기 · 이름 옆 ✕ = 일정 지우기';
+    const help = !edit ? '보기만 (수정: 소장님·관리자)' : listEdit ? '엑셀처럼 줄 옆의 +위 / +아래 로 줄을 넣고, 삭제로 줄을 지워요 · 공종 칸에 새 이름을 쓰면 새 공종이 돼요' : drag ? '빈 칸을 마우스로 끌어 칠하면 일정이 돼요(다른 날도 또 칠할 수 있어요) · 회색 칸을 끌면 옮기기 · 끝을 끌면 늘리기 · 이름 옆 ✕ = 일정 지우기 · 칸 누르기 = 그날 켜고 끄기 · Ctrl+Z = 되돌리기' : '칸을 눌러 그날 켜고 끄기 · 이름 옆 ✕ = 일정 지우기';
     return `<div class="card gt-card"><div class="card-h"><h2>공정표</h2><span class="st-ro">${help}</span>
         <span class="gt-btns">${edit ? `<button type="button" class="btn ${listEdit ? 'primary' : ''}" data-listedit>${listEdit ? '다 고쳤어요' : '공정 목록 고치기'}</button><button type="button" class="btn" data-std>표준 공정표 넣기</button>` : ''}<button type="button" class="btn" data-print>인쇄</button></span></div>
       ${stdOpen && edit ? stdForm(s, tl) : ''}
@@ -202,6 +202,45 @@
 
   // ---------- 저장 ----------
   const tRef = (id) => db.ref('site/' + cur.id + '/tasks/' + id);
+  // 되돌리기(Ctrl+Z) · 다시 하기(Ctrl+Shift+Z / Ctrl+Y): 공정 쓰기는 모두 write() 를 거쳐 "바꾸기 전 값"을 기억함 (이 화면을 열어 둔 동안만, 현장을 바꾸면 비움)
+  let undoStack = [], redoStack = [];
+  const clone = (v) => (v === undefined || v === null ? null : JSON.parse(JSON.stringify(v)));
+  const getAt = (o, path) => path.split('/').reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
+  function write(up, label) {
+    const pid = cur.id, T = tasksOf(pid), before = {};
+    Object.keys(up).forEach((k) => { before[k] = clone(getAt(T, k)); });
+    undoStack.push({ pid, label, before, after: clone(up) || {} }); if (undoStack.length > 60) undoStack.shift(); redoStack = [];
+    return db.ref('site/' + pid + '/tasks').update(up).catch(fail);
+  }
+  const writeTask = (id, obj, label) => write(Object.fromEntries(Object.entries(obj).map(([k, v]) => [id + '/' + k, v === undefined ? null : v])), label);
+  // 되돌릴 때는 쓴 사람 표시(by/at)를 지금 사람으로 새로 찍음 (규칙: by 는 내 이름이어야 함)
+  function restoreMap(m) {
+    const up = {}, ids = new Set();
+    Object.entries(m).forEach(([k, v]) => {
+      const seg = k.split('/');
+      if (seg.length === 2 && (seg[1] === 'by' || seg[1] === 'at')) return;
+      if (seg.length === 1) { up[k] = v ? { ...v, by: me.name, at: Date.now() } : null; return; }
+      up[k] = v; ids.add(seg[0]);
+    });
+    ids.forEach((id) => { if (!(id in up)) { up[id + '/by'] = me.name; up[id + '/at'] = Date.now(); } });
+    return up;
+  }
+  function undoRedo(redo) {
+    const from = redo ? redoStack : undoStack, e = from.pop();
+    if (!e || !cur || cur.id !== e.pid) { if (e) from.length = 0; return flash(redo ? '다시 할 게 없어요.' : '되돌릴 게 없어요.'); }
+    (redo ? undoStack : redoStack).push(e);
+    return db.ref('site/' + e.pid + '/tasks').update(restoreMap(redo ? e.after : e.before)).then(() => flash((redo ? '다시 했어요: ' : '되돌렸어요: ') + e.label)).catch(fail);
+  }
+  // 글자를 쓰는 중(바꾼 글자가 있는 입력칸)에는 글자 되돌리기, 아니면 공정표 되돌리기
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const k = String(e.key).toLowerCase(); if (k !== 'z' && k !== 'y') return;
+    const ae = document.activeElement;
+    if (ae && ae.matches('input[type=text], input[type=date], textarea') && ae.value !== ae.defaultValue) return;
+    if (!cur || !canEdit(cur) || !document.querySelector('.gt')) return;
+    e.preventDefault();
+    undoRedo(k === 'y' || e.shiftKey);
+  });
   const stamp = () => ({ by: me.name, at: Date.now() });
   const fail = (e) => alert('저장하지 못했어요: ' + e.message);
   const shiftMap = (m, n) => { if (!m) return null; const o = {}; Object.keys(m).forEach((d) => { o[S.addDays(d, n)] = true; }); return Object.keys(o).length ? o : null; };
@@ -211,7 +250,7 @@
   function clearSchedule(id) {
     const t = tasksOf(cur.id)[id]; if (!t) return;
     if (!confirm(`"${t.name}" 일정을 지울까요?\n공정은 표에 그대로 남아요.`)) return;
-    return tRef(id).update({ start: null, end: null, plus: null, minus: null, ...stamp() }).catch(fail);
+    return writeTask(id, { start: null, end: null, plus: null, minus: null, ...stamp() }, '일정 지우기');
   }
   // 끝 잡아 늘리기/줄이기한 모습 (기간 밖의 쉬는 날은 정리, 기간 밖에 따로 더한 날은 그대로)
   function resized(t, edge, day) {
@@ -223,6 +262,12 @@
   }
   // 칠한 모습 (일정 없는 공정: from~to)
   const painted = (a, b) => (a <= b ? { start: a, end: b } : { start: b, end: a });
+  // 이미 일정이 있는 공정의 빈 칸을 끌면 그 구간이 더해짐 (기간 밖은 "더한 날", 쉬는 날로 꺼 둔 날은 다시 켬)
+  function paintedMore(t, a, b) {
+    const lo = a <= b ? a : b, hi = a <= b ? b : a, plus = { ...(t.plus || {}) }, minus = { ...(t.minus || {}) };
+    for (let d = lo, i = 0; d <= hi && i < 400; d = S.addDays(d, 1), i++) { if (S.activeOn(t, d)) continue; if (minus[d]) delete minus[d]; else plus[d] = true; }
+    return { start: t.start || null, end: t.end || null, plus: Object.keys(plus).length ? plus : null, minus: Object.keys(minus).length ? minus : null };
+  }
   // 칸 누르기: 그날 켜고 끄기 (일정 없는 공정은 그날 하루로 시작)
   function toggleDay(id, d) {
     const t = tasksOf(cur.id)[id]; if (!t) return;
@@ -230,7 +275,7 @@
     if (!S.daysOf(t).length) { up.start = d; up.end = d; up.plus = null; up.minus = null; }
     else if (S.activeOn(t, d)) { if (t.plus && t.plus[d]) up['plus/' + d] = null; else up['minus/' + d] = true; }
     else { if (t.minus && t.minus[d]) up['minus/' + d] = null; else up['plus/' + d] = true; }
-    return tRef(id).update(up).catch(fail);
+    return writeTask(id, up, '칸 누르기');
   }
   // 착공·준공 고치기: 주간 스케줄 공사기간(period 글자)만 바꿔 저장 (다른 칸은 안 건드림)
   function savePeriod(st, en) {
@@ -264,7 +309,7 @@
     const key = db.ref().push().key;
     up[key] = { name: '새 공정', order: at, ...(t && t.cat ? { cat: t.cat } : {}), ...stamp() };
     focusId = key;
-    return db.ref('site/' + cur.id + '/tasks').update(up).catch((e) => { focusId = null; fail(e); });
+    return write(up, '줄 추가');
   }
   // 표준 공정표 넣기: 이름이 같은 공정은 공종·날짜만 바꾸고, 없는 공정은 새로 (다른 공정은 그대로)
   function putStd(st) {
@@ -277,7 +322,7 @@
       else up[db.ref().push().key] = { cat, name, order: i + 1, start: d.start, end: d.end, ...(d.plus ? { plus: d.plus } : {}), ...stamp() };
     });
     stdOpen = false;
-    return db.ref('site/' + cur.id + '/tasks').update(up).catch(fail);
+    return write(up, '표준 공정표 넣기');
   }
 
   // ---------- 누르기 ----------
@@ -298,7 +343,7 @@
     const tr = e.target.closest('tr[data-t]');
     const clr = e.target.closest('[data-clear]');
     if (clr) { const host = clr.closest('[data-t]'); if (host) clearSchedule(host.dataset.t); return; }
-    if (tr && e.target.closest('[data-del]')) { const t = tasks[tr.dataset.t]; if (confirm(`"${t.name}" 공정을 삭제할까요?`)) tRef(tr.dataset.t).remove().catch(fail); return; }
+    if (tr && e.target.closest('[data-del]')) { const t = tasks[tr.dataset.t]; if (confirm(`"${t.name}" 공정을 삭제할까요?`)) write({ [tr.dataset.t]: null }, '줄 삭제'); return; }
     const ins = e.target.closest('[data-ins]');
     if (tr && ins) return insertRow(tr.dataset.t, +ins.dataset.ins);
     const mv = e.target.closest('[data-mv]');
@@ -306,7 +351,7 @@
       const tl = S.taskList(tasks), i = tl.findIndex((t) => t.id === tr.dataset.t), j = i + +mv.dataset.mv;
       if (j < 0 || j >= tl.length) return;
       const up = {}; [tl[i], tl[j]] = [tl[j], tl[i]]; tl.forEach((t, k) => { if ((t.order || 0) !== k + 1) up[t.id + '/order'] = k + 1; });
-      return db.ref('site/' + cur.id + '/tasks').update(up).catch(fail);
+      return write(up, '줄 순서 바꾸기');
     }
     // 휴대폰: 칸 누르기 (PC 는 아래 끌기에서 처리)
     const td = e.target.closest('table.gt.edit td.d[data-day]');
@@ -322,9 +367,9 @@
     if (!cur || !canEdit(cur)) return;
     const tr = e.target.closest('tr[data-t]'); if (!tr) return;
     const t = tasksOf(cur.id)[tr.dataset.t]; if (!t) return;
-    if (e.target.classList.contains('chk')) tRef(tr.dataset.t).update({ done: e.target.checked, ...stamp() }).catch(fail);
-    if (e.target.classList.contains('nmc')) { const v = e.target.value.trim().slice(0, 30); if (v && v !== t.name) tRef(tr.dataset.t).update({ name: v, ...stamp() }).catch(fail); else e.target.value = t.name; }
-    if (e.target.classList.contains('catc')) { const v = e.target.value.trim().slice(0, 20); if (v !== (t.cat || '')) tRef(tr.dataset.t).update({ cat: v || null, ...stamp() }).catch(fail); }
+    if (e.target.classList.contains('chk')) writeTask(tr.dataset.t, { done: e.target.checked, ...stamp() }, '완료 체크');
+    if (e.target.classList.contains('nmc')) { const v = e.target.value.trim().slice(0, 30); if (v && v !== t.name) writeTask(tr.dataset.t, { name: v, ...stamp() }, '이름 고치기'); else e.target.value = t.name; }
+    if (e.target.classList.contains('catc')) { const v = e.target.value.trim().slice(0, 20); if (v !== (t.cat || '')) writeTask(tr.dataset.t, { cat: v || null, ...stamp() }, '공종 고치기'); }
   });
 
   // ---------- 끌기 (PC) ----------
@@ -353,18 +398,17 @@
     const day = td.dataset.day, edge = (e.target.dataset && e.target.dataset.edge) || null;
     const has = S.daysOf(t).length > 0;
     // 끝 손잡이 = 늘리기, 회색 칸 = 옮기기, 일정 없는 공정의 빈 칸 = 칠하기, 그 밖의 빈 칸 = 누르기만
-    const mode = edge ? 'resize' : td.classList.contains('on') ? 'move' : !has ? 'paint' : 'tap';
-    drag = { src: 'table', id: tr.dataset.t, mode, edge, from: day, to: day, t };
+    const mode = edge ? 'resize' : td.classList.contains('on') ? 'move' : 'paint';
+    drag = { src: 'table', id: tr.dataset.t, mode, edge, from: day, to: day, t, has };
     document.body.classList.add('st-dragging');
   });
   document.addEventListener('pointermove', (e) => {
     if (!drag) return;
     const d = dayAt(e.clientX, e.clientY); if (!d || d === drag.to) return;
-    if (drag.mode === 'tap') { drag.moved = true; return; } // 일정 있는 공정의 빈 칸을 끌면 아무 일도 안 함
     drag.to = d;
     if (drag.src === 'cal') { const n = S.diffDays(drag.from, d); preview = { tasks: Object.fromEntries(drag.ts.map((t) => [t.id, shifted(t, n)])) }; }
     else {
-      const next = drag.mode === 'resize' ? resized(drag.t, drag.edge, d) : drag.mode === 'paint' ? painted(drag.from, d) : shifted(drag.t, S.diffDays(drag.from, d));
+      const next = drag.mode === 'resize' ? resized(drag.t, drag.edge, d) : drag.mode === 'paint' ? (drag.has ? paintedMore(drag.t, drag.from, d) : painted(drag.from, d)) : shifted(drag.t, S.diffDays(drag.from, d));
       preview = { tasks: { [drag.id]: next } };
     }
     renderLive();
@@ -373,7 +417,6 @@
     if (!drag) return;
     const g = drag; drag = null; document.body.classList.remove('st-dragging');
     const commit = preview; preview = null;
-    if (g.mode === 'tap' && g.moved) return;
     if (g.to === g.from || !commit) { // 움직이지 않았으면: 표 = 칸 누르기, 캘린더 = 아무 일 없음
       renderLive();
       if (g.src === 'table') return toggleDay(g.id, g.from);
@@ -381,7 +424,7 @@
     }
     const up = {};
     Object.entries(commit.tasks).forEach(([id, t]) => { up[id + '/start'] = t.start || null; up[id + '/end'] = t.end || null; up[id + '/plus'] = t.plus || null; up[id + '/minus'] = t.minus || null; up[id + '/by'] = me.name; up[id + '/at'] = Date.now(); });
-    db.ref('site/' + cur.id + '/tasks').update(up).catch(fail);
+    write(up, g.src === 'cal' ? '공종 옮기기' : g.mode === 'paint' ? '일정 넣기' : g.mode === 'resize' ? '일정 늘리기·줄이기' : '일정 옮기기');
     renderLive();
   });
 
@@ -391,7 +434,7 @@
     const L = lists();
     const prev = cur && cur.id;
     cur = L.all.find((s) => s.id === id) || (id ? null : L.active[0] || L.undated[0] || null);
-    if ((cur && cur.id) !== prev) { listEdit = false; stdOpen = false; perOpen = false; }
+    if ((cur && cur.id) !== prev) { listEdit = false; stdOpen = false; perOpen = false; undoStack = []; redoStack = []; }
     drawSide(); drawMain();
   }
   window.addEventListener('hashchange', route);

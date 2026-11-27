@@ -75,6 +75,18 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log(nm.length === 39 && nm.indexOf('새 공정') === nm.indexOf('필름') - 1, '+위: 그 줄 바로 위에 새 줄');
   await a.locator('tr:has(input.nmc[value="새 공정"]) [data-del]').click(); await new Promise((r) => setTimeout(r, 600));
   log((await names()).length === 38 && !(await names()).includes('새 공정'), '삭제: 그 줄 지우기 (엑셀처럼)');
+  await a.keyboard.press('Control+z'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 39);
+  nm = await names();
+  log(nm.includes('새 공정') && nm.indexOf('새 공정') === nm.indexOf('필름') - 1, 'Ctrl+Z → 지운 줄이 제자리로 돌아옴');
+  await a.keyboard.press('Control+Shift+z'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 38);
+  log(!(await names()).includes('새 공정'), 'Ctrl+Shift+Z → 다시 지움');
+  await a.keyboard.press('Control+z'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 39);
+  await a.keyboard.press('Control+z'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 38 && !document.querySelector('input.nmc[value="새 공정"]'));
+  await a.keyboard.press('Control+z'); await a.waitForFunction(() => !!document.querySelector('input.nmc[value="새 공정"]') && !document.querySelector('input.nmc[value="필름"]'));
+  log(true, 'Ctrl+Z 를 계속 누르면 줄 추가·이름 쓰기도 한 단계씩 거꾸로 돌아감');
+  for (let i = 0; i < 3; i++) { await a.keyboard.press('Control+Shift+z'); await new Promise((r) => setTimeout(r, 700)); }
+  await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 38 && !!document.querySelector('input.nmc[value="필름"]'));
+  log(true, 'Ctrl+Shift+Z 로 다시 앞으로 (필름 줄이 돌아옴)');
   const jb = a.locator('tr[data-t] input.nmc[value="잔손보기"]'); await jb.fill('잔손 보기'); await jb.press('Tab');
   await a.waitForSelector('tr[data-t] input.nmc[value="잔손 보기"]');
   log(true, '공정 이름 고치기');
@@ -87,7 +99,11 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   const pdrag = async (from, to, hold) => { await a.locator(from).scrollIntoViewIfNeeded(); const f = await a.locator(from).boundingBox(), t = await a.locator(to).boundingBox(); await a.mouse.move(f.x + f.width / 2, f.y + f.height / 2); await a.mouse.down(); await a.mouse.move(t.x + t.width / 2, t.y + t.height / 2, { steps: 8 }); if (hold) return hold(); await a.mouse.up(); await new Promise((r) => setTimeout(r, 700)); };
   await pdrag(cell(fId, TODAY), cell(fId, plus(2)));
   const f1 = await get(`site/p1/tasks/${fId}`);
-  log(f1.start === TODAY && f1.end === plus(2), '빈 칸 끌어 칠하기 → 오늘~2일 뒤 (일정 없는 공정만)');
+  log(f1.start === TODAY && f1.end === plus(2), '빈 칸 끌어 칠하기 → 오늘~2일 뒤');
+  await a.keyboard.press('Control+z'); await new Promise((r) => setTimeout(r, 800));
+  log(!(await get(`site/p1/tasks/${fId}/start`)) && (await a.locator(`tr[data-t="${fId}"] td.d.on`).count()) === 0, 'Ctrl+Z → 방금 칠한 일정이 사라짐');
+  await a.keyboard.press('Control+y'); await new Promise((r) => setTimeout(r, 800));
+  log((await get(`site/p1/tasks/${fId}/start`)) === TODAY && (await get(`site/p1/tasks/${fId}/end`)) === plus(2), 'Ctrl+Y → 다시 칠해짐');
   // 끝 손잡이로 늘리기 (→ 4일 뒤)
   await pdrag(`${cell(fId, plus(2))} .hr`, cell(fId, plus(4)));
   const f2 = await get(`site/p1/tasks/${fId}`);
@@ -103,10 +119,15 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   await pdrag(cell(fId, plus(1)), cell(fId, TODAY));
   const f4 = await get(`site/p1/tasks/${fId}`);
   log(f4.start === TODAY && f4.end === plus(4), '다시 오늘~4일 뒤로');
-  // 일정 있는 공정의 빈 칸을 끌어도 새 일정이 안 생김 (같은 기능은 한 가지 방법)
+  // 일정이 있는 공정에도 다른 날 빈 칸을 끌면 그 구간이 더해짐 (여러 구간)
   await pdrag(cell(mokId, plus(10)), cell(mokId, plus(12)));
   const m1 = await get(`site/p1/tasks/${mokId}`);
-  log(m1.start === plus(-1) && m1.end === plus(3) && !m1.plus, '일정 있는 공정의 빈 칸 끌기 → 아무 일 없음');
+  log(m1.start === plus(-1) && m1.end === plus(3) && !!m1.plus && !!m1.plus[plus(10)] && !!m1.plus[plus(11)] && !!m1.plus[plus(12)] && Object.keys(m1.plus).length === 3 && (await a.locator(`${cell(mokId, plus(11))}.on`).count()) === 1, '이미 일정이 있어도 다른 날 빈 칸을 끌면 구간이 더해짐 (두 번째·세 번째 구간)');
+  await pdrag(cell(mokId, plus(16)), cell(mokId, plus(17)));
+  log(Object.keys((await get(`site/p1/tasks/${mokId}/plus`)) || {}).length === 5, '또 다른 날을 끌어도 계속 더해짐');
+  await a.keyboard.press('Control+z'); await new Promise((r) => setTimeout(r, 800));
+  await a.keyboard.press('Control+z'); await new Promise((r) => setTimeout(r, 800));
+  log(!(await get(`site/p1/tasks/${mokId}/plus`)) && (await get(`site/p1/tasks/${mokId}/start`)) === plus(-1), 'Ctrl+Z 두 번 → 더한 구간이 한 단계씩 사라지고 처음 일정은 그대로');
   // 칸 누르기: 하는 날은 쉬는 날로, 다시 누르면 하는 날 / 기간 밖 빈 칸은 그날 더하기
   await a.click(cell(fId, plus(2))); await new Promise((r) => setTimeout(r, 600));
   log((await get(`site/p1/tasks/${fId}/minus/${plus(2)}`)) === true && (await a.locator(`${cell(fId, plus(2))}.on`).count()) === 0, '칸 누르기: 그날만 쉬는 날');
