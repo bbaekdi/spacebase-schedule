@@ -236,9 +236,15 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   const tdays = await a.locator('table.gt tbody tr:first-child td.d[data-day]').evaluateAll((els) => els.map((e) => e.dataset.day));
   const hd = await a.evaluate((days) => days.find((d) => window.SB_HOLIDAYS[d]), tdays);
   if (hd) {
-    const hv = a.locator(`table.gt tbody tr:first-child td.d[data-day="${hd}"] .holv`), hvb = await hv.boundingBox();
+    const hv = a.locator(`table.gt tbody tr:first-child td.d[data-day="${hd}"] .holv > span`), hvb = await hv.boundingBox();
     const hs = await hv.evaluate((e) => { const c = getComputedStyle(e); return { wm: c.writingMode, col: c.color, ov: getComputedStyle(e.parentElement).overflow }; });
-    log((await hv.innerText()) === (await a.evaluate((d) => window.SB_HOLIDAYS[d], hd)) && /vertical/.test(hs.wm) && hvb.height > 300 && hvb.width < 40 && hs.ov === 'visible' && /0\.\d+\)$/.test(hs.col), `공정표: 공휴일 이름이 연하게 세로로 길게 (${hd})`);
+    log((await hv.innerText()) === (await a.evaluate((d) => window.SB_HOLIDAYS[d], hd)) && /vertical/.test(hs.wm) && hvb.height > 20 && hvb.width < 40 && hs.ov === 'visible' && /0\.\d+\)$/.test(hs.col), `공정표: 공휴일 이름이 연하게 세로로 길게 (${hd})`);
+    // 표를 아래로 내려도 보임 (머리 밑에 붙어 따라옴)
+    await a.evaluate(() => { const sc = document.querySelector('.gt-scroll'); sc.scrollTop = 400; });
+    await new Promise((r) => setTimeout(r, 300));
+    const vis = await a.evaluate((d) => { const sc = document.querySelector('.gt-scroll').getBoundingClientRect(), t = document.querySelector(`table.gt tbody tr:first-child td.d[data-day="${d}"] .holv > span`).getBoundingClientRect(); return { top: t.top - sc.top, bottom: sc.bottom - t.bottom, h: t.height }; }, hd);
+    log(vis.top >= 60 && vis.bottom >= 0 && vis.h > 20, `공정표를 아래로 내려도 공휴일 글씨가 머리 밑에 보임 (머리에서 ${Math.round(vis.top)}px 아래)`);
+    await a.evaluate(() => { document.querySelector('.gt-scroll').scrollTop = 0; });
   } else log(true, '공정표: (이 기간에는 공휴일이 없어 건너뜀)');
   await hv(mokId);
   const sizes = await a.evaluate((id) => ['[data-clear]', '[data-ins]', '[data-del]'].map((q) => { const b = document.querySelector(`tr[data-t="${id}"] ${q}`).getBoundingClientRect(); return Math.round(b.width) + 'x' + Math.round(b.height); }), mokId);

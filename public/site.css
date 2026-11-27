@@ -307,3 +307,8 @@ body.st-dragging .nmw .x { display: none !important; }
 @media print { .holv { color: rgba(0, 0, 0, .35); } }
 .nmw .pm, .nmw .acts .pm, .nmw .acts .pm.clr, .nmw > .pm.clr { box-sizing: border-box; width: 30px; min-width: 30px; max-width: 30px; height: 22px; padding: 0; text-align: center; }
 .gt td.d { overflow: visible; }
+
+/* 공휴일 세로 글씨: 표를 아래로 밀어 내려도 머리 밑에 붙어 따라와서 항상 보임 */
+.holv { display: block; padding: 0; overflow: visible; align-items: initial; writing-mode: horizontal-tb; }
+.holv > span { position: sticky; top: 84px; display: inline-block; writing-mode: vertical-rl; font-size: 11px; line-height: 1; letter-spacing: 1px; white-space: nowrap; padding: 6px 0 0 6px; color: rgba(0, 0, 0, .38); }
+@media print { .holv > span { position: static; color: rgba(0, 0, 0, .4); } }

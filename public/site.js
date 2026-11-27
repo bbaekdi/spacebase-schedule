@@ -146,7 +146,7 @@
         const on = S.activeOn(t, d);
         const hl = drag && on && d === t.start ? '<i class="hl" data-edge="start"></i>' : '';
         const hr = drag && on && d === (t.end || t.start) ? '<i class="hr" data-edge="end"></i>' : '';
-        const hv = isFirst && H()[d] ? `<span class="holv">${esc(H()[d])}</span>` : '';
+        const hv = isFirst && H()[d] ? `<span class="holv"><span>${esc(H()[d])}</span></span>` : '';
         return `<td class="d ${on ? 'on' : ''} ${colCls(d)}" data-day="${d}">${hv}${hl}${hr}</td>`;
       }).join('');
       // 공종 칸: PC 는 바로 고치는 글자칸 (합쳐진 칸 = 그 공종 전체 이름 바꾸기) + 마우스를 올리면 ＋(아래에 새 공종)
