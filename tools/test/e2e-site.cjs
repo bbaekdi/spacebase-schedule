@@ -40,12 +40,12 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log(/소장: 김테스트 대리/.test(await a.locator('.st-head').innerText()), '소장 = 주간 스케줄 시공 담당(약칭 김 → 김테스트 대리)');
   // 공정표 한 장 (왼쪽엔 현장 목록만)
   log((await a.locator('#side .st-tp').count()) === 0 && (await a.locator('.gt').count()) === 1, '공정표 (왼쪽엔 현장 목록만)');
-  const row = (n) => `tr:has(.nmt:text-is("${n}"))`, cell = (id, d) => `tr[data-t="${id}"] td.d[data-day="${d}"]`;
+  const row = (n) => `tr:has(input.nmc[value="${n}"])`, cell = (id, d) => `tr[data-t="${id}"] td.d[data-day="${d}"]`;
   // 표준 공정표 넣기: 착공일 기준 날짜 (착공 = 10일 전)
   await a.click('[data-std]'); await a.fill('.gt-std input[name=st]', plus(-10)); await a.click('.gt-std button[type=submit]');
   await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 37);
   log(true, '표준 공정표 넣기 → 공정 37개');
-  log((await a.locator('td.cat[rowspan="4"]:has-text("목공사")').count()) === 1 && (await a.locator('td.cat:has-text("보양,철거공사")').count()) === 1, '공종 칸이 세로로 합쳐짐 (목공사 4줄)');
+  log((await a.locator('td.cat[rowspan="4"]:has(input.catc[value="목공사"])').count()) === 1 && (await a.locator('td.cat:has(input.catc[value="보양,철거공사"])').count()) === 1, '공종 칸이 세로로 합쳐짐 (목공사 4줄)');
   const mokId = await a.getAttribute(row('벽체 MDF 마감판넬 작업'), 'data-t');
   const m0 = await get(`site/p1/tasks/${mokId}`);
   log(m0.cat === '목공사' && m0.start === plus(-1) && m0.end === plus(3), `표준 날짜: 벽체 MDF = 착공 10~14일째 (${m0.start}~${m0.end})`);
@@ -55,46 +55,84 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await a.locator('thead th.dw.red').count()) >= 1 && (await a.locator('thead th.dw.blue').count()) >= 1, '일요일 빨강·토요일 파랑');
   log((await a.locator(`${cell(mokId, TODAY)}`).evaluate((el) => getComputedStyle(el).backgroundColor)).replace(/\s/g, '') !== 'rgb(255,255,255)', '하는 날은 회색 칸');
   log(/오늘 공정[\s\S]*벽체 MDF/.test(await a.locator('.st-stats').innerText()) && !/진행률 \d+%\s*·/.test(await a.locator('.st-head').innerText()), '오늘 하는 공정은 위 카드에 (머리의 긴 한 줄은 없앰)');
-  // 공정 목록 고치기 (엑셀처럼): 줄 위/아래 추가 · 삭제 · 이름 · 순서
-  await a.click('[data-listedit]');
+  // 줄 바로 고치기 (모드 없음): ＋ － 는 마우스를 올릴 때만, 이름·공종은 눌러서 바로 수정
   const names = async () => a.locator('tr[data-t]').evaluateAll((trs) => trs.map((t) => (t.querySelector('input.nmc') || t.querySelector('.nmt')).value || t.querySelector('.nmt').textContent));
-  log((await a.locator('[data-ins]').count()) === 2 * 37 && (await a.locator('.gt-add').count()) === 0, '줄마다 +위 / +아래 버튼 (아래쪽 공정 추가 칸은 없앰)');
-  const mdfBo = await a.getAttribute('tr:has(input.nmc[value="천정 MDF보드 작업"])', 'data-t');
-  await a.click(`tr[data-t="${mdfBo}"] [data-ins="1"]`);
+  const rowsN = () => a.locator('tr[data-t]').count();
+  const hv = (id) => a.hover(`tr[data-t="${id}"] input.nmc`);
+  const waitRows = (n) => a.waitForFunction((n) => document.querySelectorAll('tr[data-t]').length === n, n);
+  log((await a.locator('[data-listedit]').count()) === 0 && !/공정 목록 고치기/.test(await a.locator('.gt-card').innerText()) && (await a.locator('[data-ins]').count()) === 37 && (await a.locator('[data-del]').count()) === 37, '"공정 목록 고치기"는 없고 모든 줄에 ＋ － 가 있음');
+  const mdfBo = await a.getAttribute(row('천정 MDF보드 작업'), 'data-t');
+  const disp0 = await a.locator(`tr[data-t="${mdfBo}"] .acts`).evaluate((e) => getComputedStyle(e).display);
+  await hv(mdfBo);
+  const disp1 = await a.locator(`tr[data-t="${mdfBo}"] .acts`).evaluate((e) => getComputedStyle(e).display);
+  log(disp0 === 'none' && disp1 === 'flex', '＋ － 는 마우스를 올릴 때만 나옴');
+  // 이름 바로 수정 (Enter 로 저장) + Ctrl+Z
+  const mi = a.locator(`tr[data-t="${mdfBo}"] input.nmc`); await mi.fill('천정 MDF보드'); await mi.press('Enter');
+  await a.waitForFunction(async () => true); await new Promise((r) => setTimeout(r, 600));
+  log((await get(`site/p1/tasks/${mdfBo}/name`)) === '천정 MDF보드', '공종 상세 이름을 눌러서 바로 수정 (Enter 로 저장)');
+  await a.keyboard.press('Control+z'); await new Promise((r) => setTimeout(r, 700));
+  log((await get(`site/p1/tasks/${mdfBo}/name`)) === '천정 MDF보드 작업', 'Ctrl+Z → 이름이 원래대로');
+  // ＋ 줄 추가: 이름 칸에 바로 커서, 쓰고 Enter
+  await hv(mdfBo); await a.click(`tr[data-t="${mdfBo}"] [data-ins="1"]`);
   await a.waitForFunction(() => document.activeElement && document.activeElement.classList.contains('nmc') && document.activeElement.value === '새 공정');
   let nm = await names();
-  log(nm.length === 38 && nm.indexOf('새 공정') === nm.indexOf('천정 MDF보드 작업') + 1, '+아래: 그 줄 바로 아래에 새 줄 (같은 공종), 이름 칸에 바로 커서');
-  await a.keyboard.type('필름'); await a.keyboard.press('Tab');
+  log(nm.length === 38 && nm.indexOf('새 공정') === nm.indexOf('천정 MDF보드 작업') + 1, '＋ → 그 줄 바로 아래에 새 줄 (같은 공종), 이름 칸에 바로 커서');
+  await a.keyboard.type('필름'); await a.keyboard.press('Enter');
   await a.waitForSelector('tr[data-t] input.nmc[value="필름"]');
-  nm = await names();
-  log(nm.indexOf('필름') === nm.indexOf('천정 MDF보드 작업') + 1 && (await get(`site/p1/tasks/${await a.getAttribute('tr:has(input.nmc[value="필름"])', 'data-t')}/cat`)) === '목공사', '새 줄 이름을 쓰면 저장 (공종 = 목공사)');
-  const fId0 = await a.getAttribute('tr:has(input.nmc[value="필름"])', 'data-t');
-  await a.click(`tr[data-t="${fId0}"] [data-ins="-1"]`);
-  await a.waitForFunction(() => document.activeElement && document.activeElement.value === '새 공정');
-  nm = await names();
-  log(nm.length === 39 && nm.indexOf('새 공정') === nm.indexOf('필름') - 1, '+위: 그 줄 바로 위에 새 줄');
-  await a.locator('tr:has(input.nmc[value="새 공정"]) [data-del]').click(); await new Promise((r) => setTimeout(r, 600));
-  log((await names()).length === 38 && !(await names()).includes('새 공정'), '삭제: 그 줄 지우기 (엑셀처럼)');
-  await a.keyboard.press('Control+z'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 39);
-  nm = await names();
-  log(nm.includes('새 공정') && nm.indexOf('새 공정') === nm.indexOf('필름') - 1, 'Ctrl+Z → 지운 줄이 제자리로 돌아옴');
-  await a.keyboard.press('Control+Shift+z'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 38);
-  log(!(await names()).includes('새 공정'), 'Ctrl+Shift+Z → 다시 지움');
-  await a.keyboard.press('Control+z'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 39);
-  await a.keyboard.press('Control+z'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 38 && !document.querySelector('input.nmc[value="새 공정"]'));
-  await a.keyboard.press('Control+z'); await a.waitForFunction(() => !!document.querySelector('input.nmc[value="새 공정"]') && !document.querySelector('input.nmc[value="필름"]'));
-  log(true, 'Ctrl+Z 를 계속 누르면 줄 추가·이름 쓰기도 한 단계씩 거꾸로 돌아감');
-  for (let i = 0; i < 3; i++) { await a.keyboard.press('Control+Shift+z'); await new Promise((r) => setTimeout(r, 700)); }
-  await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 38 && !!document.querySelector('input.nmc[value="필름"]'));
-  log(true, 'Ctrl+Shift+Z 로 다시 앞으로 (필름 줄이 돌아옴)');
-  const jb = a.locator('tr[data-t] input.nmc[value="잔손보기"]'); await jb.fill('잔손 보기'); await jb.press('Tab');
-  await a.waitForSelector('tr[data-t] input.nmc[value="잔손 보기"]');
-  log(true, '공정 이름 고치기');
+  const fId0 = await a.getAttribute(row('필름'), 'data-t');
+  log((await get(`site/p1/tasks/${fId0}/cat`)) === '목공사' && (await names()).indexOf('필름') === (await names()).indexOf('천정 MDF보드 작업') + 1, '새 줄 이름을 쓰면 저장 (공종 = 목공사)');
+  // 줄을 만들고 이름까지 쓴 뒤 Ctrl+Z 한 번 → 줄 통째로 (공종 상세 포함) 사라짐
+  await a.keyboard.press('Control+z'); await waitRows(37);
+  log(!(await names()).includes('필름') && !(await names()).includes('새 공정') && (await get(`site/p1/tasks/${fId0}`)) === null, 'Ctrl+Z 한 번 → 새 줄이 이름까지 통째로 사라짐');
+  await a.keyboard.press('Control+Shift+z'); await waitRows(38);
+  log((await names()).includes('필름') && (await get(`site/p1/tasks/${fId0}/name`)) === '필름', 'Ctrl+Shift+Z → 줄이 이름과 함께 돌아옴');
+  // 새 줄에 날짜를 칠한 뒤 Ctrl+Z 한 번 → 칸과 줄(공종 상세)이 같이 사라짐
+  await a.locator(`tr[data-t="${fId0}"] td.d[data-day="${TODAY}"]`).scrollIntoViewIfNeeded();
+  await a.click(`tr[data-t="${fId0}"] td.d[data-day="${TODAY}"]`); await new Promise((r) => setTimeout(r, 700));
+  log((await get(`site/p1/tasks/${fId0}/start`)) === TODAY, '(준비) 새 줄의 칸을 눌러 일정을 넣음');
+  await a.keyboard.press('Control+z'); await waitRows(37);
+  log(!(await names()).includes('필름') && (await get(`site/p1/tasks/${fId0}`)) === null, '새 줄에 칠한 뒤 Ctrl+Z 한 번 → 칸만이 아니라 줄(공종 상세)까지 같이 사라짐');
+  await a.keyboard.press('Control+Shift+z'); await waitRows(38);
+  log((await get(`site/p1/tasks/${fId0}/start`)) === TODAY && (await get(`site/p1/tasks/${fId0}/name`)) === '필름', 'Ctrl+Shift+Z → 줄과 칸이 함께 돌아옴');
+  await put(`site/p1/tasks/${fId0}/start`, null); await put(`site/p1/tasks/${fId0}/end`, null); await new Promise((r) => setTimeout(r, 700));
+  // 삭제 (－): 확인 없이 지우고 Ctrl+Z 로 복구 (공종 상세 포함)
+  await hv(fId0); await a.click(`tr[data-t="${fId0}"] [data-del]`); await waitRows(37);
+  log(!(await names()).includes('필름') && (await get(`site/p1/tasks/${fId0}`)) === null, '－ → 줄 지우기 (공종 상세 이름까지)');
+  await a.keyboard.press('Control+z'); await waitRows(38);
+  log((await names()).includes('필름') && (await get(`site/p1/tasks/${fId0}/name`)) === '필름', 'Ctrl+Z → 지운 줄이 이름과 함께 제자리로');
   const fId = fId0;
-  await a.click(`tr[data-t="${fId}"] [data-mv="-1"]`); await a.waitForFunction(async () => true);
-  await a.waitForFunction((id) => { const t = [...document.querySelectorAll('tr[data-t]')]; return t.findIndex((x) => x.dataset.t === id) < t.findIndex((x) => /MDF보드/.test(x.innerHTML)); }, fId);
-  log(true, '공정 순서 바꾸기 (필름 ↑)');
-  await a.click('[data-listedit]'); await a.waitForSelector('tr[data-t] .nmt');
+  // 줄 순서: Alt+↑ / Alt+↓ (엑셀처럼 줄을 선택해 위아래로)
+  const order = async () => a.locator('tr[data-t]').evaluateAll((trs) => trs.map((t) => t.dataset.t));
+  await a.locator(`tr[data-t="${fId}"] input.nmc`).focus(); await a.keyboard.press('Alt+ArrowUp');
+  await a.waitForFunction(([f, m]) => { const t = [...document.querySelectorAll('tr[data-t]')].map((x) => x.dataset.t); return t.indexOf(f) < t.indexOf(m); }, [fId, mdfBo]);
+  log(true, 'Alt+↑ → 줄이 한 칸 위로');
+  await a.keyboard.press('Alt+ArrowDown'); await new Promise((r) => setTimeout(r, 900));
+  const o1 = await order(); log(o1.indexOf(fId) === o1.indexOf(mdfBo) + 1, 'Alt+↓ → 다시 한 칸 아래로');
+  // 줄 끌어서 다른 공종 사이로 (⋮⋮): 그 공종이 됨
+  const kyung = await a.getAttribute(row('벽체 경량철골틀 설치작업'), 'data-t');
+  await hv(fId); const gb = await a.locator(`tr[data-t="${fId}"] .rgrip`).boundingBox(); await a.locator(`tr[data-t="${kyung}"]`).scrollIntoViewIfNeeded();
+  const gb2 = await a.locator(`tr[data-t="${fId}"] .rgrip`).boundingBox(), kb = await a.locator(`tr[data-t="${kyung}"]`).boundingBox();
+  await a.mouse.move(gb2.x + gb2.width / 2, gb2.y + gb2.height / 2); await a.mouse.down(); await a.mouse.move(kb.x + 200, kb.y + 3, { steps: 8 });
+  log((await a.locator('tr.drop-before').count()) === 1, '끄는 동안 놓을 자리에 파란 선');
+  await a.mouse.up(); await new Promise((r) => setTimeout(r, 800));
+  const o2 = await order();
+  log((await get(`site/p1/tasks/${fId}/cat`)) === '경량공사' && o2.indexOf(fId) === o2.indexOf(kyung) - 1, '⋮⋮ 끌기 → 줄이 그 자리로, 공종도 그 공종으로');
+  await a.keyboard.press('Control+z'); await new Promise((r) => setTimeout(r, 800));
+  log((await get(`site/p1/tasks/${fId}/cat`)) === '목공사', 'Ctrl+Z → 줄 순서·공종 되돌아감');
+  // ＋공종: 이 공종 아래에 새 공종, 공종 칸 바로 수정
+  await a.locator(`td.cat:has(input.catc[value="사인공사"])`).scrollIntoViewIfNeeded(); await a.hover('td.cat:has(input.catc[value="사인공사"])');
+  await a.click('td.cat:has(input.catc[value="사인공사"]) [data-addcat]');
+  await a.waitForFunction(() => document.activeElement && document.activeElement.classList.contains('catc') && document.activeElement.value === '새 공종');
+  await a.keyboard.type('마감공사'); await a.keyboard.press('Enter'); await new Promise((r) => setTimeout(r, 700));
+  const newCatTask = Object.entries((await get('site/p1/tasks')) || {}).find(([, t]) => t.cat === '마감공사');
+  log(!!newCatTask && newCatTask[1].name === '새 공정' && (await a.locator('td.cat input.catc[value="마감공사"]').count()) === 1, '＋공종 → 새 공종 줄이 생기고 공종 칸에 바로 쓰기');
+  await a.keyboard.press('Control+z'); await waitRows(38);
+  log((await a.locator('td.cat input.catc[value="마감공사"]').count()) === 0 && !Object.values((await get('site/p1/tasks')) || {}).some((t) => t.cat === '마감공사'), 'Ctrl+Z 한 번 → 새 공종 줄이 통째로 사라짐');
+  // 공종 칸 바로 수정: 그 공종 전체 이름 바뀜
+  const cc = a.locator('td.cat input.catc[value="사인공사"]'); await cc.fill('사인·간판공사'); await cc.press('Enter'); await new Promise((r) => setTimeout(r, 700));
+  log(Object.values((await get('site/p1/tasks')) || {}).some((t) => t.name === '사인물 설치' && t.cat === '사인·간판공사'), '공종 칸을 눌러 바로 수정 → 그 공종 이름이 바뀜');
+  await a.keyboard.press('Control+z'); await new Promise((r) => setTimeout(r, 700));
+  log(Object.values((await get('site/p1/tasks')) || {}).some((t) => t.name === '사인물 설치' && t.cat === '사인공사'), 'Ctrl+Z → 공종 이름 원래대로');
   // 일정 넣기: 일정 없는 공정의 빈 칸을 끌어 칠하기 (오늘 → 2일 뒤)
   const pdrag = async (from, to, hold) => { await a.locator(from).scrollIntoViewIfNeeded(); const f = await a.locator(from).boundingBox(), t = await a.locator(to).boundingBox(); await a.mouse.move(f.x + f.width / 2, f.y + f.height / 2); await a.mouse.down(); await a.mouse.move(t.x + t.width / 2, t.y + t.height / 2, { steps: 8 }); if (hold) return hold(); await a.mouse.up(); await new Promise((r) => setTimeout(r, 700)); };
   await pdrag(cell(fId, TODAY), cell(fId, plus(2)));
@@ -149,10 +187,10 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log(!f5.start && !f5.end && !f5.plus && !f5.minus && f5.name === '필름' && (await a.locator(`tr[data-t="${fId}"]`).count()) === 1 && (await a.locator(`tr[data-t="${fId}"] td.d.on`).count()) === 0, '이름 옆 ✕ → 일정만 지워지고 공정은 표에 남음');
   // 데이터 안 지움: 이전 방식(공종 없음) 공정도 "기타" 로 보임
   await put('site/p1/tasks/old1', { name: '옛날 공정', order: 99, start: TODAY, end: TODAY });
-  await a.waitForSelector('tr:has(.nmt:text-is("옛날 공정"))');
-  log((await a.locator('td.cat:has-text("기타")').count()) >= 1, '공종 없는 예전 공정도 "기타" 로 보임 (안 사라짐)');
-  await a.click('[data-listedit]'); await a.click('tr:has(input.nmc[value="옛날 공정"]) [data-del]'); await new Promise((r) => setTimeout(r, 600));
-  log((await get('site/p1/tasks/old1')) === null, '공정 삭제'); await a.click('[data-listedit]');
+  await a.waitForSelector('tr:has(input.nmc[value="옛날 공정"])');
+  log((await a.locator('td.cat input.catc[value=""]').count()) >= 1, '공종 없는 예전 공정도 "기타" 로 보임 (안 사라짐)');
+  await a.hover('tr:has(input.nmc[value="옛날 공정"]) input.nmc'); await a.click('tr:has(input.nmc[value="옛날 공정"]) [data-del]'); await new Promise((r) => setTimeout(r, 600));
+  log((await get('site/p1/tasks/old1')) === null, '공정 삭제');
   // 넓게 보임 · 출근 없음
   const gw = await a.locator('.gt-card').boundingBox();
   log(gw.width > 1040, `공정표가 오른쪽으로 넓게 보임 (${Math.round(gw.width)}px)`);

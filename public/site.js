@@ -12,7 +12,7 @@
   const H = () => window.SB_HOLIDAYS || {};
   const sundayOf = (d) => S.addDays(d, -S.parse(d).getDay());
   let me = null, db = null, base = null, sched = { projects: [], groups: [], members: [] }, siteData = {}, cur = null, projKeys = {};
-  let listEdit = false, stdOpen = false, perOpen = false, scrolledFor = null;
+  let stdOpen = false, perOpen = false, scrolledFor = null, focusSel = null, rowDrag = null;
   const home = () => S.addDays(sundayOf(S.today()), -7); // 지난주 일요일부터 3주
   let weekBase = home();
   const canDrag = () => matchMedia('(pointer: fine)').matches && innerWidth > 900;
@@ -77,7 +77,7 @@
       </div>
       ${calCard(s, withPreview(tl), canEdit(s))}
       ${gtCard(s, tl, canEdit(s))}`;
-    if (focusId) { const el = $('tr[data-t="' + focusId + '"] input.nmc'); if (el) { el.focus(); el.select(); focusId = null; } }
+    if (focusSel) { const el = $(focusSel); if (el) { el.focus(); if (el.select) el.select(); focusSel = null; } }
     const pick = $('#pick'); if (pick) pick.onchange = () => { location.hash = 's=' + encodeURIComponent(pick.value); };
     // 옆으로 밀어 둔 자리 유지, 처음 열 때는 오늘이 보이게
     const sc = $('.gt-scroll');
@@ -106,13 +106,13 @@
 
   function gtCard(s, tlRaw, edit) {
     const tl = tlRaw, drag = edit && canDrag();
-    const help = !edit ? '보기만 (수정: 소장님·관리자)' : listEdit ? '엑셀처럼 줄 옆의 +위 / +아래 로 줄을 넣고, 삭제로 줄을 지워요 · 공종 칸에 새 이름을 쓰면 새 공종이 돼요' : drag ? '빈 칸을 마우스로 끌어 칠하면 일정이 돼요(다른 날도 또 칠할 수 있어요) · 회색 칸을 끌면 옮기기 · 끝을 끌면 늘리기 · 이름 옆 ✕ = 일정 지우기 · 칸 누르기 = 그날 켜고 끄기 · Ctrl+Z = 되돌리기' : '칸을 눌러 그날 켜고 끄기 · 이름 옆 ✕ = 일정 지우기';
+    const help = !edit ? '보기만 (수정: 소장님·관리자)' : drag ? '빈 칸을 마우스로 끌어 칠하면 일정이 돼요(다른 날도 또 칠할 수 있어요) · 회색 칸을 끌면 옮기기 · 끝을 끌면 늘리기 · 줄에 마우스를 올리면 ＋ － (줄 추가·삭제) · 이름은 눌러서 바로 수정 · ⋮⋮ 를 끌면 줄 순서 · Ctrl+Z = 되돌리기' : '칸을 눌러 그날 켜고 끄기 · 이름 옆 ✕ = 일정 지우기';
     return `<div class="card gt-card"><div class="card-h"><h2>공정표</h2><span class="st-ro">${help}</span>
-        <span class="gt-btns">${edit ? `<button type="button" class="btn ${listEdit ? 'primary' : ''}" data-listedit>${listEdit ? '다 고쳤어요' : '공정 목록 고치기'}</button><button type="button" class="btn" data-std>표준 공정표 넣기</button>` : ''}<button type="button" class="btn" data-print>인쇄</button></span></div>
+        <span class="gt-btns">${edit ? `<button type="button" class="btn" data-std>표준 공정표 넣기</button>` : ''}<button type="button" class="btn" data-print>인쇄</button></span></div>
       ${stdOpen && edit ? stdForm(s, tl) : ''}
       <div class="gt-ptitle"><b>INTERIOR PROGRESS SCHEDULE</b><span>공 사 명 : ${esc(s.name)}</span></div>
       <div class="gt-scroll">${gtTable(s, withPreview(tl), edit)}</div>
-      ${edit && listEdit ? catList(tl) : ''}
+      ${edit && drag ? catList(tl) : ''}
       ${edit && !tl.length ? '<button type="button" class="btn" data-addfirst style="margin-top:10px">+ 첫 공정 줄 추가</button>' : ''}
       ${!tl.length ? `<div class="st-none" style="margin-top:10px">아직 공정이 없어요. ${edit ? '"표준 공정표 넣기"를 누르면 회사 공정표의 공종·공정이 착공일 기준 날짜로 들어가요.' : ''}</div>` : ''}
     </div>`;
@@ -143,15 +143,17 @@
         const hr = drag && on && d === (t.end || t.start) ? '<i class="hr" data-edge="end"></i>' : '';
         return `<td class="d ${on ? 'on' : ''} ${colCls(d)}" data-day="${d}">${hl}${hr}</td>`;
       }).join('');
-      const catCell = listEdit && edit ? `<td class="cat"><input type="text" class="catc" value="${esc(t.cat || '')}" list="gtCats" maxlength="20" placeholder="기타" aria-label="공종"></td>`
-        : k === 0 ? `<td class="cat" rowspan="${ts.length}">${esc(cat)}</td>` : '';
-      const i = tl.findIndex((x) => x.id === t.id);
-      const nmCell = listEdit && edit
-        ? `<td class="nm"><div class="nmw"><input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공정 이름"><span class="acts"><button type="button" class="ins" data-ins="-1" title="이 줄 위에 줄 추가">+위</button><button type="button" class="ins" data-ins="1" title="이 줄 아래에 줄 추가">+아래</button><button type="button" data-mv="-1" ${i ? '' : 'disabled'} aria-label="한 줄 위로" title="줄을 위로 옮기기">↑</button><button type="button" data-mv="1" ${i < tl.length - 1 ? '' : 'disabled'} aria-label="한 줄 아래로" title="줄을 아래로 옮기기">↓</button><button type="button" class="del" data-del aria-label="삭제" title="이 줄 삭제">삭제</button></span></div></td>`
+      // 공종 칸: PC 는 바로 고치는 글자칸 (합쳐진 칸 = 그 공종 전체 이름 바꾸기) + 마우스를 올리면 ＋(아래에 새 공종)
+      const catCell = k !== 0 ? '' : drag
+        ? `<td class="cat" rowspan="${ts.length}"><div class="catw"><input type="text" class="catc" value="${esc(cat === '기타' && !ts.some((x) => x.cat) ? '' : cat)}" list="gtCats" maxlength="20" placeholder="기타" aria-label="공종 (눌러서 바로 수정)" title="눌러서 공종 이름 바로 수정"><button type="button" class="pm" data-addcat title="이 공종 아래에 새 공종 추가">＋공종</button></div></td>`
+        : `<td class="cat" rowspan="${ts.length}">${esc(cat)}</td>`;
+      // 공종 상세 칸: PC 는 바로 고치는 글자칸 + ⋮⋮(끌어서 순서) + 마우스를 올리면 ✕ ＋ －, 휴대폰은 글자만 (✕ 는 누를 수 있음)
+      const nmCell = drag
+        ? `<td class="nm"><div class="nmw"><span class="rgrip" title="끌어서 줄 순서 바꾸기 (또는 Alt+↑/↓)">⋮⋮</span><input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료"><input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공종 상세 (눌러서 바로 수정)"><span class="acts">${ds.length ? '<i class="x" data-clear title="일정 지우기 (이름은 남아요)">✕</i>' : ''}<button type="button" class="pm" data-ins="1" title="이 줄 아래에 줄 추가">＋</button><button type="button" class="pm del" data-del title="이 줄 삭제 (Ctrl+Z 로 되돌려요)">－</button></span></div></td>`
         : `<td class="nm"><div class="nmw">${edit ? `<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료">` : t.done ? '<span class="ok">✓</span>' : ''}<span class="nmt" title="${esc(t.name)}">${esc(t.name)}</span>${edit && ds.length ? '<i class="x" data-clear title="일정 지우기 (공정 이름은 남아요)">✕</i>' : ''}</div></td>`;
       return `<tr class="${k === 0 ? 'g1' : ''} ${t.done ? 'done' : ''} ${isLive(t.id) ? 'live' : ''}" data-t="${esc(t.id)}">${catCell}${nmCell}${cells}</tr>`;
     }).join('')).join('');
-    return `<table class="gt ${drag && !listEdit ? 'drag' : ''} ${edit && !listEdit ? 'edit' : ''} ${listEdit ? 'le' : ''}" style="--n:${days.length}"><colgroup><col class="c-cat"><col class="c-nm">${days.map(() => '<col class="c-d">').join('')}</colgroup>${head}<tbody>${rows}</tbody></table>`;
+    return `<table class="gt ${drag ? 'drag' : ''} ${edit ? 'edit' : ''}" style="--n:${days.length}"><colgroup><col class="c-cat"><col class="c-nm">${days.map(() => '<col class="c-d">').join('')}</colgroup>${head}<tbody>${rows}</tbody></table>`;
   }
 
   function perForm(s) {
@@ -206,10 +208,20 @@
   let undoStack = [], redoStack = [];
   const clone = (v) => (v === undefined || v === null ? null : JSON.parse(JSON.stringify(v)));
   const getAt = (o, path) => path.split('/').reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
-  function write(up, label) {
-    const pid = cur.id, T = tasksOf(pid), before = {};
+  const setAt = (o, path, val) => { const seg = path.split('/'); let x = o; seg.slice(0, -1).forEach((k) => { if (!x[k] || typeof x[k] !== 'object') x[k] = {}; x = x[k]; }); if (val === null || val === undefined) delete x[seg[seg.length - 1]]; else x[seg[seg.length - 1]] = val; };
+  let fresh = null; // 방금 만든 새 줄 {key, entry}: 그 줄을 이어서 고치는 일(이름·날짜 칠하기 …)은 "줄 추가"와 한 단계로 묶음 → Ctrl+Z 한 번이면 줄 통째로 사라짐
+  function write(up, label, opts = {}) {
+    const pid = cur.id, T = tasksOf(pid);
+    if (fresh && fresh.entry.pid === pid && undoStack[undoStack.length - 1] === fresh.entry && Object.keys(up).every((k) => k.split('/')[0] === fresh.key && k.includes('/'))) {
+      const obj = fresh.entry.after[fresh.key];
+      if (obj && typeof obj === 'object') { Object.entries(clone(up)).forEach(([k, v]) => setAt(obj, k.slice(fresh.key.length + 1), v)); redoStack = []; return db.ref('site/' + pid + '/tasks').update(up).catch(fail); }
+    }
+    fresh = null;
+    const before = {};
     Object.keys(up).forEach((k) => { before[k] = clone(getAt(T, k)); });
-    undoStack.push({ pid, label, before, after: clone(up) || {} }); if (undoStack.length > 60) undoStack.shift(); redoStack = [];
+    const entry = { pid, label, before, after: clone(up) || {} };
+    undoStack.push(entry); if (undoStack.length > 60) undoStack.shift(); redoStack = [];
+    if (opts.fresh) fresh = { key: opts.fresh, entry };
     return db.ref('site/' + pid + '/tasks').update(up).catch(fail);
   }
   const writeTask = (id, obj, label) => write(Object.fromEntries(Object.entries(obj).map(([k, v]) => [id + '/' + k, v === undefined ? null : v])), label);
@@ -299,8 +311,7 @@
       flash(`캘린더에 "${s.name}" 일정을 ${ex ? '바꿨어요' : '등록했어요'}. (${S.md(s.st)} ~ ${S.md(s.en)})`);
     } catch (e) { fail(e); }
   }
-  // 엑셀처럼 줄 넣기: 고른 줄의 위/아래에 같은 공종의 새 줄 ("새 공정") — 만들자마자 이름 칸에 커서
-  let focusId = null;
+  // 줄 넣기(＋): 고른 줄 아래에 같은 공종의 새 줄 ("새 공정") — 만들자마자 이름 칸에 커서
   function insertRow(id, dir) {
     const tl = S.taskList(tasksOf(cur.id)), t = id ? tl.find((x) => x.id === id) : null;
     if (id && !t) return;
@@ -308,8 +319,32 @@
     const up = {}; tl.forEach((x) => { if ((x.order || 0) >= at) up[x.id + '/order'] = (x.order || 0) + 1; });
     const key = db.ref().push().key;
     up[key] = { name: '새 공정', order: at, ...(t && t.cat ? { cat: t.cat } : {}), ...stamp() };
-    focusId = key;
-    return write(up, '줄 추가');
+    focusSel = `tr[data-t="${key}"] input.nmc`;
+    return write(up, '줄 추가', { fresh: key });
+  }
+  // ＋공종: 이 공종 맨 아래에 새 공종 한 줄 ("새 공종" / "새 공정") — 만들자마자 공종 칸에 커서
+  function addCat(id) {
+    const tl = S.taskList(tasksOf(cur.id)), t = tl.find((x) => x.id === id); if (!t) return;
+    const grp = tl.filter((x) => catOf(x) === catOf(t)), at = Math.max(...grp.map((x) => x.order || 0)) + 1;
+    const up = {}; tl.forEach((x) => { if ((x.order || 0) >= at) up[x.id + '/order'] = (x.order || 0) + 1; });
+    const key = db.ref().push().key;
+    up[key] = { name: '새 공정', cat: '새 공종', order: at, ...stamp() };
+    focusSel = `tr[data-t="${key}"] input.catc`;
+    return write(up, '공종 추가', { fresh: key });
+  }
+  // 보이는 순서 (공종끼리 묶인 모습)
+  const displayList = (tl) => groupsOf(tl).flatMap(([, ts]) => ts);
+  // 줄 옮기기 (끌기 · Alt+↑/↓): 다른 공종 줄 사이로 놓으면 그 공종이 됨. 바뀐 순서·공종 칸만 저장
+  function moveRow(id, targetId, after) {
+    const tl = S.taskList(tasksOf(cur.id)), disp = displayList(tl), t = disp.find((x) => x.id === id), tg = disp.find((x) => x.id === targetId);
+    if (!t || !tg || t.id === tg.id) return;
+    const rest = disp.filter((x) => x.id !== id), idx = rest.findIndex((x) => x.id === targetId) + (after ? 1 : 0);
+    rest.splice(idx, 0, t);
+    const up = {}; rest.forEach((x, k) => { if ((x.order || 0) !== k + 1) up[x.id + '/order'] = k + 1; });
+    if (catOf(tg) !== catOf(t)) { up[id + '/cat'] = tg.cat || null; up[id + '/by'] = me.name; up[id + '/at'] = Date.now(); }
+    if (!Object.keys(up).length) return;
+    focusSel = `tr[data-t="${id}"] input.nmc`;
+    return write(up, '줄 순서 바꾸기');
   }
   // 표준 공정표 넣기: 이름이 같은 공정은 공종·날짜만 바꾸고, 없는 공정은 새로 (다른 공정은 그대로)
   function putStd(st) {
@@ -336,23 +371,16 @@
     if (e.target.closest('[data-calreg]')) return registerCal();
     if (e.target.closest('[data-per]')) { perOpen = !perOpen; return drawMain(); }
     if (e.target.closest('[data-perclose]')) { perOpen = false; return drawMain(); }
-    if (e.target.closest('[data-listedit]')) { listEdit = !listEdit; return drawMain(); }
     if (e.target.closest('[data-std]')) { stdOpen = !stdOpen; return drawMain(); }
-    if (e.target.closest('[data-addfirst]')) { listEdit = true; return insertRow(null, 1); }
+    if (e.target.closest('[data-addfirst]')) return insertRow(null, 1);
     if (e.target.closest('[data-stdclose]')) { stdOpen = false; return drawMain(); }
     const tr = e.target.closest('tr[data-t]');
     const clr = e.target.closest('[data-clear]');
     if (clr) { const host = clr.closest('[data-t]'); if (host) clearSchedule(host.dataset.t); return; }
-    if (tr && e.target.closest('[data-del]')) { const t = tasks[tr.dataset.t]; if (confirm(`"${t.name}" 공정을 삭제할까요?`)) write({ [tr.dataset.t]: null }, '줄 삭제'); return; }
+    if (tr && e.target.closest('[data-del]')) { if (tasks[tr.dataset.t]) { flash('줄을 지웠어요. 잘못 지웠으면 Ctrl+Z'); write({ [tr.dataset.t]: null }, '줄 삭제'); } return; }
+    const ac = e.target.closest('[data-addcat]'); if (tr && ac) return addCat(tr.dataset.t);
     const ins = e.target.closest('[data-ins]');
     if (tr && ins) return insertRow(tr.dataset.t, +ins.dataset.ins);
-    const mv = e.target.closest('[data-mv]');
-    if (tr && mv) {
-      const tl = S.taskList(tasks), i = tl.findIndex((t) => t.id === tr.dataset.t), j = i + +mv.dataset.mv;
-      if (j < 0 || j >= tl.length) return;
-      const up = {}; [tl[i], tl[j]] = [tl[j], tl[i]]; tl.forEach((t, k) => { if ((t.order || 0) !== k + 1) up[t.id + '/order'] = k + 1; });
-      return write(up, '줄 순서 바꾸기');
-    }
     // 휴대폰: 칸 누르기 (PC 는 아래 끌기에서 처리)
     const td = e.target.closest('table.gt.edit td.d[data-day]');
     if (td && tr && !canDrag()) return toggleDay(tr.dataset.t, td.dataset.day);
@@ -369,7 +397,12 @@
     const t = tasksOf(cur.id)[tr.dataset.t]; if (!t) return;
     if (e.target.classList.contains('chk')) writeTask(tr.dataset.t, { done: e.target.checked, ...stamp() }, '완료 체크');
     if (e.target.classList.contains('nmc')) { const v = e.target.value.trim().slice(0, 30); if (v && v !== t.name) writeTask(tr.dataset.t, { name: v, ...stamp() }, '이름 고치기'); else e.target.value = t.name; }
-    if (e.target.classList.contains('catc')) { const v = e.target.value.trim().slice(0, 20); if (v !== (t.cat || '')) writeTask(tr.dataset.t, { cat: v || null, ...stamp() }, '공종 고치기'); }
+    if (e.target.classList.contains('catc')) { // 합쳐진 공종 칸: 그 공종 전체 이름 바꾸기
+      const v = e.target.value.trim().slice(0, 20), c0 = catOf(t);
+      if ((v || '기타') === c0) return;
+      const up = {}; S.taskList(tasksOf(cur.id)).filter((x) => catOf(x) === c0).forEach((x) => { up[x.id + '/cat'] = v || null; up[x.id + '/by'] = me.name; up[x.id + '/at'] = Date.now(); });
+      write(up, '공종 이름 고치기');
+    }
   });
 
   // ---------- 끌기 (PC) ----------
@@ -428,13 +461,46 @@
     renderLive();
   });
 
+  // ---------- 줄 순서 (⋮⋮ 끌기 · Alt+↑/↓) · Enter 로 저장 ----------
+  document.addEventListener('keydown', (e) => {
+    const t = e.target; if (!t.matches || !t.matches('input.nmc, input.catc') || !cur || !canEdit(cur)) return;
+    if (e.key === 'Enter') { e.preventDefault(); t.blur(); return; }
+    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && t.matches('input.nmc')) {
+      e.preventDefault();
+      const id = t.closest('tr[data-t]').dataset.t, up = e.key === 'ArrowUp';
+      if (t.value !== t.defaultValue) t.blur();
+      setTimeout(() => { const disp = displayList(S.taskList(tasksOf(cur.id))), i = disp.findIndex((x) => x.id === id), nb = disp[i + (up ? -1 : 1)]; if (nb) moveRow(id, nb.id, !up); }, 40);
+    }
+  });
+  const clearDrop = () => document.querySelectorAll('tr.rowdrag, tr.drop-before, tr.drop-after').forEach((n) => n.classList.remove('rowdrag', 'drop-before', 'drop-after'));
+  document.addEventListener('pointerdown', (e) => {
+    const g = e.target.closest && e.target.closest('.rgrip'); if (!g || e.button !== 0 || !cur || !canEdit(cur)) return;
+    const tr = g.closest('tr[data-t]'); if (!tr) return;
+    e.preventDefault();
+    rowDrag = { id: tr.dataset.t, tg: null, after: false };
+    tr.classList.add('rowdrag'); document.body.classList.add('st-dragging');
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!rowDrag) return;
+    document.querySelectorAll('tr.drop-before, tr.drop-after').forEach((n) => n.classList.remove('drop-before', 'drop-after'));
+    const cellEl = document.elementsFromPoint(e.clientX, e.clientY).find((n) => n.matches && n.matches('table.gt tbody td')), el = cellEl && cellEl.closest('tr[data-t]');
+    if (!el || el.dataset.t === rowDrag.id) { rowDrag.tg = null; return; }
+    const r = el.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+    rowDrag.tg = el.dataset.t; rowDrag.after = after; el.classList.add(after ? 'drop-after' : 'drop-before');
+  });
+  document.addEventListener('pointerup', () => {
+    if (!rowDrag) return;
+    const g = rowDrag; rowDrag = null; document.body.classList.remove('st-dragging'); clearDrop();
+    if (g.tg) moveRow(g.id, g.tg, g.after);
+  });
+
   // ---------- 시작 ----------
   function route() {
     const id = new URLSearchParams(location.hash.slice(1)).get('s');
     const L = lists();
     const prev = cur && cur.id;
     cur = L.all.find((s) => s.id === id) || (id ? null : L.active[0] || L.undated[0] || null);
-    if ((cur && cur.id) !== prev) { listEdit = false; stdOpen = false; perOpen = false; undoStack = []; redoStack = []; }
+    if ((cur && cur.id) !== prev) { stdOpen = false; perOpen = false; undoStack = []; redoStack = []; fresh = null; }
     drawSide(); drawMain();
   }
   window.addEventListener('hashchange', route);
@@ -442,13 +508,13 @@
   let pending = false;
   function redraw(full) {
     const ae = document.activeElement;
-    if (drag || (ae && ae.matches('.gt-card input[type=text], .gt-card input[type=date], .gt-per input'))) { pending = true; return; }
+    if (drag || rowDrag || (ae && ae.matches('.gt-card input[type=text], .gt-card input[type=date], .gt-per input') && ae.value !== ae.defaultValue)) { pending = true; return; }
     pending = false;
     if (cur) cur = lists().all.find((s) => s.id === cur.id) || cur;
     full ? route() : (drawSide(), drawMain());
   }
   document.addEventListener('focusout', () => setTimeout(() => { if (pending) redraw(true); }, 0));
-  document.addEventListener('pointerup', () => setTimeout(() => { if (pending && !drag) redraw(true); }, 50));
+  document.addEventListener('pointerup', () => setTimeout(() => { if (pending && !drag && !rowDrag) redraw(true); }, 50));
   if (!window.SBAuth || !SBAuth.enabled()) {
     $('#side').style.display = 'none';
     $('#main').innerHTML = `<div class="st-empty"><b>Site 는 지금 시험 중이에요.</b><br>관리자에게 초대받은 분은 아래 버튼을 눌러<br>구글 계정으로 로그인해 주세요.<br><br><a class="btn primary" href="site.html?login=google">구글 로그인으로 들어가기</a></div>`;
