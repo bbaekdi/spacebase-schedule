@@ -22,6 +22,7 @@
   let myReads = {}, trash = false, trashPosts = [], trashRef = null;
   const KEEP_DAYS = 30, NEW_DAYS = 14;
   const isNew = (p) => !!me && !myReads[p.id] && p.uid !== me.uid && Date.now() - p.at < NEW_DAYS * 864e5;
+  let sched = { projects: [], groups: [] }; // 주간 스케줄(= Site 에 등록된 현장) 읽기만
   let projects = {}, staff = [], site = null, sitePosts = [], siteRef = null, asOpenOnly = false;
   try { cat = sessionStorage.getItem('bd_cat') || ''; asOpenOnly = sessionStorage.getItem('bd_asopen') === '1'; } catch {}
 
@@ -427,9 +428,27 @@
       <div class="bd-ownsel">${sel.length ? '고른 사람: ' + sel.map(esc).join(', ') : '아직 고르지 않았어요.'}</div>`;
   }
 
-  const siteOptions = (cur, direct) => {
-    const list = Object.entries(projects).filter(([id, v]) => !v.closed || id === cur).sort((a, b) => b[1].at - a[1].at);
-    return `<option value="">현장 고르기 (선택)</option>${list.map(([id, v]) => `<option value="${esc(id)}" ${id === cur ? 'selected' : ''}>${esc(v.siteName)}</option>`).join('')}${direct ? `<option value="__direct" ${cur === '__direct' ? 'selected' : ''}>✏️ 직접 입력</option>` : ''}`;
+  // 현장 고르기 목록 = Site 에 등록된 현장(주간 스케줄 PROJECT 구분, 끝난 현장 제외) + 프로젝트 글에만 있는 현장.
+  // 이름이 같은 프로젝트 글이 있으면 그 글(현장 방)에 이어 붙이고, 없으면 이름만 저장함.
+  const nkey = (n) => String(n || '').replace(/[\s_·.\-]+/g, '').toLowerCase();
+  const projByName = () => { const m = new Map(); Object.entries(projects).forEach(([id, v]) => { if (!m.has(nkey(v.siteName))) m.set(nkey(v.siteName), id); }); return m; };
+  function siteChoices() {
+    const L = window.SBSite ? SBSite.sites(sched) : { active: [], undated: [] }, byName = projByName(), used = new Set(), mk = (x) => {
+      const room = byName.get(nkey(x.name)); used.add(nkey(x.name));
+      return { value: room || 's:' + x.id, name: x.name };
+    };
+    const active = L.active.map(mk), undated = L.undated.map(mk);
+    const rest = Object.entries(projects).filter(([id, v]) => !v.closed && !used.has(nkey(v.siteName))).sort((a, b) => b[1].at - a[1].at).map(([id, v]) => ({ value: id, name: v.siteName }));
+    return { active, undated, rest };
+  }
+  const siteByValue = (val) => { const c = siteChoices(); return [...c.active, ...c.undated, ...c.rest].find((x) => x.value === val); };
+  const siteOptions = (cur, direct, extra) => {
+    const c = siteChoices(), all = [...c.active, ...c.undated, ...c.rest];
+    const opt = (x) => `<option value="${esc(x.value)}" ${x.value === cur ? 'selected' : ''}>${esc(x.name)}</option>`;
+    // 이미 쓴 글의 현장이 지금 목록에 없으면(끝난 현장 등) 그 이름을 그대로 보여 줌
+    const keep = extra && !all.some((x) => x.value === cur) ? `<option value="${esc(cur)}" selected>${esc(extra)}</option>` : (cur && !all.some((x) => x.value === cur) && projects[cur] ? `<option value="${esc(cur)}" selected>${esc(projects[cur].siteName)}</option>` : '');
+    const grp = (label, l) => (l.length ? `<optgroup label="${label}">${l.map(opt).join('')}</optgroup>` : '');
+    return `<option value="">현장 고르기 (선택)</option>${keep}${grp('진행 현장 (Site)', c.active)}${grp('준비 · 기간 미정 (Site)', c.undated)}${grp('그 밖의 현장 (프로젝트 글)', c.rest)}${direct ? `<option value="__direct" ${cur === '__direct' ? 'selected' : ''}>✏️ 직접 입력</option>` : ''}`;
   };
   const useForm = (c) => !!FORMS[c] && (!editing || !!editing.form || editing.cat !== c);
   // 날짜 칸: 누르면 달력(일요일·공휴일 빨강, 토요일 파랑). 값은 숨은 칸에 YYYY-MM-DD 로.
@@ -475,10 +494,13 @@
       } else h += `<input name="siteName" maxlength="40" placeholder="현장 이름 (예: ○○빌딩 3층 사무실)" value="${esc(p.siteName || '')}">`;
       if (editing) h += `<label class="bd-check"><input type="checkbox" name="closed" ${p.closed ? 'checked' : ''}> 끝난 현장 (현장 고르기 목록에서 숨김)</label>`;
     } else if (c === 'photo' || c === 'as') {
-      const cur = p.site || (p.siteName && c === 'as' ? '__direct' : '') || (!editing && site) || '';
-      h += `<label class="bd-f"><span>${c === 'as' ? '발주처명 (현장)' : '현장'}</span><select name="site">${siteOptions(cur, c === 'as')}</select></label>`;
+      // 고친다면: 글의 현장(프로젝트 글 번호) → 이름만 저장된 현장은 Site 목록에서 같은 이름을 찾음 → 없으면 A/S 는 직접 입력, 현장 사진은 이름 그대로
+      const named = !p.site && p.siteName ? siteChoices() : null, nm = named && [...named.active, ...named.undated, ...named.rest].find((x) => nkey(x.name) === nkey(p.siteName));
+      const cur = p.site || (nm && nm.value) || (p.siteName && c === 'as' ? '__direct' : '') || (p.siteName ? 'n:' + p.siteName : '') || (!editing && site) || '';
+      h += `<label class="bd-f"><span>${c === 'as' ? '발주처명 (현장)' : '현장'}</span><select name="site">${siteOptions(cur, c === 'as', p.siteName)}</select></label>`;
       if (c === 'as') h += `<input name="siteDirect" maxlength="40" placeholder="발주처명 / 현장 이름 직접 입력" value="${esc(!p.site && p.siteName ? p.siteName : '')}" class="${cur === '__direct' ? '' : 'hidden'}">`;
-      if (!Object.keys(projects).length) h += `<div class="bd-hint">아직 현장이 없어요. <b>프로젝트</b> 게시판에 현장을 등록하면 여기서 고를 수 있어요.${c === 'as' ? ' 지금은 "직접 입력"을 골라 주세요.' : ''}</div>`;
+      const nChoice = (() => { const c = siteChoices(); return c.active.length + c.undated.length + c.rest.length; })();
+      if (!nChoice) h += `<div class="bd-hint">아직 현장이 없어요. <b>Site</b>에 등록된 현장(주간 스케줄 PROJECT 구분)이 있으면 여기서 고를 수 있어요.${c === 'as' ? ' 지금은 "직접 입력"을 골라 주세요.' : ''}</div>`;
       if (c === 'as' && form) {
         h += FORMS.as.map((d) => field(d, d.k === 'recv' && !f.recv && !editing ? WS.ymd(new Date()) : f[d.k])).join('');
         if (!editing) h += `<div class="bd-f"><span>담당자 (여러 명 고를 수 있어요)</span>${ownerChips([], 'owner')}</div>`;
@@ -510,6 +532,12 @@
     writeExtras();
     dW.showModal();
     setTimeout(() => { const first = fW.querySelector('#wExtra input:not([type=hidden]):not(.hidden), #wExtra select'); (useForm((fW.querySelector('input[name=cat]:checked') || {}).value) && first ? first : fW.text).focus(); }, 30);
+  }
+  // 현장 목록이 늦게 도착하면 열려 있는 글쓰기 창의 목록만 새로 채움 (고른 값·쓰던 글은 그대로)
+  function refreshSiteSel() {
+    const sel = fW.site; if (!sel || editing) return;
+    const cur = sel.value, direct = !!fW.siteDirect;
+    sel.innerHTML = siteOptions(cur, direct); if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
   }
   $('#wCats').onchange = writeExtras;
   const ownSel = (root, name) => { const el = root.querySelector('.bd-ownsel'); if (!el) return; const v = [...root.querySelectorAll(`input[name=${name}]:checked`)].map((x) => x.value); el.textContent = v.length ? '고른 사람: ' + v.join(', ') : '아직 고르지 않았어요.'; };
@@ -644,7 +672,9 @@
       if (sid === '__direct') {
         v.site = null; v.siteName = (fW.siteDirect.value || '').trim() || null;
         if (!v.siteName) return err('발주처명(현장 이름)을 써 주세요.');
-      } else { v.site = sid || null; v.siteName = sid && projects[sid] ? projects[sid].siteName : null; }
+      } else if (sid.startsWith('n:')) { v.site = null; v.siteName = sid.slice(2).slice(0, 40); }
+      else if (sid.startsWith('s:')) { const ch = siteByValue(sid); v.site = null; v.siteName = ch ? ch.name.slice(0, 40) : null; }
+      else { v.site = sid || null; v.siteName = sid && projects[sid] ? projects[sid].siteName : null; }
     } else { v.site = null; v.siteName = null; }
     if (c !== 'project' && editing && editing.cat === 'project') v.closed = null;
     v.text = form ? compose(c, f, v.siteName) : fW.text.value.trim();
@@ -823,6 +853,7 @@
     db.ref('spaces/' + a.spaceKey + '/data/mteams').once('value').then((s) => {
       const v = s.val(); teams = (Array.isArray(v) ? v : Object.values(v || {})).filter((t) => t && t.name);
     }).catch(() => {});
+    ['projects', 'groups'].forEach((k) => db.ref('spaces/' + a.spaceKey + '/data/' + k).on('value', (s) => { sched[k] = window.SBSite ? SBSite.list(s.val()) : []; if (dW.open) refreshSiteSel(); }));
     listenProjects();
     listen();
     route();

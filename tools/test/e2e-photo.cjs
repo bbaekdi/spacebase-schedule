@@ -151,6 +151,42 @@ function jpegSize(b) { let i = 2; while (i < b.length) { if (b[i] !== 0xff) { i+
   const edId = Object.entries((await get('board/posts')) || {}).find(([, x]) => x.text === '사진 테스트 글 (고침)');
   log(S.trash.length === 1 && !edId, '"완전 삭제"하면 드라이브의 사진도 휴지통으로 보내고 글을 지움');
 
+  // ---- 7-2) 현장 고르기: Site 에 등록된 현장을 나열 ----
+  const crypto = require('crypto'), SPACE = crypto.createHash('sha256').update('spacebase:testcode').digest('hex');
+  const dot = (d) => d.replace(/-/g, '.'), plusD = (n) => new Date(Date.now() + n * 864e5 + 9 * 3600e3).toISOString().slice(0, 10);
+  await put(`spaces/${SPACE}/data/groups`, [{ id: 'g1', name: 'PROJECT' }, { id: 'g2', name: '수주 전' }]);
+  await put(`spaces/${SPACE}/data/projects`, [
+    { id: 'sp1', groupId: 'g1', name: '테스트 오피스', period: `${dot(plusD(-10))}-${dot(plusD(40))}` },
+    { id: 'sp2', groupId: 'g1', name: '지난 현장', period: `${dot(plusD(-90))}-${dot(plusD(-30))}` },
+    { id: 'sp3', groupId: 'g1', name: '준비 현장', period: '미정' },
+    { id: 'sp4', groupId: 'g2', name: '수주 전 현장', period: `${dot(plusD(-5))}-${dot(plusD(5))}` },
+  ]);
+  await put('board/posts/room1', { cat: 'project', siteName: '테스트 오피스', text: '1. 발주처명 _ 테스트', uid: 'x', name: '박', at: Date.now() - 5000 });
+  await put('board/posts/room2', { cat: 'project', siteName: '옛날 프로젝트 글 현장', text: '옛 프로젝트', uid: 'x', name: '박', at: Date.now() - 6000 });
+  await a.goto(B + 'band.html'); await a.waitForSelector('.bd-post'); await sleep(800);
+  await a.click('#write'); await a.waitForSelector('#dlgWrite[open]'); await a.click('#wCats label:has-text("현장 사진")');
+  const opts = await a.locator('#wExtra select[name=site]').evaluate((sel) => [...sel.querySelectorAll('optgroup')].map((g) => ({ label: g.label, items: [...g.querySelectorAll('option')].map((o) => ({ v: o.value, t: o.textContent })) })));
+  await a.evaluate(() => { document.querySelector('#wExtra select[name=site]').size = 9; }); await a.screenshot({ path: SH + '/p6-sites.png' }); await a.evaluate(() => { document.querySelector('#wExtra select[name=site]').removeAttribute('size'); });
+  const grp = (l) => (opts.find((g) => g.label.startsWith(l)) || { items: [] }).items;
+  log(grp('진행 현장').some((x) => x.t === '테스트 오피스' && x.v === 'room1'), '현장 고르기: Site 의 진행 현장이 나옴 (같은 이름의 프로젝트 글이 있으면 그 현장 방에 이어 붙임)');
+  log(grp('준비').some((x) => x.t === '준비 현장' && x.v === 's:sp3'), '현장 고르기: Site 의 "준비·기간 미정" 현장도 나옴');
+  const all = opts.flatMap((g) => g.items.map((x) => x.t));
+  log(!all.includes('지난 현장') && !all.includes('수주 전 현장'), '끝난 현장·PROJECT 가 아닌 구분은 안 나옴 (Site 와 같은 기준)');
+  log(grp('그 밖의').some((x) => x.t === '옛날 프로젝트 글 현장') && new Set(all).size === all.length, '프로젝트 글에만 있는 현장은 "그 밖의 현장"에, 같은 이름이 두 번 나오지 않음');
+  await a.selectOption('#wExtra select[name=site]', 's:sp3'); await a.fill('#fWrite textarea', 'Site 현장 사진 글'); await a.click('#wSave');
+  await a.waitForFunction(() => !document.querySelector('#dlgWrite').open);
+  const sp = Object.values((await get('board/posts')) || {}).find((x) => x.text === 'Site 현장 사진 글');
+  log(sp && sp.siteName === '준비 현장' && !sp.site, 'Site 현장을 고르면 현장 이름이 글에 저장됨 (현장 방이 없으면 이름만)');
+  await a.click('#write'); await a.waitForSelector('#dlgWrite[open]'); await a.click('#wCats label:has-text("현장 사진")');
+  await a.selectOption('#wExtra select[name=site]', 'room1'); await a.setInputFiles('#wFile', [tinyF]); await a.waitForSelector('.bd-th.ready');
+  await a.fill('#fWrite textarea', '방 연결 글'); const upN = S.up.length; await a.click('#wSave'); await a.waitForFunction(() => !document.querySelector('#dlgWrite').open);
+  const rp = Object.values((await get('board/posts')) || {}).find((x) => x.text === '방 연결 글');
+  log(rp && rp.site === 'room1' && rp.siteName === '테스트 오피스' && S.up.length === upN + 1 && S.up[upN].site === '테스트 오피스', '이름이 같은 현장 방이 있으면 글이 그 방에 붙고, 사진은 그 현장 이름 폴더로 감');
+  await a.locator('.bd-post', { hasText: 'Site 현장 사진 글' }).locator('.bd-text').click(); await a.waitForSelector('#dlgPost[open]');
+  await a.click('#pBody [data-a=edit]'); await a.waitForSelector('#dlgWrite[open]');
+  log((await a.locator('#wExtra select[name=site]').inputValue()) === 's:sp3', '글을 고칠 때 고른 현장이 그대로 선택돼 있음');
+  await a.click('#dlgWrite [data-close]');
+
   // ---- 8) 휴대폰 ----
   const m = await user('m@test.com', '박연습', false, { ...devices['iPhone 13'] });
   await m.waitForSelector('.bd-post .bd-ph'); await sleep(800);
