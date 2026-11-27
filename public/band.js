@@ -1,8 +1,9 @@
 // Band: 회사 게시판 (네이버 밴드 대신). 글·댓글은 Firebase board/ 에 저장, 회원(구글 로그인 + 관리자 승인)만 읽고 쓴다.
 // 규칙: firebase/database.rules.json 의 board. 글은 지우면 deleted 표시만 남김 (휴지통은 다음 단계).
-// - 프로젝트 글 = 현장 방 (siteName). 현장 사진·A/S 글은 현장을 고르면 site(프로젝트 글 id) + siteName 을 가진다.
+// - 프로젝트 게시판은 따로 운영(현장 방과 연결 없음). 현장 사진·A/S 글은 현장 고르기 = Site 에 등록된 현장(주간 스케줄 PROJECT 구분) → site(그 현장 id) + siteName 을 가진다.
+//   (예전 글 중 site 가 프로젝트 글 id 인 것은 예전 방식 현장 방으로 계속 열림)
 // - A/S 글은 asState {status: new|doing|done, owner, by, at} — 회원 누구나 바꿀 수 있다.
-// - 주소: band.html#site=<프로젝트 글 id> (현장 방), band.html#post=<글 id> (글 바로 열기)
+// - 주소: band.html#site=<Site 현장 id> (현장 방), band.html#post=<글 id> (글 바로 열기)
 (function () {
   const CATS = [
     { key: '', label: '전체' },
@@ -162,18 +163,15 @@
 
   function card(p) {
     const pj = p.cat === 'project';
-    const n = pj ? sitePostCount(p.id) : null;
     return `
       <article class="bd-post" data-id="${esc(p.id)}" tabindex="0">
         <div class="bd-meta">${isNew(p) ? '<span class="bd-new">새 글</span>' : ''}<span class="bd-chip ${esc(p.cat)}">${catLabel(p.cat)}</span>${asBadge(p)}<b>${mark(p.name)}</b><span>${ago(p.at)}${p.editedAt ? ' · 수정됨' : ''}</span></div>
-        ${pj ? `<div class="bd-ptitle">${mark(p.siteName)}${p.closed ? ' <span class="bd-as done">끝난 현장</span>' : ''}</div>` : siteChip(p) ? `<div class="bd-sitebar">${siteChip(p)}</div>` : ''}
+        ${pj ? `<div class="bd-ptitle">${mark(p.siteName)}</div>` : siteChip(p) ? `<div class="bd-sitebar">${siteChip(p)}</div>` : ''}
         <div class="bd-text">${mark(p.text)}</div>
         ${phGrid(p, false)}
-        <div class="bd-foot"><span>${ICON_CMT}댓글 ${p.commentCount || 0}</span>${pj ? `<a class="bd-room" href="#site=${encodeURIComponent(p.id)}">현장 방 열기${n ? ` (글 ${n})` : ''} ›</a>` : ''}</div>
+        <div class="bd-foot"><span>${ICON_CMT}댓글 ${p.commentCount || 0}</span></div>
       </article>`;
   }
-  // 현장 방 글 수는 지금 불러온 글에서 센다 (정확한 수는 현장 방에서)
-  const sitePostCount = (id) => posts.filter((x) => x.site === id && !x.deleted).length;
 
   function drawList() {
     if (trash) return drawTrash();
@@ -228,16 +226,24 @@
 
   // ---------- 현장 방 ----------
   function drawSiteHead() {
-    const p = projects[site];
-    const el = $('#siteHead');
-    if (!p) { el.innerHTML = '<a class="bd-back" href="#">‹ Band</a><div class="bd-empty">없는 현장이거나 삭제된 현장이에요.</div>'; return; }
-    const as = sitePosts.filter((x) => x.cat === 'as' && !x.deleted);
-    const open = as.filter((x) => asStatus(x) !== 'done').length;
+    const el = $('#siteHead'), lp = projects[site]; // lp: 예전 방식(프로젝트 글 = 현장 방)
+    const as = sitePosts.filter((x) => x.cat === 'as' && !x.deleted), open = as.filter((x) => asStatus(x) !== 'done').length;
+    const counts = `<span>현장 사진 ${sitePosts.filter((x) => x.cat === 'photo' && !x.deleted).length}</span><span>A/S ${as.length}${open ? ` (안 끝남 ${open})` : ''}</span>`;
+    if (lp) {
+      el.innerHTML = `<a class="bd-back" href="#">‹ Band</a>
+      <div class="bd-sitecard"><div class="bd-meta"><span class="bd-chip project">현장 방</span>${lp.closed ? '<span class="bd-as done">끝난 현장</span>' : ''}<span>${esc(lp.name)} · ${ago(lp.at)}</span></div>
+      <h1>${esc(lp.siteName)}</h1><div class="bd-text">${esc(lp.text)}</div>
+      <div class="bd-foot">${counts}<button class="bd-link" type="button" id="openProj">프로젝트 글 · 댓글 ${lp.commentCount || 0} ›</button></div></div>`;
+      $('#openProj').onclick = () => openPost(site);
+      return;
+    }
+    const sc = window.SBSite && SBSite.sites(sched).all.find((x) => x.id === site), name = sc ? sc.name : (sitePosts[0] && sitePosts[0].siteName) || '';
+    if (!name) { el.innerHTML = '<a class="bd-back" href="#">‹ Band</a><div class="bd-empty">없는 현장이거나 불러오는 중이에요.</div>'; return; }
+    const per = sc && (sc.st || sc.en) ? `${SBSite.yy(sc.st) || '?'} ~ ${SBSite.yy(sc.en) || '준공일 미정'}` : '';
     el.innerHTML = `<a class="bd-back" href="#">‹ Band</a>
-      <div class="bd-sitecard"><div class="bd-meta"><span class="bd-chip project">현장 방</span>${p.closed ? '<span class="bd-as done">끝난 현장</span>' : ''}<span>${esc(p.name)} · ${ago(p.at)}</span></div>
-      <h1>${esc(p.siteName)}</h1><div class="bd-text">${esc(p.text)}</div>
-      <div class="bd-foot"><span>현장 사진 ${sitePosts.filter((x) => x.cat === 'photo' && !x.deleted).length}</span><span>A/S ${as.length}${open ? ` (안 끝남 ${open})` : ''}</span><button class="bd-link" type="button" id="openProj">프로젝트 글 · 댓글 ${p.commentCount || 0} ›</button></div></div>`;
-    $('#openProj').onclick = () => openPost(site);
+      <div class="bd-sitecard"><div class="bd-meta"><span class="bd-chip photo">현장 방</span>${per ? `<span>공사기간 ${esc(per)}</span>` : ''}</div>
+      <h1>${esc(name)}</h1>
+      <div class="bd-foot">${counts}${sc ? '<a class="bd-link" href="site.html#s=' + encodeURIComponent(sc.id) + '">Site 공정표 ›</a>' : ''}</div></div>`;
   }
   function route() {
     const h = new URLSearchParams(location.hash.slice(1));
@@ -428,27 +434,24 @@
       <div class="bd-ownsel">${sel.length ? '고른 사람: ' + sel.map(esc).join(', ') : '아직 고르지 않았어요.'}</div>`;
   }
 
-  // 현장 고르기 목록 = Site 에 등록된 현장(주간 스케줄 PROJECT 구분, 끝난 현장 제외) + 프로젝트 글에만 있는 현장.
-  // 이름이 같은 프로젝트 글이 있으면 그 글(현장 방)에 이어 붙이고, 없으면 이름만 저장함.
+  // 현장 고르기 목록 = Site 에 등록된 현장 (주간 스케줄 PROJECT 구분, 끝난 현장 제외). 프로젝트 게시판과는 따로.
+  // 글에는 site(Site 현장 id) + siteName 이 저장된다. (예전 글의 site 가 프로젝트 글 id 인 경우도 그대로 둠)
   const nkey = (n) => String(n || '').replace(/[\s_·.\-]+/g, '').toLowerCase();
-  const projByName = () => { const m = new Map(); Object.entries(projects).forEach(([id, v]) => { if (!m.has(nkey(v.siteName))) m.set(nkey(v.siteName), id); }); return m; };
+  const allSites = () => (window.SBSite ? SBSite.sites(sched).all : []);
   function siteChoices() {
-    const L = window.SBSite ? SBSite.sites(sched) : { active: [], undated: [] }, byName = projByName(), used = new Set(), mk = (x) => {
-      const room = byName.get(nkey(x.name)); used.add(nkey(x.name));
-      return { value: room || 's:' + x.id, name: x.name };
-    };
-    const active = L.active.map(mk), undated = L.undated.map(mk);
-    const rest = Object.entries(projects).filter(([id, v]) => !v.closed && !used.has(nkey(v.siteName))).sort((a, b) => b[1].at - a[1].at).map(([id, v]) => ({ value: id, name: v.siteName }));
-    return { active, undated, rest };
+    const L = window.SBSite ? SBSite.sites(sched) : { active: [], undated: [] }, mk = (x) => ({ value: x.id, name: x.name });
+    return { active: L.active.map(mk), undated: L.undated.map(mk) };
   }
-  const siteByValue = (val) => { const c = siteChoices(); return [...c.active, ...c.undated, ...c.rest].find((x) => x.value === val); };
+  // 값 → 이름: Site 현장(끝난 현장 포함) → 예전 프로젝트 글
+  const siteNameOf = (val) => { const x = allSites().find((y) => y.id === val); return x ? x.name : projects[val] ? projects[val].siteName : ''; };
   const siteOptions = (cur, direct, extra) => {
-    const c = siteChoices(), all = [...c.active, ...c.undated, ...c.rest];
+    const c = siteChoices(), all = [...c.active, ...c.undated];
     const opt = (x) => `<option value="${esc(x.value)}" ${x.value === cur ? 'selected' : ''}>${esc(x.name)}</option>`;
-    // 이미 쓴 글의 현장이 지금 목록에 없으면(끝난 현장 등) 그 이름을 그대로 보여 줌
-    const keep = extra && !all.some((x) => x.value === cur) ? `<option value="${esc(cur)}" selected>${esc(extra)}</option>` : (cur && !all.some((x) => x.value === cur) && projects[cur] ? `<option value="${esc(cur)}" selected>${esc(projects[cur].siteName)}</option>` : '');
+    // 이미 쓴 글의 현장이 지금 목록에 없으면(끝난 현장·예전 방식 등) 그 이름을 그대로 보여 줌
+    const stale = cur && !all.some((x) => x.value === cur) && cur !== '__direct' ? siteNameOf(cur) || (cur.startsWith('n:') ? cur.slice(2) : extra || '') : '';
+    const keep = stale ? `<option value="${esc(cur)}" selected>${esc(stale)}</option>` : '';
     const grp = (label, l) => (l.length ? `<optgroup label="${label}">${l.map(opt).join('')}</optgroup>` : '');
-    return `<option value="">현장 고르기 (선택)</option>${keep}${grp('진행 현장 (Site)', c.active)}${grp('준비 · 기간 미정 (Site)', c.undated)}${grp('그 밖의 현장 (프로젝트 글)', c.rest)}${direct ? `<option value="__direct" ${cur === '__direct' ? 'selected' : ''}>✏️ 직접 입력</option>` : ''}`;
+    return `<option value="">현장 고르기 (선택)</option>${keep}${grp('진행 현장', c.active)}${grp('준비 · 기간 미정', c.undated)}${direct ? `<option value="__direct" ${cur === '__direct' ? 'selected' : ''}>✏️ 직접 입력</option>` : ''}`;
   };
   const useForm = (c) => !!FORMS[c] && (!editing || !!editing.form || editing.cat !== c);
   // 날짜 칸: 누르면 달력(일요일·공휴일 빨강, 토요일 파랑). 값은 숨은 칸에 YYYY-MM-DD 로.
@@ -492,14 +495,13 @@
         h += `<label class="bd-f"><span>현장 이름 <b>*</b></span><input name="siteName" maxlength="40" placeholder="현장 방 이름 (예: ○○빌딩 3층 사무실)" value="${esc(p.siteName || '')}"></label>`;
         h += FORMS.project.slice(2).map((d) => field(d, f[d.k], f)).join('');
       } else h += `<input name="siteName" maxlength="40" placeholder="현장 이름 (예: ○○빌딩 3층 사무실)" value="${esc(p.siteName || '')}">`;
-      if (editing) h += `<label class="bd-check"><input type="checkbox" name="closed" ${p.closed ? 'checked' : ''}> 끝난 현장 (현장 고르기 목록에서 숨김)</label>`;
     } else if (c === 'photo' || c === 'as') {
-      // 고친다면: 글의 현장(프로젝트 글 번호) → 이름만 저장된 현장은 Site 목록에서 같은 이름을 찾음 → 없으면 A/S 는 직접 입력, 현장 사진은 이름 그대로
-      const named = !p.site && p.siteName ? siteChoices() : null, nm = named && [...named.active, ...named.undated, ...named.rest].find((x) => nkey(x.name) === nkey(p.siteName));
+      // 고친다면: 글의 현장(site) → 이름만 저장된 글은 Site 목록에서 같은 이름을 찾음 → 없으면 A/S 는 직접 입력, 현장 사진은 이름 그대로
+      const sc0 = siteChoices(), nm = !p.site && p.siteName && [...sc0.active, ...sc0.undated].find((x) => nkey(x.name) === nkey(p.siteName));
       const cur = p.site || (nm && nm.value) || (p.siteName && c === 'as' ? '__direct' : '') || (p.siteName ? 'n:' + p.siteName : '') || (!editing && site) || '';
       h += `<label class="bd-f"><span>${c === 'as' ? '발주처명 (현장)' : '현장'}</span><select name="site">${siteOptions(cur, c === 'as', p.siteName)}</select></label>`;
       if (c === 'as') h += `<input name="siteDirect" maxlength="40" placeholder="발주처명 / 현장 이름 직접 입력" value="${esc(!p.site && p.siteName ? p.siteName : '')}" class="${cur === '__direct' ? '' : 'hidden'}">`;
-      const nChoice = (() => { const c = siteChoices(); return c.active.length + c.undated.length + c.rest.length; })();
+      const nChoice = (() => { const c = siteChoices(); return c.active.length + c.undated.length; })();
       if (!nChoice) h += `<div class="bd-hint">아직 현장이 없어요. <b>Site</b>에 등록된 현장(주간 스케줄 PROJECT 구분)이 있으면 여기서 고를 수 있어요.${c === 'as' ? ' 지금은 "직접 입력"을 골라 주세요.' : ''}</div>`;
       if (c === 'as' && form) {
         h += FORMS.as.map((d) => field(d, d.k === 'recv' && !f.recv && !editing ? WS.ymd(new Date()) : f[d.k])).join('');
@@ -513,9 +515,6 @@
     if (c === 'as' && fW.site) fW.site.onchange = () => {
       fW.siteDirect.classList.toggle('hidden', fW.site.value !== '__direct');
       if (fW.site.value === '__direct') fW.siteDirect.focus();
-      const pf = (projects[fW.site.value] || {}).form || {};
-      if (fW.f_contact && !fW.f_contact.value) fW.f_contact.value = pf.contact || '';
-      if (fW.f_phone && !fW.f_phone.value && pf.phone) { const [pre, rest] = splitPhone(pf.phone); fW.f_phonePre.value = pre; fW.f_phone.value = rest; }
     };
   }
   function openWrite(p) {
@@ -665,7 +664,6 @@
     if (c === 'project') {
       v.siteName = (fW.siteName.value || '').trim();
       if (!v.siteName) return err('현장 이름을 써 주세요.');
-      if (editing) v.closed = fW.closed && fW.closed.checked ? true : null;
       v.site = null;
     } else if (c === 'photo' || c === 'as') {
       const sid = fW.site ? fW.site.value : '';
@@ -673,8 +671,8 @@
         v.site = null; v.siteName = (fW.siteDirect.value || '').trim() || null;
         if (!v.siteName) return err('발주처명(현장 이름)을 써 주세요.');
       } else if (sid.startsWith('n:')) { v.site = null; v.siteName = sid.slice(2).slice(0, 40); }
-      else if (sid.startsWith('s:')) { const ch = siteByValue(sid); v.site = null; v.siteName = ch ? ch.name.slice(0, 40) : null; }
-      else { v.site = sid || null; v.siteName = sid && projects[sid] ? projects[sid].siteName : null; }
+      else if (sid) { v.site = sid; v.siteName = (siteNameOf(sid) || (editing && editing.site === sid && editing.siteName) || '').slice(0, 40) || null; if (!v.siteName) v.site = null; }
+      else { v.site = null; v.siteName = null; }
     } else { v.site = null; v.siteName = null; }
     if (c !== 'project' && editing && editing.cat === 'project') v.closed = null;
     v.text = form ? compose(c, f, v.siteName) : fW.text.value.trim();
@@ -736,7 +734,6 @@
       ${p.cat === 'project' ? `<div class="bd-ptitle">${esc(p.siteName)}</div>` : siteChip(p) ? `<div class="bd-sitebar">${siteChip(p)}</div>` : p.siteName ? `<div class="bd-sitebar"><span class="bd-site plain">${ICON_PIN}${esc(p.siteName)}</span></div>` : ''}
       ${p.form ? formView(p) : `<div class="bd-text">${linkPhones(p.text)}</div>`}
       ${phGrid(p, true)}
-      ${p.cat === 'project' && site !== p.id ? `<a class="btn" style="margin-top:12px" href="#site=${encodeURIComponent(p.id)}">현장 방 열기 ›</a>` : ''}
       ${asBox(p)}
       ${canEdit(p) ? '<div class="bd-acts"><button class="btn" type="button" data-a="edit">수정</button><button class="btn danger" type="button" data-a="del">삭제</button></div>' : ''}
       <ul class="bd-cmts">${cmts.length ? cmts.map((c) => `<li data-cid="${esc(c.id)}"><div class="who"><b>${esc(c.name)}</b><span>${ago(c.at)}</span>${me && (c.uid === me.uid || me.admin) ? '<button type="button" data-a="cdel">삭제</button>' : ''}</div><div class="t">${esc(c.text)}</div></li>`).join('') : '<li class="none">첫 댓글을 달아 보세요.</li>'}</ul>`;
@@ -853,7 +850,7 @@
     db.ref('spaces/' + a.spaceKey + '/data/mteams').once('value').then((s) => {
       const v = s.val(); teams = (Array.isArray(v) ? v : Object.values(v || {})).filter((t) => t && t.name);
     }).catch(() => {});
-    ['projects', 'groups'].forEach((k) => db.ref('spaces/' + a.spaceKey + '/data/' + k).on('value', (s) => { sched[k] = window.SBSite ? SBSite.list(s.val()) : []; if (dW.open) refreshSiteSel(); }));
+    ['projects', 'groups'].forEach((k) => db.ref('spaces/' + a.spaceKey + '/data/' + k).on('value', (s) => { sched[k] = window.SBSite ? SBSite.list(s.val()) : []; if (dW.open) refreshSiteSel(); if (site) drawSiteHead(); }));
     listenProjects();
     listen();
     route();

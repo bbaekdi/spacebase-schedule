@@ -5,6 +5,10 @@ const SH = process.argv[2], B = 'http://127.0.0.1:8080/', DB = 'http://127.0.0.1
 let fails = 0; const log = (ok, m) => { if (!ok) fails++; console.log((ok ? '✓ ' : '✗ ') + m); };
 const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', headers: { Authorization: 'Bearer owner' }, body: JSON.stringify(v) });
 (async () => {
+  // 주간 스케줄(= Site 현장) 시험 자료: 진행 중 현장 1개
+  const SPACE = require('crypto').createHash('sha256').update('spacebase:testcode').digest('hex'), dotD = (n) => new Date(Date.now() + n * 864e5 + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, '.');
+  await put(`spaces/${SPACE}/data/groups`, [{ id: 'g1', name: 'PROJECT' }]);
+  await put(`spaces/${SPACE}/data/projects`, [{ id: 'sbp1', groupId: 'g1', name: '테스트빌딩 3층 사무실', period: `${dotD(-10)}-${dotD(40)}` }]);
   const br = await chromium.launch(); const errs = [];
   async function user(email, name, admin, opt = {}) {
     const c = await br.newContext({ viewport: { width: 1280, height: 860 }, deviceScaleFactor: 1, ...opt });
@@ -109,11 +113,12 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await a.click('.bd-post:has(.bd-chip.project) .bd-text');
   log((await a.locator('#pBody a[href="tel:01012345678"]').count()) === 1 && (await a.locator('#pBody a[href*="map.naver.com"]').count()) === 1, '글 보기: 연락처 누르면 전화, 주소 누르면 지도');
   await a.click('#dlgPost [data-close]');
-  log(true, '프로젝트(현장) 등록');
+  log((await a.locator('.bd-post:has(.bd-chip.project) .bd-room').count()) === 0 && (await a.locator('.bd-post:has(.bd-chip.project) a[href^="#site="]').count()) === 0, '프로젝트 글에는 현장 방 링크가 없음 (프로젝트 게시판은 따로 운영)');
+  log(true, '프로젝트 등록');
   await b.click('#write'); await b.click('#wCats label:has-text("A/S")');
   await b.waitForSelector('#wExtra select[name=site] option:has-text("테스트빌딩")', { state: 'attached' });
   await b.selectOption('#wExtra select[name=site]', { label: '테스트빌딩 3층 사무실' });
-  log((await b.inputValue('[name=f_contact]')) === '홍길동 팀장' && (await b.inputValue('[name=f_phone]')) === '1234-5678' && (await b.inputValue('[name=f_phonePre]')) === '010', 'A/S: 현장 고르면 발주처 담당자·연락처 자동으로 채움');
+  log((await b.locator('#wExtra select[name=site] optgroup[label="진행 현장"] option').allInnerTexts()).join() === '테스트빌딩 3층 사무실' && (await b.inputValue('[name=f_contact]')) === '', 'A/S 현장 고르기: Site 에 등록된 현장이 나옴 (프로젝트 글과 따로, 담당자·연락처는 안 채움)');
   log((await b.inputValue('[name=f_recv]')) !== '' && /^\d{2}년 \d{2}월 \d{2}일$/.test(await b.locator('[data-cal=f_recv]').innerText()), 'A/S: 접수일 오늘로 미리 채움 (달력 칸)');
   log((await b.locator('.bd-owners label').count()) === 3, 'A/S 담당자 = 주간 스케줄 직원표 전 직원 (3명)');
   log((await b.locator('.bd-teamh').allInnerTexts()).join('|').replace(/\s+/g, ' ') === '설계팀 2명|시공팀 1명', '담당자: 팀별로 나눠서 (설계팀 2명 / 시공팀 1명)');
@@ -121,6 +126,7 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   log((await b.locator('.bd-f:has-text("A/S 형태")').count()) === 1, 'A/S 형태 칸 있음');
   await b.click('.bd-owners label:has-text("김테스트 대리")'); await b.click('.bd-owners label:has-text("박연습 과장")');
   await b.fill('[name=f_kind]', '추가공사'); await b.fill('[name=f_req]', '화장실 문 손잡이 고장');
+  await b.fill('[name=f_contact]', '홍길동 팀장'); await b.locator('[name=f_phone]').pressSequentially('12345678');
   log((await b.locator('.bd-f > span').allInnerTexts()).slice(0, 4).join('|') === '발주처명 (현장)|A/S 형태|A/S 예정일|접수일' && !(await b.locator('[data-cal=f_asStart]').count()), 'A/S 순서: 발주처명 → A/S 형태 → A/S 예정일 → 접수일 (A/S 기간 없음)');
   await b.click('[data-cal=f_plan]'); await b.click('.bd-cal [data-mv="1"]'); await b.click('.bd-cal [data-d$="-15"]');
   log(/^\d{2}년 \d{2}월 15일$/.test(await b.locator('[data-cal=f_plan]').innerText()), 'A/S 예정일 달력으로 고르기');
@@ -165,12 +171,12 @@ const put = (path, v) => fetch(DB + path + '.json' + NS, { method: 'PUT', header
   await b.waitForFunction(() => document.querySelectorAll('.bd-post').length === 1 && !/손잡이/.test(document.getElementById('list').innerText));
   log(true, 'A/S 완료 → "안 끝난 A/S만" 보기에서 빠짐');
   await b.uncheck('#asOpen'); await b.click('#cats button:has-text("전체")');
-  // 끝난 현장 → 고르기 목록에서 숨김
+  // 프로젝트 글을 고쳐도 현장 고르기에는 영향 없음 (끝난 현장 칸도 없음)
   await a.click('.bd-post:has(.bd-chip.project) .bd-text'); await a.click('#pBody [data-a=edit]');
-  await a.check('#wExtra input[name=closed]'); await a.click('#wSave');
-  await a.waitForSelector('.bd-post:has-text("끝난 현장")');
+  log((await a.locator('#wExtra input[name=closed]').count()) === 0, '프로젝트 글 수정에는 "끝난 현장" 칸이 없음');
+  await a.fill('[name=siteName]', '테스트빌딩 3층 사무실 (고침)'); await a.click('#wSave'); await a.waitForSelector('.bd-post:has-text("(고침)")');
   await b.click('#write'); await b.click('#wCats label:has-text("현장 사진")');
-  log((await b.locator('#wExtra select[name=site] option:has-text("테스트빌딩")').count()) === 0, '끝난 현장은 현장 고르기 목록에서 숨김');
+  log((await b.locator('#wExtra select[name=site] option').allInnerTexts()).join('|').includes('테스트빌딩 3층 사무실') && !(await b.locator('#wExtra select[name=site] option:has-text("(고침)")').count()), '프로젝트 글 이름을 바꿔도 현장 고르기(Site 현장)는 그대로');
   await b.click('#dlgWrite [data-close]');
   // 홈 카드
   await b.click('#write'); await b.click('#wCats label:has-text("A/S")'); await b.fill('[name=f_req]', '새 A/S 하나'); await b.click('#wSave');
