@@ -111,7 +111,7 @@
     const tl = tlRaw, drag = edit && canDrag();
     const help = !edit ? '보기만 (수정: 소장님·관리자)' : drag ? '빈 칸을 마우스로 끌어 칠하면 일정이 돼요(다른 날도 또 칠할 수 있어요) · 회색 칸을 끌면 옮기기 · 끝을 끌면 늘리기 · 줄에 마우스를 올리면 ＋ － (줄 추가·삭제) · 이름은 눌러서 바로 수정 · ⋮⋮ 를 끌면 줄 순서 · Ctrl+Z = 되돌리기' : '칸을 눌러 그날 켜고 끄기 · 이름 옆 ✕ = 일정 지우기';
     return `<div class="card gt-card"><div class="card-h"><h2>공정표</h2><span class="st-ro">${help}</span>
-        <span class="gt-btns">${edit ? `<button type="button" class="btn" data-std>표준 공정표 넣기</button>` : ''}<button type="button" class="btn" data-print>인쇄</button></span></div>
+        <span class="gt-btns">${edit ? `<button type="button" class="btn" data-std>표준 공정표 넣기</button>${tl.length ? '<button type="button" class="btn danger" data-clearall title="이 현장의 공정을 모두 지워요 (Ctrl+Z 로 되돌려요)">전체 삭제</button>' : ''}` : ''}<button type="button" class="btn" data-print>인쇄</button></span></div>
       ${stdOpen && edit ? stdForm(s, tl) : ''}
       <div class="gt-ptitle"><b>INTERIOR PROGRESS SCHEDULE</b><span>공 사 명 : ${esc(s.name)}</span></div>
       <div class="gt-scroll">${gtTable(s, withPreview(tl), edit)}</div>
@@ -352,6 +352,13 @@
     focusSel = `tr[data-t="${id}"] input.nmc`;
     return write(up, '줄 순서 바꾸기');
   }
+  // 이 현장의 공정 전체 삭제 (Ctrl+Z 로 한 번에 되돌림)
+  function clearAll() {
+    const tl = S.taskList(tasksOf(cur.id)); if (!tl.length) return;
+    if (!confirm(`"${cur.name}" 공정 ${tl.length}개를 모두 지울까요?\n(잘못 지웠으면 바로 Ctrl+Z 로 되돌릴 수 있어요)`)) return;
+    flash(`공정 ${tl.length}개를 모두 지웠어요. 잘못 지웠으면 Ctrl+Z`);
+    return write(Object.fromEntries(tl.map((t) => [t.id, null])), '공정 전체 삭제');
+  }
   // 표준 공정표 넣기: 이름이 같은 공정은 공종·날짜만 바꾸고, 없는 공정은 새로 (다른 공정은 그대로)
   function putStd(st) {
     const tl = S.taskList(tasksOf(cur.id)), byName = new Map(tl.map((t) => [S.norm(t.name), t]));
@@ -377,6 +384,7 @@
     if (e.target.closest('[data-calreg]')) return registerCal();
     if (e.target.closest('[data-per]')) { perOpen = !perOpen; return drawMain(); }
     if (e.target.closest('[data-perclose]')) { perOpen = false; return drawMain(); }
+    if (e.target.closest('[data-clearall]')) return clearAll();
     if (e.target.closest('[data-std]')) { stdOpen = !stdOpen; return drawMain(); }
     if (e.target.closest('[data-addfirst]')) return insertRow(null, 1);
     if (e.target.closest('[data-stdclose]')) { stdOpen = false; return drawMain(); }

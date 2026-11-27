@@ -317,6 +317,14 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log(!(await get(`site/p1/tasks/${mf}/start`)), '휴대폰: ✕ 로 일정 지우기');
   log((await m.locator('.st-wk').count()) === 3 && (await m.locator('.st-seg.drag').count()) === 0 && (await m.locator('.st-seg').count()) > 0, '휴대폰: 3주 캘린더는 보기만');
   await m.screenshot({ path: SH + '/s3-mobile.png', fullPage: true });
+  // 현장 공정 전체 삭제 (+ Ctrl+Z 로 한 번에 복구)
+  await a.goto(B + 'site.html'); await a.waitForSelector('.gt');
+  const nBefore = await a.locator('tr[data-t]').count(), keysBefore = Object.keys((await get('site/p1/tasks')) || {}).length;
+  await a.click('[data-clearall]'); await a.waitForFunction(() => document.querySelectorAll('tr[data-t]').length === 0);
+  log(nBefore > 10 && (await get('site/p1/tasks')) === null && (await a.locator('[data-clearall]').count()) === 0 && (await a.locator('.gt-card').innerText()).includes('아직 공정이 없어요'), `"전체 삭제" → 이 현장 공정 ${nBefore}개가 모두 지워짐`);
+  log(Object.keys((await get('site/p2/tasks')) || {}).length === 0 && (await a.locator('#side').innerText()).includes('테스트 오피스'), '다른 현장 데이터는 그대로');
+  await a.keyboard.press('Control+z'); await a.waitForFunction((n) => document.querySelectorAll('tr[data-t]').length === n, nBefore);
+  log(Object.keys((await get('site/p1/tasks')) || {}).length === keysBefore && (await a.locator('td.d.on').count()) > 0, 'Ctrl+Z → 전체 삭제가 한 번에 되돌아옴 (이름·날짜 모두)');
   // 구글 로그인 꺼진 기기
   const P = await br.newContext(); await P.addInitScript(() => { try { localStorage.setItem('sb_emu', '1'); } catch {} });
   const pp = await P.newPage(); pp.on('pageerror', (e) => errs.push(e.message));

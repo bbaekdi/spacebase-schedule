@@ -319,3 +319,7 @@ body.st-dragging .nmw .x { display: none !important; }
 .holv > i { font-style: normal; font-size: 15px; font-weight: 700; line-height: 1; color: rgba(0, 0, 0, .27); }
 @media print { .holv > i { color: rgba(0, 0, 0, .35); font-size: 12px; } }
 .holv { justify-content: space-between; padding: 12px 0; box-sizing: border-box; }
+
+.gt-btns .btn.danger { color: #c22; border-color: #e6b9b9; }
+.gt-btns .btn.danger:hover { background: #fdeeee; }
+@media print { .gt-btns { display: none !important; } }
