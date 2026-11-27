@@ -77,6 +77,7 @@
       </div>
       ${calCard(s, withPreview(tl), canEdit(s))}
       ${gtCard(s, tl, canEdit(s))}`;
+    if (focusId) { const el = $('tr[data-t="' + focusId + '"] input.nmc'); if (el) { el.focus(); el.select(); focusId = null; } }
     const pick = $('#pick'); if (pick) pick.onchange = () => { location.hash = 's=' + encodeURIComponent(pick.value); };
     // 옆으로 밀어 둔 자리 유지, 처음 열 때는 오늘이 보이게
     const sc = $('.gt-scroll');
@@ -105,13 +106,14 @@
 
   function gtCard(s, tlRaw, edit) {
     const tl = tlRaw, drag = edit && canDrag();
-    const help = !edit ? '보기만 (수정: 소장님·관리자)' : listEdit ? '공종·공정 이름, 순서, 삭제를 고쳐요' : drag ? '빈 칸을 끌어 일정 넣기 · 회색 칸을 끌어 옮기기 · 끝을 끌어 늘리기 · 이름 옆 ✕ = 일정 지우기 · 칸 누르기 = 그날 켜고 끄기' : '칸을 눌러 그날 켜고 끄기 · 이름 옆 ✕ = 일정 지우기';
+    const help = !edit ? '보기만 (수정: 소장님·관리자)' : listEdit ? '엑셀처럼 줄 옆의 +위 / +아래 로 줄을 넣고, 삭제로 줄을 지워요 · 공종 칸에 새 이름을 쓰면 새 공종이 돼요' : drag ? '일정 없는 공정은 그 줄의 빈 칸을 마우스로 끌어 칠하면 일정이 돼요 · 회색 칸을 끌면 옮기기 · 끝을 끌면 늘리기 · 이름 옆 ✕ = 일정 지우기 · 칸 누르기 = 그날 켜고 끄기' : '칸을 눌러 그날 켜고 끄기 · 이름 옆 ✕ = 일정 지우기';
     return `<div class="card gt-card"><div class="card-h"><h2>공정표</h2><span class="st-ro">${help}</span>
         <span class="gt-btns">${edit ? `<button type="button" class="btn ${listEdit ? 'primary' : ''}" data-listedit>${listEdit ? '다 고쳤어요' : '공정 목록 고치기'}</button><button type="button" class="btn" data-std>표준 공정표 넣기</button>` : ''}<button type="button" class="btn" data-print>인쇄</button></span></div>
       ${stdOpen && edit ? stdForm(s, tl) : ''}
       <div class="gt-ptitle"><b>INTERIOR PROGRESS SCHEDULE</b><span>공 사 명 : ${esc(s.name)}</span></div>
       <div class="gt-scroll">${gtTable(s, withPreview(tl), edit)}</div>
-      ${edit && (listEdit || !tl.length) ? addForm(tl) : ''}
+      ${edit && listEdit ? catList(tl) : ''}
+      ${edit && !tl.length ? '<button type="button" class="btn" data-addfirst style="margin-top:10px">+ 첫 공정 줄 추가</button>' : ''}
       ${!tl.length ? `<div class="st-none" style="margin-top:10px">아직 공정이 없어요. ${edit ? '"표준 공정표 넣기"를 누르면 회사 공정표의 공종·공정이 착공일 기준 날짜로 들어가요.' : ''}</div>` : ''}
     </div>`;
   }
@@ -119,11 +121,8 @@
     return `<form class="gt-std"><b>표준 공정표 넣기</b><span>회사 공정표의 공정 ${S.STD_TASKS.length}개를 착공일부터 36일 일정으로 넣어요.${tl.length ? ' 이름이 같은 공정은 날짜만 바꾸고, 다른 공정은 그대로 둬요.' : ''}</span>
       <label>착공일 <input type="date" name="st" value="${esc(s.st || S.today())}" required></label><button class="btn primary" type="submit">넣기</button><button class="btn" type="button" data-stdclose>취소</button></form>`;
   }
-  function addForm(tl) {
-    const cats = [...new Set(tl.map(catOf))];
-    return `<form class="st-add gt-add"><input name="cat" list="gtCats" placeholder="공종 (예: 목공사)" maxlength="20" autocomplete="off"><input name="nm" placeholder="+ 공정 추가 (Enter)" maxlength="30" autocomplete="off"><button class="btn" type="submit">추가</button>
-      <datalist id="gtCats">${cats.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></form>`;
-  }
+  // 공종 이름 후보 (공종 칸 입력 자동완성)
+  const catList = (tl) => `<datalist id="gtCats">${[...new Set(tl.map(catOf))].map((c) => `<option value="${esc(c)}">`).join('')}</datalist>`;
 
   function gtTable(s, tl, edit) {
     const day = S.today(), days = daysRange(s, tl), drag = edit && canDrag();
@@ -148,11 +147,11 @@
         : k === 0 ? `<td class="cat" rowspan="${ts.length}">${esc(cat)}</td>` : '';
       const i = tl.findIndex((x) => x.id === t.id);
       const nmCell = listEdit && edit
-        ? `<td class="nm"><div class="nmw"><input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공정 이름"><span class="acts"><button type="button" data-mv="-1" ${i ? '' : 'disabled'} aria-label="위로">▲</button><button type="button" data-mv="1" ${i < tl.length - 1 ? '' : 'disabled'} aria-label="아래로">▼</button><button type="button" class="del" data-del aria-label="삭제">삭제</button></span></div></td>`
+        ? `<td class="nm"><div class="nmw"><input type="text" class="nmc" value="${esc(t.name)}" maxlength="30" aria-label="공정 이름"><span class="acts"><button type="button" class="ins" data-ins="-1" title="이 줄 위에 줄 추가">+위</button><button type="button" class="ins" data-ins="1" title="이 줄 아래에 줄 추가">+아래</button><button type="button" data-mv="-1" ${i ? '' : 'disabled'} aria-label="한 줄 위로" title="줄을 위로 옮기기">↑</button><button type="button" data-mv="1" ${i < tl.length - 1 ? '' : 'disabled'} aria-label="한 줄 아래로" title="줄을 아래로 옮기기">↓</button><button type="button" class="del" data-del aria-label="삭제" title="이 줄 삭제">삭제</button></span></div></td>`
         : `<td class="nm"><div class="nmw">${edit ? `<input type="checkbox" class="chk" ${t.done ? 'checked' : ''} aria-label="${esc(t.name)} 완료" title="완료">` : t.done ? '<span class="ok">✓</span>' : ''}<span class="nmt" title="${esc(t.name)}">${esc(t.name)}</span>${edit && ds.length ? '<i class="x" data-clear title="일정 지우기 (공정 이름은 남아요)">✕</i>' : ''}</div></td>`;
       return `<tr class="${k === 0 ? 'g1' : ''} ${t.done ? 'done' : ''} ${isLive(t.id) ? 'live' : ''}" data-t="${esc(t.id)}">${catCell}${nmCell}${cells}</tr>`;
     }).join('')).join('');
-    return `<table class="gt ${drag && !listEdit ? 'drag' : ''} ${edit && !listEdit ? 'edit' : ''}" style="--n:${days.length}"><colgroup><col class="c-cat"><col class="c-nm">${days.map(() => '<col class="c-d">').join('')}</colgroup>${head}<tbody>${rows}</tbody></table>`;
+    return `<table class="gt ${drag && !listEdit ? 'drag' : ''} ${edit && !listEdit ? 'edit' : ''} ${listEdit ? 'le' : ''}" style="--n:${days.length}"><colgroup><col class="c-cat"><col class="c-nm">${days.map(() => '<col class="c-d">').join('')}</colgroup>${head}<tbody>${rows}</tbody></table>`;
   }
 
   function perForm(s) {
@@ -255,6 +254,18 @@
       flash(`캘린더에 "${s.name}" 일정을 ${ex ? '바꿨어요' : '등록했어요'}. (${S.md(s.st)} ~ ${S.md(s.en)})`);
     } catch (e) { fail(e); }
   }
+  // 엑셀처럼 줄 넣기: 고른 줄의 위/아래에 같은 공종의 새 줄 ("새 공정") — 만들자마자 이름 칸에 커서
+  let focusId = null;
+  function insertRow(id, dir) {
+    const tl = S.taskList(tasksOf(cur.id)), t = id ? tl.find((x) => x.id === id) : null;
+    if (id && !t) return;
+    const at = t ? (dir < 0 ? t.order || 0 : (t.order || 0) + 1) : 1;
+    const up = {}; tl.forEach((x) => { if ((x.order || 0) >= at) up[x.id + '/order'] = (x.order || 0) + 1; });
+    const key = db.ref().push().key;
+    up[key] = { name: '새 공정', order: at, ...(t && t.cat ? { cat: t.cat } : {}), ...stamp() };
+    focusId = key;
+    return db.ref('site/' + cur.id + '/tasks').update(up).catch((e) => { focusId = null; fail(e); });
+  }
   // 표준 공정표 넣기: 이름이 같은 공정은 공종·날짜만 바꾸고, 없는 공정은 새로 (다른 공정은 그대로)
   function putStd(st) {
     const tl = S.taskList(tasksOf(cur.id)), byName = new Map(tl.map((t) => [S.norm(t.name), t]));
@@ -282,11 +293,14 @@
     if (e.target.closest('[data-perclose]')) { perOpen = false; return drawMain(); }
     if (e.target.closest('[data-listedit]')) { listEdit = !listEdit; return drawMain(); }
     if (e.target.closest('[data-std]')) { stdOpen = !stdOpen; return drawMain(); }
+    if (e.target.closest('[data-addfirst]')) { listEdit = true; return insertRow(null, 1); }
     if (e.target.closest('[data-stdclose]')) { stdOpen = false; return drawMain(); }
     const tr = e.target.closest('tr[data-t]');
     const clr = e.target.closest('[data-clear]');
     if (clr) { const host = clr.closest('[data-t]'); if (host) clearSchedule(host.dataset.t); return; }
     if (tr && e.target.closest('[data-del]')) { const t = tasks[tr.dataset.t]; if (confirm(`"${t.name}" 공정을 삭제할까요?`)) tRef(tr.dataset.t).remove().catch(fail); return; }
+    const ins = e.target.closest('[data-ins]');
+    if (tr && ins) return insertRow(tr.dataset.t, +ins.dataset.ins);
     const mv = e.target.closest('[data-mv]');
     if (tr && mv) {
       const tl = S.taskList(tasks), i = tl.findIndex((t) => t.id === tr.dataset.t), j = i + +mv.dataset.mv;
@@ -303,17 +317,6 @@
     if (per) { e.preventDefault(); if (cur && canEdit(cur)) savePeriod(per.st.value, per.en.value); return; }
     const std = e.target.closest('.gt-std');
     if (std) { e.preventDefault(); if (cur && canEdit(cur) && std.st.value) putStd(std.st.value); return; }
-    const f = e.target.closest('.st-add'); if (!f) return;
-    e.preventDefault();
-    if (!cur || !canEdit(cur)) return;
-    const name = f.nm.value.trim().slice(0, 30), cat = f.cat.value.trim().slice(0, 20); if (!name) return;
-    const tl = S.taskList(tasksOf(cur.id));
-    // 같은 공종의 마지막 공정 바로 뒤에 (없으면 맨 끝)
-    const same = tl.filter((t) => cat && catOf(t) === cat), after = same.length ? same[same.length - 1].order || 0 : Math.max(0, ...tl.map((t) => t.order || 0));
-    const up = {}; tl.forEach((t) => { if ((t.order || 0) > after) up[t.id + '/order'] = (t.order || 0) + 1; });
-    up[db.ref().push().key] = { name, order: after + 1, ...(cat ? { cat } : {}), ...stamp() };
-    f.nm.value = '';
-    db.ref('site/' + cur.id + '/tasks').update(up).catch(fail);
   });
   document.addEventListener('change', (e) => {
     if (!cur || !canEdit(cur)) return;

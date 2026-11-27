@@ -55,17 +55,30 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await a.locator('thead th.dw.red').count()) >= 1 && (await a.locator('thead th.dw.blue').count()) >= 1, '일요일 빨강·토요일 파랑');
   log((await a.locator(`${cell(mokId, TODAY)}`).evaluate((el) => getComputedStyle(el).backgroundColor)).replace(/\s/g, '') !== 'rgb(255,255,255)', '하는 날은 회색 칸');
   log(/오늘 공정[\s\S]*벽체 MDF/.test(await a.locator('.st-stats').innerText()) && !/진행률 \d+%\s*·/.test(await a.locator('.st-head').innerText()), '오늘 하는 공정은 위 카드에 (머리의 긴 한 줄은 없앰)');
-  // 공정 목록 고치기: 추가 (공종 + 이름) · 이름 · 순서
+  // 공정 목록 고치기 (엑셀처럼): 줄 위/아래 추가 · 삭제 · 이름 · 순서
   await a.click('[data-listedit]');
-  await a.fill('.gt-add input[name=cat]', '목공사'); await a.fill('.gt-add input[name=nm]', '필름'); await a.press('.gt-add input[name=nm]', 'Enter');
-  await a.waitForSelector('tr[data-t] input.nmc[value="필름"]');
   const names = async () => a.locator('tr[data-t]').evaluateAll((trs) => trs.map((t) => (t.querySelector('input.nmc') || t.querySelector('.nmt')).value || t.querySelector('.nmt').textContent));
+  log((await a.locator('[data-ins]').count()) === 2 * 37 && (await a.locator('.gt-add').count()) === 0, '줄마다 +위 / +아래 버튼 (아래쪽 공정 추가 칸은 없앰)');
+  const mdfBo = await a.getAttribute('tr:has(input.nmc[value="천정 MDF보드 작업"])', 'data-t');
+  await a.click(`tr[data-t="${mdfBo}"] [data-ins="1"]`);
+  await a.waitForFunction(() => document.activeElement && document.activeElement.classList.contains('nmc') && document.activeElement.value === '새 공정');
   let nm = await names();
-  log(nm.indexOf('필름') === nm.indexOf('천정 MDF보드 작업') + 1, '공정 추가: 같은 공종 맨 아래에 (공종 칸 입력)');
+  log(nm.length === 38 && nm.indexOf('새 공정') === nm.indexOf('천정 MDF보드 작업') + 1, '+아래: 그 줄 바로 아래에 새 줄 (같은 공종), 이름 칸에 바로 커서');
+  await a.keyboard.type('필름'); await a.keyboard.press('Tab');
+  await a.waitForSelector('tr[data-t] input.nmc[value="필름"]');
+  nm = await names();
+  log(nm.indexOf('필름') === nm.indexOf('천정 MDF보드 작업') + 1 && (await get(`site/p1/tasks/${await a.getAttribute('tr:has(input.nmc[value="필름"])', 'data-t')}/cat`)) === '목공사', '새 줄 이름을 쓰면 저장 (공종 = 목공사)');
+  const fId0 = await a.getAttribute('tr:has(input.nmc[value="필름"])', 'data-t');
+  await a.click(`tr[data-t="${fId0}"] [data-ins="-1"]`);
+  await a.waitForFunction(() => document.activeElement && document.activeElement.value === '새 공정');
+  nm = await names();
+  log(nm.length === 39 && nm.indexOf('새 공정') === nm.indexOf('필름') - 1, '+위: 그 줄 바로 위에 새 줄');
+  await a.locator('tr:has(input.nmc[value="새 공정"]) [data-del]').click(); await new Promise((r) => setTimeout(r, 600));
+  log((await names()).length === 38 && !(await names()).includes('새 공정'), '삭제: 그 줄 지우기 (엑셀처럼)');
   const jb = a.locator('tr[data-t] input.nmc[value="잔손보기"]'); await jb.fill('잔손 보기'); await jb.press('Tab');
   await a.waitForSelector('tr[data-t] input.nmc[value="잔손 보기"]');
   log(true, '공정 이름 고치기');
-  const fId = await a.getAttribute('tr:has(input.nmc[value="필름"])', 'data-t');
+  const fId = fId0;
   await a.click(`tr[data-t="${fId}"] [data-mv="-1"]`); await a.waitForFunction(async () => true);
   await a.waitForFunction((id) => { const t = [...document.querySelectorAll('tr[data-t]')]; return t.findIndex((x) => x.dataset.t === id) < t.findIndex((x) => /MDF보드/.test(x.innerHTML)); }, fId);
   log(true, '공정 순서 바꾸기 (필름 ↑)');
