@@ -179,20 +179,13 @@
     document.getElementById('mySiteCard').classList.toggle('hidden', !mine.length);
     const day = S.today();
     document.getElementById('mySites').innerHTML = mine.map((s) => {
-      const d = siteData[s.id] || {}, now = S.todayTasks(d.tasks, day), att = ((d.attend || {})[day] || {})[me.uid];
+      const d = siteData[s.id] || {}, now = S.todayTasks(d.tasks, day);
       return `<div class="mysite" data-id="${esc(s.id)}"><a href="site.html#s=${encodeURIComponent(s.id)}"><b>${esc(s.name)}</b><small>${now.length ? '오늘: ' + now.map((t) => esc(t.name)).join(', ') : '오늘은 공정이 없어요'} · 진행률 ${S.progress(d.tasks)}%</small></a>
-        ${att ? '<span class="mysite-ok">✓ 출근함</span>' : '<button class="btn primary" type="button" data-att>출근</button>'}</div>`;
+      </div>`;
     }).join('');
   };
   ['projects', 'groups', 'members'].forEach((k) => base.child(k).on('value', (s) => { sched[k] = S.list(s.val()); draw(); }));
   db.ref('site').on('value', (s) => { siteData = s.val() || {}; draw(); });
-  document.getElementById('mySites').addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-att]'); if (!b) return;
-    const s = S.sites(sched).all.find((x) => x.id === b.closest('.mysite').dataset.id); if (!s) return;
-    b.disabled = true;
-    try { const r = await S.attend(db, me, s); if (r.already) alert('오늘은 이미 출근 등록을 했어요.'); }
-    catch (er) { alert('출근 등록을 하지 못했어요: ' + er.message); b.disabled = false; }
-  });
 })();
 
 // Band 새 글 (구글 로그인 회원만)

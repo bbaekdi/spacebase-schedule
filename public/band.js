@@ -10,7 +10,6 @@
     { key: 'as', label: 'A/S' },
     { key: 'project', label: '프로젝트' },
     { key: 'notice', label: '공지·자유글' },
-    { key: 'attend', label: '출근' }, // Site 출근 버튼이 자동으로 쓰는 글 (직접 쓰기 없음)
   ];
   const AS = { new: '접수', doing: '처리 중', done: '완료' };
   const catLabel = (k) => (CATS.find((c) => c.key === k) || {}).label || '';

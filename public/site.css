@@ -1,5 +1,5 @@
 /* Site: 현장 공정 스케줄표 + 출근 */
-.st { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 20px; align-items: start; max-width: 1240px; }
+.wrap.st { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 20px; align-items: start; max-width: none; padding-left: 28px; padding-right: 28px; }
 .st-side { position: sticky; top: 76px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 10px; }
 .st-side h3 { font-size: 12px; color: var(--sub); margin: 6px 8px 6px; font-weight: 700; }
 .st-side h3 + .st-none { margin: 0 8px 8px; }
@@ -136,7 +136,7 @@ body.st-dragging .st-seg .x { display: none !important; }
 .st-calf button { border: 0; background: none; color: var(--sub); font-size: 13px; cursor: pointer; padding: 4px 6px; text-decoration: underline; }
 
 @media (max-width: 900px) {
-  .st { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .wrap.st { grid-template-columns: minmax(0, 1fr); gap: 12px; padding-left: 16px; padding-right: 16px; }
   .st-side { display: none; }
   .st-pick { display: block; width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font-size: 15px; font-weight: 700; background: #fff; }
   .st-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -160,8 +160,8 @@ body.st-dragging .st-seg .x { display: none !important; }
 .gt-std span { color: var(--sub); flex: 1; min-width: 200px; }
 .gt-std input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
 .gt-scroll { overflow: auto; max-height: 76vh; border: 1px solid #222; }
-.gt { border-collapse: collapse; table-layout: fixed; width: calc(276px + var(--n) * 24px); font-size: 11px; background: #fff; }
-.gt col.c-cat { width: 86px; } .gt col.c-nm { width: 190px; } .gt col.c-d { width: 24px; }
+.gt { border-collapse: collapse; table-layout: fixed; width: 100%; min-width: calc(340px + var(--n) * 24px); font-size: 11px; background: #fff; }
+.gt col.c-cat { width: 100px; } .gt col.c-nm { width: 240px; } .gt col.c-d { width: auto; }
 .gt th, .gt td { border: 1px solid #cfcfcf; padding: 0; height: 24px; text-align: center; overflow: hidden; }
 .gt thead th { background: #fff; font-weight: 700; height: 20px; position: sticky; z-index: 3; }
 .gt thead tr:nth-child(1) th { top: 0; } .gt thead tr:nth-child(2) th { top: 20px; } .gt thead tr:nth-child(3) th { top: 40px; } .gt thead tr:nth-child(4) th { top: 60px; }
@@ -171,8 +171,8 @@ body.st-dragging .st-seg .x { display: none !important; }
 .gt th.dp { font-weight: 400; color: #555; }
 .gt th.td { background: #fff3c4; }
 .gt td.cat, .gt td.nm { position: sticky; background: #fff; z-index: 2; text-align: center; font-weight: 600; border-color: #222; }
-.gt td.cat { left: 0; } .gt td.nm { left: 86px; text-align: left; font-weight: 400; border-color: #cfcfcf; }
-.gt thead th.cat, .gt tbody td.cat { left: 0; } .gt thead th.nm { left: 86px; }
+.gt td.cat { left: 0; } .gt td.nm { left: 100px; text-align: left; font-weight: 400; border-color: #cfcfcf; }
+.gt thead th.cat, .gt tbody td.cat { left: 0; } .gt thead th.nm { left: 100px; }
 .gt thead th.cat, .gt thead th.nm { z-index: 4; }
 .gt tr.g1 td, .gt tr.g1 th { border-top: 1px solid #222; }
 .gt td.wk { background: #fcf6f6; }
@@ -213,7 +213,7 @@ body.st-dragging .nmw .x { display: none !important; }
 @media (max-width: 900px) {
   .gt-scroll { max-height: 70vh; }
   .gt col.c-cat { width: 64px; } .gt col.c-nm { width: 130px; } .gt col.c-d { width: 26px; }
-  .gt { width: calc(194px + var(--n) * 26px); }
+  .gt { width: calc(194px + var(--n) * 26px); min-width: 0; }
   .gt td.nm { left: 64px; } .gt thead th.nm { left: 64px; }
   .gt td .hl, .gt td .hr { display: none; }
   .nmw .x { display: block; width: 20px; height: 20px; line-height: 20px; }
@@ -244,3 +244,14 @@ body.st-dragging .nmw .x { display: none !important; }
   .gt tr.att { display: none; }
   .nmw { padding: 0 3px; } .nmw .chk, .nmw .ok { display: none; }
 }
+
+/* 착공·준공 고치기 · 알림 · 일정 없는 공정 칩 */
+.st-link { border: 0; background: none; color: var(--accent-text, #8a5a00); font: inherit; font-size: 12px; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0 2px; }
+.gt-per { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--bg); border-radius: 10px; padding: 8px 12px; margin-top: 8px; font-size: 13px; }
+.gt-per input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+.gt-per .btn { padding: 7px 12px; font-size: 12px; }
+.st-flash { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 90; background: #1d1d1b; color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100vw - 32px); }
+.st-tray { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; font-size: 12px; }
+.st-chip { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 1px solid var(--line); border-radius: 99px; padding: 4px 11px; font-size: 12px; font-weight: 700; cursor: grab; user-select: none; }
+.st-chip.dragging { opacity: .45; }
+@media print { .st-calcard, .st-flash { display: none !important; } }

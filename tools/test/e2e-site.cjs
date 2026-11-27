@@ -1,4 +1,4 @@
-// Site(현장 공정·출근) 화면 시험 (연습용 Firebase, 가짜 데이터). 실행 방법은 e2e-auth.cjs 와 같음:
+// Site(현장 공정표·일정 등록) 화면 시험 (연습용 Firebase, 가짜 데이터). 실행 방법은 e2e-auth.cjs 와 같음:
 // 에뮬레이터 + 로컬 서버를 켠 뒤 node tools/test/emu-seed.mjs && node tools/test/e2e-site.cjs <스크린샷 폴더>
 const { chromium, devices } = require('playwright');
 const crypto = require('crypto');
@@ -39,7 +39,7 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await a.locator('.st-head h1').innerText()) === '테스트 오피스', '진행 현장이 먼저 열림');
   log(/소장: 김테스트 대리/.test(await a.locator('.st-head').innerText()), '소장 = 주간 스케줄 시공 담당(약칭 김 → 김테스트 대리)');
   // 공정표 한 장 (왼쪽엔 현장 목록만)
-  log((await a.locator('#side .st-tp').count()) === 0 && (await a.locator('.gt').count()) === 1 && (await a.locator('.st-calcard').count()) === 0, '공정표 한 장 (왼쪽엔 현장 목록만, 4주 캘린더 없음)');
+  log((await a.locator('#side .st-tp').count()) === 0 && (await a.locator('.gt').count()) === 1, '공정표 (왼쪽엔 현장 목록만)');
   const row = (n) => `tr:has(.nmt:text-is("${n}"))`, cell = (id, d) => `tr[data-t="${id}"] td.d[data-day="${d}"]`;
   // 표준 공정표 넣기: 착공일 기준 날짜 (착공 = 10일 전)
   await a.click('[data-std]'); await a.fill('.gt-std input[name=st]', plus(-10)); await a.click('.gt-std button[type=submit]');
@@ -119,42 +119,100 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log((await a.locator('td.cat:has-text("기타")').count()) >= 1, '공종 없는 예전 공정도 "기타" 로 보임 (안 사라짐)');
   await a.click('[data-listedit]'); await a.click('tr:has(input.nmc[value="옛날 공정"]) [data-del]'); await new Promise((r) => setTimeout(r, 600));
   log((await get('site/p1/tasks/old1')) === null, '공정 삭제'); await a.click('[data-listedit]');
-  // 출근 (+ 새 글 알림 요청)
-  let notifyReq = null;
-  await a.route('**/push/notify', (r) => { notifyReq = r.request().postDataJSON(); r.fulfill({ status: 200, body: '{}' }); });
-  await a.click('#attBtn'); await a.waitForSelector('.st-attend .done');
-  log((await a.locator('.st-attend .done').innerText()) === '✓ 출근함', '출근 → "✓ 출근함" (시간 없음)');
-  log(/✓/.test(await a.locator(`tr.att td.d[data-day="${TODAY}"]`).innerText()), '공정표 출근 줄에 오늘 출근 표시');
-  const posts = Object.values((await get('board/posts')) || {});
-  log(posts.some((x) => x.cat === 'attend' && /김테스트 출근 · \d\d:\d\d/.test(x.text) && x.siteName === '테스트 오피스'), 'Band "출근" 게시판에 자동 글');
-  await new Promise((r) => setTimeout(r, 800));
-  log(!!notifyReq && !!notifyReq.post, '출근하면 새 글 알림 보내기 요청');
-  await a.locator('.st-head').screenshot({ path: SH + '/s0-head.png' });
-  await a.locator('.gt-card').screenshot({ path: SH + '/s4-calendar.png' });
+  // 넓게 보임 · 출근 없음
+  const gw = await a.locator('.gt-card').boundingBox();
+  log(gw.width > 1040, `공정표가 오른쪽으로 넓게 보임 (${Math.round(gw.width)}px)`);
+  log((await a.locator('[data-att], #attBtn, tr.att').count()) === 0 && !/출근/.test(await a.locator('#main').innerText()), '출근 버튼·출근 줄 없음');
+  // 착공·준공 고치기: 주간 스케줄 공사기간도 같이 바뀜 (그 현장만, 다른 칸은 그대로)
+  const projects = async () => Object.values((await get(`spaces/${SPACE}/data/projects`)) || {});
+  const before = (await projects()).find((x) => x.id === 'p1');
+  await a.click('[data-per]'); await a.fill('.gt-per input[name=st]', plus(-12)); await a.fill('.gt-per input[name=en]', plus(-20)); await a.click('.gt-per button[type=submit]');
+  await new Promise((r) => setTimeout(r, 600));
+  log((await projects()).find((x) => x.id === 'p1').period === before.period, '준공일이 착공일보다 빠르면 저장 안 함');
+  await a.fill('.gt-per input[name=en]', plus(30)); await a.click('.gt-per button[type=submit]');
+  await a.waitForFunction((d) => document.querySelector('table.gt td.d[data-day]').dataset.day === d, plus(-12));
+  const after = (await projects()).find((x) => x.id === 'p1');
+  log(after.period === dot(plus(-12)) + '-' + dot(plus(30)) && after.name === before.name && after.build === before.build && (await projects()).length === 4, `착공·준공 고치기 → 주간 스케줄 공사기간 "${after.period}" (다른 칸·다른 현장은 그대로)`);
+  log((await a.locator('table.gt td.d[data-day]').last().getAttribute('data-day')) === plus(30) && (await a.locator('thead th.dp.jg').innerText()) === '준공', '표 날짜 범위가 새 착공~준공으로 바뀜');
+  // 일정 등록: 회사 캘린더에 현장 이름으로 한 건 (다시 눌러도 한 건)
+  await a.click('[data-calreg]'); await a.waitForSelector('.st-flash'); await new Promise((r) => setTimeout(r, 500));
+  const items1 = (await get(`spaces/${SPACE}/calendar/items`)) || {}, ci = items1['site-p1'];
+  log(!!ci && ci.title === '테스트 오피스' && ci.allDay === true && ci.start === new Date(`${plus(-12)}T00:00:00+09:00`).toISOString() && ci.end === new Date(`${plus(31)}T00:00:00+09:00`).toISOString() && ci.by === '김테스트', '일정 등록 → 회사 캘린더에 현장 이름·공사기간 한 건');
+  await a.click('[data-calreg]'); await new Promise((r) => setTimeout(r, 700));
+  log(Object.keys((await get(`spaces/${SPACE}/calendar/items`)) || {}).filter((k) => k.startsWith('site-')).length === 1, '다시 눌러도 같은 일정 한 건 (중복 없음)');
+  await a.goto(B + 'calendar.html'); await a.waitForFunction(() => /테스트 오피스/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+  log(/테스트 오피스/.test(await a.locator('body').innerText()), 'Calendar 화면에 현장 일정이 보임');
+  await a.goto(B + 'site.html'); await a.waitForSelector('.gt');
+  // 3주 캘린더 (지난주 · 이번 주 · 다음 주)
+  const sun = (d) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() - x.getDay()); return kst(new Date(x.getTime() + 9 * 3600e3)); };
+  const W0 = await a.getAttribute('.st-wk >> nth=0 >> .st-day >> nth=0', 'data-day');
+  log((await a.locator('.st-wk').count()) === 3 && W0 === S_add(sun(TODAY), -7), '캘린더 3주: 지난주 · 이번 주 · 다음 주');
+  await a.click('[data-wk="7"]'); const W1 = await a.getAttribute('.st-wk >> nth=0 >> .st-day >> nth=0', 'data-day'); await a.click('[data-wk="0"]');
+  log(W1 === S_add(W0, 7), '› 누르면 한 주씩 넘어감');
+  const cd = (d) => `.st-month button.st-day[data-day="${d}"]`, bar = `.st-seg[data-t="${fId}"]`;
+  log((await a.locator('.st-chip').count()) >= 1 && (await a.locator(`.st-chip:has-text("필름")`).count()) === 1, '일정 없는 공정이 칩으로 보임');
+  await a.locator('.st-chip:has-text("필름")').dragTo(a.locator(cd(TODAY)), { targetPosition: { x: 12, y: 10 } });
+  await a.waitForSelector(bar);
+  const k1 = await get(`site/p1/tasks/${fId}`);
+  log(k1.start === TODAY && k1.end === TODAY, '칩을 날짜로 끌어다 놓기 → 그날 하루 막대');
+  { // 끝 손잡이 늘리기 (→ 3일 뒤)
+    await a.locator('.st-month').scrollIntoViewIfNeeded(); await a.evaluate(() => document.querySelector('.st-month').scrollIntoView({ block: 'center' }));
+    const hr = a.locator(`${bar} .hr`);
+    const f = await hr.boundingBox(), t = await a.locator(cd(plus(3))).boundingBox(), c0 = await a.locator(cd(TODAY)).boundingBox();
+    const ty = t.y + (f.y + f.height / 2 - c0.y); // 다른 주 줄이면 그 줄의 같은 높이로
+    await a.mouse.move(f.x + f.width / 2, f.y + f.height / 2); await a.mouse.down(); await a.mouse.move(t.x + t.width / 2, ty, { steps: 8 }); await a.mouse.up(); await new Promise((r) => setTimeout(r, 700));
+  }
+  const k2 = await get(`site/p1/tasks/${fId}`);
+  log(k2.start === TODAY && k2.end === plus(3), '막대 끝 잡아 늘리기 → 오늘~3일 뒤');
+  { // 막대 옮기기 (+1일): 끄는 동안 막대가 제 색으로 따라오고 저장은 아직
+    const b0 = await a.locator(`${bar} >> nth=0`).boundingBox(), c0 = await a.locator(cd(TODAY)).boundingBox(), c1 = await a.locator(cd(plus(1))).boundingBox();
+    const y = b0.y + b0.height / 2, y1 = c1.y + (y - c0.y);
+    await a.mouse.move(c0.x + c0.width / 2, y); await a.mouse.down(); await a.mouse.move(c1.x + c1.width / 2, y1, { steps: 8 });
+    const lc = await a.locator(`${bar}.live >> nth=0`).evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => '');
+    log((await a.locator(`${bar}.live`).count()) >= 1 && lc && !/rgb\(217, 213, 203\)/.test(lc) && (await a.locator('.st-day.hl').count()) === 0 && (await get(`site/p1/tasks/${fId}/start`)) === TODAY && (await a.locator(`tr.live[data-t="${fId}"]`).count()) === 1, '끄는 동안 막대가 제 색으로 따라 움직이고 표도 같이 바뀜 (놓기 전엔 저장 안 함)');
+    await a.screenshot({ path: SH + '/s5-dragging.png' });
+    await a.mouse.up(); await new Promise((r) => setTimeout(r, 700));
+  }
+  const k3 = await get(`site/p1/tasks/${fId}`);
+  log(k3.start === plus(1) && k3.end === plus(4), `막대 끌어 옮기기 → 하루 뒤로, 기간은 그대로 (${k3.start}~${k3.end})`);
+  log((await a.locator(`.st-chip:has-text("필름")`).count()) === 0, '일정이 생기면 칩에서 빠짐 (넣기는 칩 끌기 하나)');
+  // 날짜 누르기: 그날 하는 공정 켜고 끄기 (쉬는 날) — 일정 있는 공정만
+  await a.locator(cd(TODAY)).click({ position: { x: 12, y: 10 } }); await a.waitForSelector('.st-daypop');
+  log(await a.isChecked(`.st-daypop input[data-t="${mokId}"]`) && (await a.locator('.st-daypop [data-clear-t]').count()) === 0, '날짜 누르기: 그날 하는 공정 (목록에 일정 지우기 없음)');
+  await a.uncheck(`.st-daypop input[data-t="${mokId}"]`); await new Promise((r) => setTimeout(r, 600));
+  log((await get(`site/p1/tasks/${mokId}/minus/${TODAY}`)) === true, '끄면 그날만 쉬는 날');
+  await a.check(`.st-daypop input[data-t="${mokId}"]`); await new Promise((r) => setTimeout(r, 600));
+  log((await get(`site/p1/tasks/${mokId}/minus/${TODAY}`)) === null, '다시 켜면 하는 날');
+  await a.click('.st-daypop [data-close]');
+  // 막대 ✕ → 일정 지우기 (공정은 남음)
+  await a.hover(`${bar} >> nth=-1`); await a.click(`${bar} >> nth=-1 >> .x`); await new Promise((r) => setTimeout(r, 700));
+  const k4 = await get(`site/p1/tasks/${fId}`);
+  log(!k4.start && !k4.end && k4.name === '필름' && (await a.locator(`.st-chip:has-text("필름")`).count()) === 1, '막대 ✕ → 일정만 지워지고 공정은 남음 (다시 칩으로)');
+  await a.screenshot({ path: SH + '/s1-site.png' });
   // 다른 직원 (소장 아님)
   const { p: b } = await user('b@test.com', '이시험', false);
   await b.waitForSelector('.st-head h1');
-  log((await b.locator('#attBtn').count()) === 0 && (await b.locator('[data-std]').count()) === 0 && (await b.locator('.gt-add').count()) === 0 && (await b.locator('.gt.edit').count()) === 0 && (await b.locator('.gt .nmw .x').count()) === 0 && (await b.locator('.gt input.chk').count()) === 0, '소장 아닌 직원: 출근·추가·끌기 없음 (보기만)');
-  log(/✓/.test(await b.locator('tr.att').innerText()), '다른 직원도 출근한 날을 봄');
+  log((await b.locator('[data-calreg]').count()) === 0 && (await b.locator('[data-per]').count()) === 0 && (await b.locator('.st-tray').count()) === 0 && (await b.locator('button.st-day').count()) === 0 && (await b.locator('.st-seg.drag').count()) === 0 && (await b.locator('[data-std]').count()) === 0 && (await b.locator('.gt-add').count()) === 0 && (await b.locator('.gt.edit').count()) === 0 && (await b.locator('.gt .nmw .x').count()) === 0 && (await b.locator('.gt input.chk').count()) === 0, '소장 아닌 직원: 일정 등록·기간 고치기·추가·끌기 없음 (보기만)');
+  log((await b.locator('.gt td.d.on').count()) > 0 && (await b.locator('.st-seg').count()) > 0, '다른 직원도 표·캘린더를 봄');
   await b.goto(B + 'band.html'); await b.waitForTimeout(1500);
-  log(!/출근 ·/.test(await b.locator('#list').innerText()), 'Band "전체"에는 출근 글이 안 섞임');
-  await b.click('#cats button:has-text("출근")'); await b.waitForTimeout(300);
-  log(/김테스트 출근/.test(await b.locator('#list').innerText()), 'Band "출근" 게시판에서 보임');
+  await put('board/posts/old_att', { cat: 'attend', text: '옛 출근 글', siteName: '테스트 오피스', uid: 'x', name: '옛', at: 5, commentCount: 0 });
+  await b.reload().catch(() => {}); await b.waitForTimeout(1500);
+  log(!/옛 출근 글/.test(await b.locator('#list').innerText()) && (await b.locator('#cats button:has-text("출근")').count()) === 0, 'Band 에 "출근" 게시판 없음 (옛 글은 안 보이고 데이터는 보관)');
+  log((await get('board/posts/old_att')) !== null, '옛 출근 글 데이터는 지워지지 않음');
   await b.click('#write');
-  log((await b.locator('#wCats label:has-text("출근")').count()) === 0, '글쓰기에서는 "출근" 게시판을 못 고름');
   await b.click('#dlgWrite [data-close]');
   // 홈 카드
   await a.goto(B + 'portal.html'); await a.waitForSelector('#mySiteCard:not(.hidden) .mysite');
-  log(/테스트 오피스[\s\S]*오늘: [\s\S]*벽체 MDF[\s\S]*✓ 출근함/.test(await a.locator('#mySiteCard').innerText()), '홈 "오늘 내 현장": 오늘 공정 + 출근함');
+  log(/테스트 오피스[\s\S]*오늘: [\s\S]*벽체 MDF/.test(await a.locator('#mySiteCard').innerText()) && (await a.locator('#mySiteCard [data-att]').count()) === 0 && !/출근/.test(await a.locator('#mySiteCard').innerText()), '홈 "오늘 내 현장": 오늘 공정 (출근 버튼 없음)');
   await a.waitForTimeout(800); await a.screenshot({ path: SH + '/s2-home.png' });
   await b.goto(B + 'portal.html'); await b.waitForTimeout(2000);
   log(await b.locator('#mySiteCard').isHidden(), '소장 아닌 직원은 "오늘 내 현장" 카드 없음');
-  // 관리자 (소장 아님): 출근 버튼·오늘 내 현장 카드 보임
+  // 관리자 (소장 아님): 일정 등록 버튼·오늘 내 현장 카드 보임
   const { p: c } = await user('c@test.com', '박관리', true);
   await c.waitForSelector('.st-head h1');
-  log((await c.locator('#attBtn').count()) === 1 && (await c.locator('[data-std]').count()) === 1, '관리자: 출근 버튼 + 수정 가능');
+  log((await c.locator('[data-calreg]').count()) === 1 && (await c.locator('[data-std]').count()) === 1 && (await c.locator('[data-per]').count()) === 1, '관리자: 일정 등록 · 기간 고치기 · 수정 가능');
   await c.goto(B + 'portal.html'); await c.waitForSelector('#mySiteCard:not(.hidden) .mysite');
-  log(/테스트 오피스/.test(await c.locator('#mySiteCard').innerText()) && (await c.locator('#mySiteCard [data-att]').count()) === 1, '관리자: 홈 "오늘 내 현장" 카드 + 출근 버튼');
+  log(/테스트 오피스/.test(await c.locator('#mySiteCard').innerText()), '관리자: 홈 "오늘 내 현장" 카드');
   // 휴대폰
   const { p: m } = await user('a@test.com', '김테스트', false, { ...devices['iPhone 13'] });
   await m.waitForSelector('.st-head h1'); await m.waitForTimeout(500);
@@ -167,6 +225,10 @@ const S_add = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.g
   log(mf1.start === TODAY && mf1.end === TODAY, '휴대폰 칸 누르기: 일정 없는 공정은 그날로 시작');
   await m.locator(`tr[data-t="${mf}"] .x`).first().tap(); await new Promise((r) => setTimeout(r, 700));
   log(!(await get(`site/p1/tasks/${mf}/start`)), '휴대폰: ✕ 로 일정 지우기');
+  log((await m.locator('.st-wk').count()) === 3 && (await m.locator('.st-tray').count()) === 0 && (await m.locator('.st-seg.drag').count()) === 0, '휴대폰: 3주 캘린더 (칩·끌기 없음)');
+  await m.locator(`.st-month button.st-day[data-day="${plus(-1)}"]`).tap({ position: { x: 10, y: 10 } }); await m.waitForSelector('.st-daypop');
+  log((await m.locator('.st-daypop [data-clear-t]').count()) >= 1 && /필름/.test(await m.locator('.st-daypop').innerText()), '휴대폰 날짜 누르기: 일정 없는 공정도 보임 + "일정 지우기"');
+  await m.evaluate(() => document.querySelector('.st-daypop [data-close]').click());
   await m.screenshot({ path: SH + '/s3-mobile.png', fullPage: true });
   // 구글 로그인 꺼진 기기
   const P = await br.newContext(); await P.addInitScript(() => { try { localStorage.setItem('sb_emu', '1'); } catch {} });

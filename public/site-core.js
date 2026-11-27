@@ -1,7 +1,7 @@
 // Site(현장 공정·출근) 공용 도우미: Site 화면(site.js)과 홈 "오늘 내 현장" 카드가 같이 쓴다.
 // - 현장 목록 = 주간 스케줄 PROJECT 구분 현장 (주간 스케줄 데이터는 읽기만 함)
 // - 현장 소장 = 주간 스케줄 "시공 담당"(약칭) → 직원표 이름
-// - 공정·출근은 Firebase site/<현장id>/tasks, site/<현장id>/attend/<날짜>/<uid>
+// - 공정은 Firebase site/<현장id>/tasks (예전 출근 기록 site/<현장id>/attend 는 지우지 않고 보관만)
 (function () {
   const pad = (n) => String(n).padStart(2, '0');
   const ymdOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -135,28 +135,7 @@
     return { start: day(a), end: day(b), plus: Object.keys(plus).length ? plus : null };
   }
 
-  // 새 글 알림 보내기 (Band 중계 worker/push.js)
-  async function notify(postId) {
-    try {
-      const api = String(window.SB_BAND_API || '').replace(/\/$/, ''); if (!api || !postId) return;
-      const t = await firebase.auth().currentUser.getIdToken();
-      fetch(api + '/push/notify', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ post: postId }) }).catch(() => {});
-    } catch {}
-  }
-  // 출근할 수 있는 사람: 그 현장 소장님 + 관리자
+  // 수정할 수 있는 사람: 그 현장 소장님 + 관리자
   const canAttend = (site, members, me) => !!me && (me.admin || isManager(site, members, me.name));
-  // 출근: site/<id>/attend/<날짜>/<uid> + Band "출근" 게시판 글 + 새 글 알림 (하루 한 번)
-  async function attend(db, me, site) {
-    const day = today(), ref = db.ref('site/' + site.id + '/attend/' + day + '/' + me.uid);
-    if ((await ref.once('value')).exists()) return { already: true };
-    const now = Date.now();
-    await ref.set({ name: me.name, at: now });
-    const hm = new Date(now).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
-    const post = db.ref('board/posts').push();
-    await post.set({ cat: 'attend', text: `${me.name} 출근 · ${hm}`, siteName: site.name.slice(0, 40), uid: me.uid, name: me.name, at: now, commentCount: 0 }).then(() => notify(post.key)).catch(() => {});
-    return { at: now, hm };
-  }
-  const hmOf = (t) => new Date(t).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
-
-  window.SBSite = { today, addDays, diffDays, parse, ymdOf, yy, md, periodRange, sites, managers, isManager, canAttend, activeOn, daysOf, taskList, progress, todayTasks, nextTask, STD_TASKS, stdDates, attend, notify, hmOf, list, norm };
+  window.SBSite = { today, addDays, diffDays, parse, ymdOf, yy, md, periodRange, sites, managers, isManager, canAttend, activeOn, daysOf, taskList, progress, todayTasks, nextTask, STD_TASKS, stdDates, list, norm };
 })();
